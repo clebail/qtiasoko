@@ -1,6 +1,7 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include <QByteArray>
 #include <QPainter>
 #include "level.h"
 #include "sprite.h"
@@ -31,6 +32,7 @@ public:
     int getNumNiveau() const { return numNiveau; }
     bool isGagne() const { return gagne; }
     bool isPerdu() const { return perdu; }
+    QByteArray getEtat() const;
 private:
     int largeur = 0;
     int hauteur = 0;

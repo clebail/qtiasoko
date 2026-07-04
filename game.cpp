@@ -200,3 +200,7 @@ bool Game::moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caisse
 
     return true;
 }
+
+QByteArray Game::getEtat() const {
+    return QByteArray();
+}
