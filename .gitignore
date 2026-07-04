@@ -1,0 +1,9 @@
+.qmake.stash
+Makefile
+build/
+*.o
+moc_*.*
+ui_*.*
+qrc_*.*
+qtiasoko
+qtiasoko.pro.user
