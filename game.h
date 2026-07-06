@@ -52,6 +52,7 @@ private:
     bool move(EDirection dir);
     bool moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction);
     void checkVictoire();
+    short getMinIdx() const;
 };
 
 #endif // GAME_H

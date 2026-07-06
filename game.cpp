@@ -1,4 +1,5 @@
 #include <QtDebug>
+#include <climits>
 #include "game.h"
 #include "player.h"
 #include "mur.h"
@@ -202,5 +203,66 @@ bool Game::moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caisse
 }
 
 QByteArray Game::getEtat() const {
-    return QByteArray();
+    QByteArray etat;
+    const short idxPalyer= getMinIdx();
+
+    for (int y = 0; y < hauteur; y++) {
+        for (int x = 0; x < largeur; x++) {
+            int idx = x + y * largeur;
+            if(cases[idx] == Level::tcCaisse || cases[idx] == Level::tcGoalCaisse) {
+                etat += (unsigned char)(((short)idx) >> 8);
+                etat += (unsigned char)(((short)idx) & 0x00FF);
+            }
+        }
+    }
+
+    etat += (unsigned char)(((short)idxPalyer) >> 8);
+    etat += (unsigned char)(((short)idxPalyer) & 0x00FF);
+
+    return etat;
+}
+
+short Game::getMinIdx() const {
+    QList<short> file;
+    QVector<bool> visite(largeur*hauteur, false);
+    short idx = playerPoint.x() + playerPoint.y() * largeur;
+    short result = (short)SHRT_MAX;
+
+    file.append(idx);
+    visite[idx] = true;
+
+    while(file.size()) {
+        short vHaut, vDroite, vBas, vGauche;
+
+        idx = file.takeFirst();
+        if(idx < result) {
+            result = idx;
+        }
+
+        vHaut = idx - largeur;
+        if(vHaut >= 0 && (cases[vHaut] == Level::tcNone || cases[vHaut] == Level::tcGoal) && !visite[vHaut]) {
+            file.append(vHaut);
+            visite[vHaut] = true;
+        }
+
+        vDroite = idx + 1;
+        if((idx % largeur) != largeur -1  && (cases[vDroite] == Level::tcNone || cases[vDroite] == Level::tcGoal) && !visite[vDroite]) {
+            file.append(vDroite);
+            visite[vDroite] = true;
+        }
+
+        vBas = idx + largeur;
+        if(vBas < largeur * hauteur && (cases[vBas] == Level::tcNone || cases[vBas] == Level::tcGoal) && !visite[vBas]) {
+            file.append(vBas);
+            visite[vBas] = true;
+        }
+
+        vGauche = idx - 1;
+        if(idx % largeur != 0 && (cases[vGauche] == Level::tcNone || cases[vGauche] == Level::tcGoal) && !visite[vGauche]) {
+            file.append(vGauche);
+            visite[vGauche] = true;
+        }
+    }
+
+    return result;
 }
