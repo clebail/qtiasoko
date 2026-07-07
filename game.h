@@ -8,6 +8,7 @@
 
 #define NB_DIRECTION                4
 #define NB_COIN_TO_CHECK            2
+#define NB_MUR_TO_CHECK             2
 
 class Game {
     // Accès aux membres privés pour les tests unitaires (tests/tst_getetat.cpp).

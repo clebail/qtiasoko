@@ -178,6 +178,11 @@ private slots:
     //       checkDefaite() est privé → appel direct via l'amitié (friend).
     void cornerDeadlock_data();
     void cornerDeadlock();
+
+    // §3 — Adjacent deadlocks : deux caisses côte à côte figées sur l'axe
+    //       perpendiculaire (mur/caisse des deux côtés).
+    void adjacentDeadlock_data();
+    void adjacentDeadlock();
 };
 
 void TestGetEtat::renduFidele_data() {
@@ -372,6 +377,56 @@ void TestGetEtat::cornerDeadlock() {
     QVERIFY2(!g.isPerdu(), "un jeu neuf ne doit pas etre perdu avant evaluation");
 
     g.checkDefaite(); // membre privé, accessible via friend class TestGetEtat
+
+    QCOMPARE(g.isPerdu(), perduAttendu);
+}
+
+void TestGetEtat::adjacentDeadlock_data() {
+    QTest::addColumn<QString>("grille");
+    QTest::addColumn<bool>("perduAttendu");
+
+    // --- Deadlocks. Caisses placées hors des coins → c'est bien la logique
+    //     adjacente (et non le corner) qui déclenche la défaite.
+
+    // Paire horizontale, mur au-dessus des deux caisses.
+    QTest::newRow("horizontale, mur au-dessus")
+        << QString("######\n# ## #\n# $$ #\n#  @ #\n######") << true;
+    // Paire horizontale, mur en dessous des deux caisses.
+    QTest::newRow("horizontale, mur en dessous")
+        << QString("######\n#  @ #\n# $$ #\n# ## #\n######") << true;
+    // Paire verticale, mur à gauche des deux caisses.
+    QTest::newRow("verticale, mur a gauche")
+        << QString("######\n#    #\n##$  #\n##$@ #\n#    #\n######") << true;
+    // Bloc 2x2 : chaque paire est bloquée par les caisses voisines.
+    QTest::newRow("bloc 2x2")
+        << QString("######\n#    #\n# $$ #\n# $$ #\n#  @ #\n######") << true;
+    // Caisse (hors goal) + caisse sur goal, mur au-dessus : la caisse hors goal
+    // reste figée → deadlock (la voisine sur goal compte comme partenaire).
+    QTest::newRow("caisse + caisse sur goal, mur au-dessus")
+        << QString("######\n# ## #\n# $* #\n#  @ #\n######") << true;
+
+    // --- Pas de deadlock.
+
+    // Paire horizontale en espace ouvert : chaque caisse est poussable verticalement.
+    QTest::newRow("horizontale espace ouvert")
+        << QString("######\n#    #\n# $$ #\n#  @ #\n######") << false;
+    // Paire verticale en espace ouvert : poussable horizontalement.
+    QTest::newRow("verticale espace ouvert")
+        << QString("######\n#    #\n# $  #\n# $  #\n#  @ #\n######") << false;
+    // Deux caisses sur goals adossées à un mur : déjà résolues (tcGoalCaisse,
+    // exclues du test) → pas de défaite.
+    QTest::newRow("paire sur goals adossee au mur")
+        << QString("######\n# ## #\n# ** #\n#  @ #\n######") << false;
+}
+
+void TestGetEtat::adjacentDeadlock() {
+    QFETCH(QString, grille);
+    QFETCH(bool, perduAttendu);
+
+    Game g = makeGame(grille.split('\n'));
+    QVERIFY2(!g.isPerdu(), "un jeu neuf ne doit pas etre perdu avant evaluation");
+
+    g.checkDefaite();
 
     QCOMPARE(g.isPerdu(), perduAttendu);
 }

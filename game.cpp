@@ -147,7 +147,10 @@ void Game::checkVictoire() {
 
 void Game::checkDefaite() {
     const SDirection coins[NB_DIRECTION][NB_COIN_TO_CHECK] = {{{0, -1}, {1, 0}}, {{1, 0}, {0, 1}}, {{0, 1}, {-1, 0}}, {{-1, 0}, {0, -1}}};
+    const SDirection adjacents[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+    const SDirection adjacentsMur[NB_DIRECTION][NB_MUR_TO_CHECK] = {{{1, 0}, {-1, 0}}, {{0, -1}, {0, 1}}, {{1, 0}, {-1, 0}}, {{0, -1}, {0, 1}}};
 
+    // Test des corners deadlocks (caisse coincée dans un coin)
     for (int y = 0; y < hauteur; y++) {
         for (int x = 0; x < largeur; x++) {
             int idx = x + y * largeur;
@@ -164,6 +167,33 @@ void Game::checkDefaite() {
                     if (bloque) {
                         perdu = true;
                         return;
+                    }
+                }
+            };
+        }
+    }
+
+    // Test des adjacents deadlocks (2 caisses adjacentes collées à un mur)
+    for (int y = 0; y < hauteur; y++) {
+        for (int x = 0; x < largeur; x++) {
+            int idx = x + y * largeur;
+
+            if (cases[idx] == Level::tcCaisse) {
+                for(int d = 0; d < NB_DIRECTION; d++) {
+                    int xC = x + adjacents[d].dx;
+                    int yC = y + adjacents[d].dy;
+                    int idxC = xC + yC * largeur;
+
+                    if (cases[idxC] == Level::tcCaisse || cases[idxC] == Level::tcGoalCaisse) {
+                        for(int m = 0; m < NB_MUR_TO_CHECK; m++) {
+                            int idxM1 = (x + adjacentsMur[d][m].dx) + (y + adjacentsMur[d][m].dy) * largeur;
+                            int idxM2 = (xC + adjacentsMur[d][m].dx) + (yC + adjacentsMur[d][m].dy) * largeur;
+
+                            if ((cases[idxM1] == Level::tcMur || cases[idxM1] == Level::tcCaisse || cases[idxM1] == Level::tcGoalCaisse) && (cases[idxM2] == Level::tcMur || cases[idxM2] == Level::tcCaisse || cases[idxM2] == Level::tcGoalCaisse)) {
+                                perdu = true;
+                                return;
+                            }
+                        }
                     }
                 }
             };
