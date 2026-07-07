@@ -3,7 +3,9 @@ Makefile
 build/
 *.o
 moc_*.*
+*.moc
 ui_*.*
 qrc_*.*
 qtiasoko
 qtiasoko.pro.user
+tests/tst_getetat

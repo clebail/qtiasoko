@@ -15,14 +15,18 @@ Deux configurations avec les mêmes caisses mais le joueur dans la même zone = 
 ### 1.2 État d'avancement
 - [x] `getEtat()` : clé caisses (scan y/x → tri implicite) + `getMinIdx()`.
 - [x] `getMinIdx()` : BFS 4-directions depuis le joueur, `QVector<bool> visite`, bornes de bord corrigées (wrap horizontal via `% largeur`), renvoie le min des ids atteignables.
-- [ ] Tests unitaires (§1.3) — **à reprendre**.
+- [x] Tests unitaires (§1.3) — cible QTest dans `tests/` (`qmake && make && ./tst_getetat`). **94 passés / 5 ignorés** (niveaux 10, 12, 13, 21, 32 : joueur coincé sur une seule case → invariance triviale).
 
 ### 1.3 Tests unitaires (QTest)
-BFS sur les cases libres pour identifier les zones de chaque niveau.
+Cible séparée `tests/tests.pro` (n'inclut que `game/level/sprite/*`, pas la GUI ; `QTEST_GUILESS_MAIN`, aucune ressource ni `QApplication`). Chemin des `.xsb` injecté via `DEFINES += LEVELS_DIR`.
+Chaque `.xsb` est parsé en carte canonique (murs/goals/caisses/joueur) ; les variantes sont re-générées dans un `.xsb` temporaire puis chargées comme un vrai niveau — `getEtat()` ne dépend que de la grille.
+
+BFS sur les cases libres (murs **et** caisses = obstacles) pour identifier les zones de chaque niveau.
 Pour chaque niveau (32 au total) :
-- Deux positions dans la même zone + mêmes caisses → même état normalisé
-- Deux positions dans des zones différentes + mêmes caisses → états différents
-- Une caisse à une position différente → nouvel état, même si le mouvement est inutile et même si la caisse n'est pas poussable dans cet état
+- Deux positions dans la même zone + mêmes caisses → même état normalisé (`memeZone`, testé sur toute la composante connexe du joueur)
+- Deux positions dans des zones différentes + mêmes caisses → états différents (`zonesDifferentes` : niveau synthétique 2 salles + poches inaccessibles des niveaux réels)
+- Une caisse à une position différente → nouvel état, même si le mouvement est inutile et même si la caisse n'est pas poussable dans cet état (`caisseDeplacee`)
+- Sanity : grille re-générée == chargement direct du `.xsb`, et déterminisme de `getEtat()` (`renduFidele`)
 
 ## 2. Corner deadlocks
 Une caisse (pas sur un goal) contre deux murs perpendiculaires → état élagué.
