@@ -7,14 +7,22 @@
 #include "sprite.h"
 
 #define NB_DIRECTION                4
+#define NB_COIN_TO_CHECK            2
 
 class Game {
+    // Accès aux membres privés pour les tests unitaires (tests/tst_getetat.cpp).
+    friend class TestGetEtat;
+
 public:
     typedef enum { dHaut, dDroite, dBas, dGauche} EDirection;
     typedef struct _SDirection {
         int dx, dy;
-        int pd;
     }SDirection;
+
+    typedef struct _SPlayerDirection {
+        SDirection direction;
+        int playerDirection;
+    }SPlayerDirection;
 
     Game();
     Game(const Level& level, int numNiveau = 1);
@@ -52,6 +60,7 @@ private:
     bool move(EDirection dir);
     bool moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction);
     void checkVictoire();
+    void checkDefaite();
     short getMinIdx() const;
 };
 

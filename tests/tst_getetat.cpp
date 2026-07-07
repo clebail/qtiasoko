@@ -90,11 +90,11 @@ QStringList rendre(const LevelMap& m, int joueur, const QSet<int>& caisses) {
     return lignes;
 }
 
-// Charge une grille (via un .xsb temporaire) et renvoie l'état normalisé.
-QByteArray etatDe(const QStringList& lignes) {
+// Construit un Game à partir d'une grille, via un .xsb temporaire.
+// (Le fichier est supprimé à la sortie ; Level::load l'a déjà copié en mémoire.)
+Game makeGame(const QStringList& lignes) {
     QTemporaryFile f(QDir::tempPath() + "/qtiasoko_XXXXXX.xsb");
-    if (!f.open())
-        return QByteArray();
+    f.open();
     {
         QTextStream out(&f);
         for (const QString& l : lignes)
@@ -103,8 +103,12 @@ QByteArray etatDe(const QStringList& lignes) {
     f.flush();
     Level lvl;
     lvl.load(f.fileName());
-    Game g(lvl);
-    return g.getEtat();
+    return Game(lvl);
+}
+
+// Raccourci : état normalisé d'une grille.
+QByteArray etatDe(const QStringList& lignes) {
+    return makeGame(lignes).getEtat();
 }
 
 // Composantes connexes des cases libres (murs ET caisses = obstacles),
@@ -169,6 +173,11 @@ private slots:
     // §1.3 — Déplacer une caisse → nouvel état (même si le coup est inutile).
     void caisseDeplacee_data();
     void caisseDeplacee();
+
+    // §2 — Corner deadlocks : caisse hors goal coincée par 2 murs perpendiculaires.
+    //       checkDefaite() est privé → appel direct via l'amitié (friend).
+    void cornerDeadlock_data();
+    void cornerDeadlock();
 };
 
 void TestGetEtat::renduFidele_data() {
@@ -327,6 +336,44 @@ void TestGetEtat::caisseDeplacee() {
         if (trouve) break;
     }
     QVERIFY2(trouve, "aucune caisse deplacable trouvee");
+}
+
+void TestGetEtat::cornerDeadlock_data() {
+    QTest::addColumn<QString>("grille");
+    QTest::addColumn<bool>("perduAttendu");
+
+    // --- Caisse (hors goal) coincée dans un coin → défaite. Les 4 orientations.
+    QTest::newRow("coin haut-gauche") << QString("####\n#$ #\n# @#\n####") << true;
+    QTest::newRow("coin haut-droite") << QString("####\n# $#\n#@ #\n####") << true;
+    QTest::newRow("coin bas-gauche")  << QString("####\n#@ #\n#$ #\n####") << true;
+    QTest::newRow("coin bas-droite")  << QString("####\n# @#\n# $#\n####") << true;
+
+    // Une caisse saine ne masque pas une caisse coincée ailleurs sur le plateau.
+    QTest::newRow("deadlock parmi plusieurs caisses")
+        << QString("######\n# $  #\n#    #\n#  @ #\n#   $#\n######") << true;
+
+    // --- Pas de défaite.
+    // Caisse dans un coin mais SUR un goal (tcGoalCaisse, exclu du test).
+    QTest::newRow("coin mais sur goal")
+        << QString("####\n#* #\n# @#\n####") << false;
+    // Caisse contre un seul mur : encore poussable, pas de coin.
+    QTest::newRow("un seul mur")
+        << QString("######\n#    #\n#$ @ #\n#    #\n######") << false;
+    // Caisse au centre, aucun mur adjacent.
+    QTest::newRow("au centre")
+        << QString("#####\n#   #\n# $ #\n# @ #\n#####") << false;
+}
+
+void TestGetEtat::cornerDeadlock() {
+    QFETCH(QString, grille);
+    QFETCH(bool, perduAttendu);
+
+    Game g = makeGame(grille.split('\n'));
+    QVERIFY2(!g.isPerdu(), "un jeu neuf ne doit pas etre perdu avant evaluation");
+
+    g.checkDefaite(); // membre privé, accessible via friend class TestGetEtat
+
+    QCOMPARE(g.isPerdu(), perduAttendu);
 }
 
 QTEST_GUILESS_MAIN(TestGetEtat)

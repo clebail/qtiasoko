@@ -30,6 +30,8 @@ Pour chaque niveau (32 au total) :
 
 ## 2. Corner deadlocks
 Une caisse (pas sur un goal) contre deux murs perpendiculaires → état élagué.
+- [x] `checkDefaite()` : pour chaque caisse `tcCaisse` (goal exclu), teste les 4 coins (`coins[NB_DIRECTION][NB_COIN_TO_CHECK]`) ; si un coin a ses 2 cases perpendiculaires en mur → `perdu`. Appelée par `move()` après une poussée (si pas déjà gagné). Pas de test de bornes : bordure toujours en murs.
+- [x] Tests (`cornerDeadlock`, data-driven) : 4 orientations de coin, détection parmi plusieurs caisses, et non-défaites (coin sur goal, un seul mur, centre). `checkDefaite()` testé en direct via `friend class TestGetEtat`.
 
 ## 3. Adjacent deadlocks
 Deux caisses côte à côte contre un mur → aucune des deux ne peut bouger → état élagué.

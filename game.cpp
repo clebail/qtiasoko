@@ -7,7 +7,7 @@
 #include "goal.h"
 #include "goalcaisse.h"
 
-static const Game::SDirection directions[NB_DIRECTION] = {{0, -1, 0}, {1, 0, 2}, {0, 1, 0}, {-1, 0, 1}};
+static const Game::SPlayerDirection playerDirections[NB_DIRECTION] = {{{0, -1}, 0}, {{1, 0}, 2}, {{0, 1}, 0}, {{-1, 0}, 1}};
 
 void Game::initSprites() {
     sprites[0] = nullptr;
@@ -80,6 +80,7 @@ Game& Game::operator=(const Game& other) {
     playerPoint = other.playerPoint;
     playerDirection = other.playerDirection;
     numNiveau = other.numNiveau;
+
     if (other.cases) {
         cases = new Level::ETypeCase[largeur * hauteur];
         for (int i = 0; i < largeur * hauteur; ++i)
@@ -87,6 +88,7 @@ Game& Game::operator=(const Game& other) {
     } else {
         cases = nullptr;
     }
+
     cloneSprites(other);
     return *this;
 }
@@ -143,17 +145,40 @@ void Game::checkVictoire() {
     gagne = true;
 }
 
+void Game::checkDefaite() {
+    const SDirection coins[NB_DIRECTION][NB_COIN_TO_CHECK] = {{{0, -1}, {1, 0}}, {{1, 0}, {0, 1}}, {{0, 1}, {-1, 0}}, {{-1, 0}, {0, -1}}};
+
+    for (int y = 0; y < hauteur; y++) {
+        for (int x = 0; x < largeur; x++) {
+            int idx = x + y * largeur;
+
+            if (cases[idx] == Level::tcCaisse) {
+                for(int d = 0; d < NB_DIRECTION; d++) {
+                    bool bloque = true;
+                    for(int c = 0; c < NB_COIN_TO_CHECK ; c++) {
+                        int idxC = (x + coins[d][c].dx) + (y + coins[d][c].dy) * largeur;
+
+                        bloque &= cases[idxC] == Level::tcMur;
+                    }
+
+                    if (bloque) {
+                        perdu = true;
+                        return;
+                    }
+                }
+            };
+        }
+    }
+}
+
 
 bool Game::move(EDirection dir) {
     if (gagne || perdu) return false;
-    SDirection direction = directions[(int)dir];
-    QPoint playerPointNew(playerPoint.x() + direction.dx, playerPoint.y() + direction.dy);
+    SPlayerDirection pDirection = playerDirections[(int)dir];
+    QPoint playerPointNew(playerPoint.x() + pDirection.direction.dx, playerPoint.y() + pDirection.direction.dy);
 
-    if (playerPointNew.x() < 0 || playerPointNew.x() >= largeur ||
-        playerPointNew.y() < 0 || playerPointNew.y() >= hauteur) {
-        return false;
-    }
-
+    // Pas de test de bornes : la bordure du niveau est toujours en murs, le
+    // joueur est donc toujours intérieur et playerPointNew reste dans la grille.
     int idx    = playerPoint.x()    + playerPoint.y()    * largeur;
     int idxNew = playerPointNew.x() + playerPointNew.y() * largeur;
 
@@ -162,19 +187,22 @@ bool Game::move(EDirection dir) {
         cases[idxNew] = cases[idxNew] == Level::tcGoal ? Level::tcGoalPlayer : Level::tcPlayer;
         cases[idx]    = cases[idx]    == Level::tcPlayer ? Level::tcNone : Level::tcGoal;
         playerPoint     = playerPointNew;
-        playerDirection = direction.pd;
+        playerDirection = pDirection.playerDirection;
         nbDep++;
         return true;
     }
 
     // Poussée de caisse
     if (cases[idxNew] == Level::tcCaisse || cases[idxNew] == Level::tcGoalCaisse)
-        if(moveCaisse(cases, playerPoint, playerPointNew, direction)) {
+        if(moveCaisse(cases, playerPoint, playerPointNew, pDirection.direction)) {
             playerPoint = playerPointNew;
-            playerDirection = direction.pd;
+            playerDirection = pDirection.playerDirection;
             nbDep++;
             nbDepCaisse++;
             checkVictoire();
+            if(!gagne) {
+                checkDefaite();
+            }
             return true;
         }
 
@@ -184,10 +212,7 @@ bool Game::move(EDirection dir) {
 bool Game::moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction) {
     QPoint caissePointNew(caissePoint.x() + direction.dx, caissePoint.y() + direction.dy);
 
-    if (caissePointNew.x() < 0 || caissePointNew.x() >= largeur ||
-        caissePointNew.y() < 0 || caissePointNew.y() >= hauteur)
-        return false;
-
+    // Idem : une caisse est toujours intérieure, caissePointNew reste dans la grille.
     int idxCaisse    = caissePoint.x()    + caissePoint.y()    * largeur;
     int idxCaisseNew = caissePointNew.x() + caissePointNew.y() * largeur;
     int idxPlayer    = playerPoint.x()    + playerPoint.y()    * largeur;
