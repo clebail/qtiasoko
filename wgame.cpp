@@ -16,9 +16,7 @@ void WGame::paintEvent(QPaintEvent *) {
     QPainter painter(this);
 
     if (game && game->isLoaded()) {
-        game->draw(&painter);
-
-        painter.fillRect(rect(), QColor(0, 0, 0, 80));
+        painter.fillRect(rect(), QColor(0xDD, 0xDD, 0xDD));
 
         QString statNiveau = QString("Niveau : %1").arg(game->getNumNiveau());
         QString statDep    = QString("Déplacements : %1").arg(game->getNbDep());
@@ -38,5 +36,7 @@ void WGame::paintEvent(QPaintEvent *) {
         painter.drawText(8, 24, statNiveau);
         painter.drawText(8, 46, statDep);
         painter.drawText(8, 68, statCaisse);
+
+        game->draw(&painter);
     }
 }
