@@ -37,6 +37,11 @@ void WGame::setGame(const Game *g) {
     update();
 }
 
+void WGame::setEtatsExplores(qint64 n) {
+    etatsExplores = n;
+    update();
+}
+
 void WGame::paintEvent(QPaintEvent *) {
     QPainter painter(this);
 
@@ -46,6 +51,7 @@ void WGame::paintEvent(QPaintEvent *) {
         QString statNiveau = QString("Niveau : %1").arg(game->getNumNiveau());
         QString statDep    = QString("Déplacements : %1").arg(game->getNbDep());
         QString statCaisse = QString("Caisses : %1").arg(game->getNbDepCaisse());
+        QString statEtats  = QString("Etats explores : %1").arg(etatsExplores);
 
         QFont font = painter.font();
         font.setPointSize(14);
@@ -56,11 +62,13 @@ void WGame::paintEvent(QPaintEvent *) {
         painter.drawText(9, 25, statNiveau);
         painter.drawText(9, 47, statDep);
         painter.drawText(9, 69, statCaisse);
+        painter.drawText(9, 91, statEtats);
 
         painter.setPen(QColorConstants::White);
         painter.drawText(8, 24, statNiveau);
         painter.drawText(8, 46, statDep);
         painter.drawText(8, 68, statCaisse);
+        painter.drawText(8, 90, statEtats);
 
         const int largeur = game->getLargeur();
         const int hauteur = game->getHauteur();

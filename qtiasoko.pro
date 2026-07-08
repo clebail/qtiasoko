@@ -20,6 +20,7 @@ SOURCES += \
     mainwindow.cpp \
     mur.cpp \
     player.cpp \
+    solveur.cpp \
     sprite.cpp \
     wgame.cpp
 
@@ -33,6 +34,7 @@ HEADERS += \
     mainwindow.h \
     mur.h \
     player.h \
+    solveur.h \
     sprite.h \
     wgame.h
 

@@ -14,10 +14,12 @@ public:
     ~WGame();
 
     void setGame(const Game *game);
+    void setEtatsExplores(qint64 n);
 protected:
     virtual void paintEvent(QPaintEvent *);
 private:
     const Game *game = nullptr;
+    qint64 etatsExplores = 0;
     Sprite *sprites[NB_SPRITE];
 
     void initSprites();

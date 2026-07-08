@@ -2,8 +2,10 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QTimer>
 #include "ui_mainwindow.h"
 #include "game.h"
+#include "solveur.h"
 
 class MainWindow : public QMainWindow, private Ui::MainWindow
 {
@@ -14,7 +16,16 @@ public:
     ~MainWindow();
 protected:
     bool eventFilter(QObject *obj, QEvent *event);
+private slots:
+    void onNiveauChange(int index);
+    void onIALance();
+    void onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsExplores);
+    void onAucuneSolution();
+    void rejouerCoup();
 private:
     Game game;
+    Solveur *solveur = nullptr;
+    QTimer timerRejeu;
+    QList<Game::EDirection> coupsRestants;
 };
 #endif // MAINWINDOW_H

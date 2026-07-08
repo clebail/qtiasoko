@@ -2,6 +2,7 @@
 #define GAME_H
 
 #include <QByteArray>
+#include <QMetaType>
 #include <QPoint>
 #include <QVector>
 #include "level.h"
@@ -77,5 +78,7 @@ private:
     short getMinIdx(const QVector<bool>& zone) const;
     bool isLibre(int idx) const;
 };
+
+Q_DECLARE_METATYPE(Game::EDirection)
 
 #endif // GAME_H

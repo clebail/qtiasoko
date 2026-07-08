@@ -29,7 +29,8 @@ Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
 Game::Game(const Game& other)
     : largeur(other.largeur), hauteur(other.hauteur), size(other.size),
       playerPoint(other.playerPoint), playerDirection(other.playerDirection),
-      numNiveau(other.numNiveau)
+      nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
+      gagne(other.gagne), perdu(other.perdu)
 {
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -46,7 +47,11 @@ Game& Game::operator=(const Game& other) {
     size = other.size;
     playerPoint = other.playerPoint;
     playerDirection = other.playerDirection;
+    nbDep = other.nbDep;
+    nbDepCaisse = other.nbDepCaisse;
     numNiveau = other.numNiveau;
+    gagne = other.gagne;
+    perdu = other.perdu;
 
     if (other.cases) {
         cases = new Level::ETypeCase[size];
