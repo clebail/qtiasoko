@@ -7,8 +7,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     installEventFilter(this);
 
     Level lvl;
-    lvl.load("level0032.xsb");
-    game = Game(lvl, 32);
+    lvl.load("level0001.xsb");
+    game = Game(lvl, 1);
 
     wGame->setGame(&game);
 }
