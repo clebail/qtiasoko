@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include "game.h"
+#include "sprite.h"
 
 class WGame : public QWidget
 {
@@ -17,6 +18,10 @@ protected:
     virtual void paintEvent(QPaintEvent *);
 private:
     const Game *game = nullptr;
+    Sprite *sprites[NB_SPRITE];
+
+    void initSprites();
+    void freeSprites();
 };
 
 #endif // WGAME_H

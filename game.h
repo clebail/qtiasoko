@@ -2,9 +2,9 @@
 #define GAME_H
 
 #include <QByteArray>
-#include <QPainter>
+#include <QPoint>
+#include <QVector>
 #include "level.h"
-#include "sprite.h"
 
 #define NB_DIRECTION                4
 #define NB_COIN_TO_CHECK            2
@@ -31,16 +31,21 @@ public:
     Game& operator=(const Game& other);
     ~Game();
     bool isLoaded() const;
-    void draw(QPainter *painter) const;
     bool haut();
     bool droite();
     bool bas();
     bool gauche();
+    bool deplace(EDirection dir) { return move(dir); }
     int getNbDep() const { return nbDep; }
     int getNbDepCaisse() const { return nbDepCaisse; }
     int getNumNiveau() const { return numNiveau; }
     bool isGagne() const { return gagne; }
     bool isPerdu() const { return perdu; }
+    int getLargeur() const { return largeur; }
+    int getHauteur() const { return hauteur; }
+    QPoint getPlayerPoint() const { return playerPoint; }
+    int getPlayerDirection() const { return playerDirection; }
+    Level::ETypeCase getCase(int idx) const { return cases[idx]; }
     // Zone atteignable par le joueur sans pousser de caisse (flood-fill sur
     // les cases libres). Coûteuse à calculer : à réutiliser via les surcharges
     // ci-dessous quand plusieurs requêtes portent sur le même état (le
@@ -64,11 +69,7 @@ private:
     int numNiveau = 1;
     bool gagne = false;
     bool perdu = false;
-    Sprite *sprites[NB_SPRITE];
 
-    void initSprites();
-    void freeSprites();
-    void cloneSprites(const Game& other);
     bool move(EDirection dir);
     bool moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction);
     void checkVictoire();

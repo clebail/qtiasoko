@@ -16,21 +16,9 @@ SOURCES += \
     tst_getetat.cpp \
     ../game.cpp \
     ../level.cpp \
-    ../sprite.cpp \
-    ../player.cpp \
-    ../mur.cpp \
-    ../caisse.cpp \
-    ../goal.cpp \
-    ../goalcaisse.cpp \
     ../astar.cpp
 
 HEADERS += \
     ../game.h \
     ../level.h \
-    ../sprite.h \
-    ../player.h \
-    ../mur.h \
-    ../caisse.h \
-    ../goal.h \
-    ../goalcaisse.h \
     ../astar.h

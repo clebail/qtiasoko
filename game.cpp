@@ -1,44 +1,11 @@
 #include <QtDebug>
 #include <climits>
 #include "game.h"
-#include "player.h"
-#include "mur.h"
-#include "caisse.h"
-#include "goal.h"
-#include "goalcaisse.h"
 
 static const Game::SPlayerDirection playerDirections[NB_DIRECTION] = {{{0, -1}, 0}, {{1, 0}, 2}, {{0, 1}, 0}, {{-1, 0}, 1}};
 static const Game::SDirection directions[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
 
-void Game::initSprites() {
-    sprites[0] = nullptr;
-    sprites[1] = new Mur();
-    sprites[2] = new Player();
-    sprites[3] = new Caisse();
-    sprites[4] = new Goal();
-    sprites[5] = new GoalCaisse();
-    sprites[6] = sprites[2]; // GoalPlayer réutilise le sprite Player
-}
-
-void Game::freeSprites() {
-    sprites[6] = nullptr; // alias, ne pas double-free
-    for (int i = 1; i < NB_SPRITE; ++i) {
-        delete sprites[i];
-        sprites[i] = nullptr;
-    }
-}
-
-void Game::cloneSprites(const Game& other) {
-    sprites[0] = nullptr;
-    for (int i = 1; i < NB_SPRITE - 1; ++i)
-        sprites[i] = other.sprites[i] ? other.sprites[i]->clone() : nullptr;
-    sprites[6] = sprites[2]; // alias GoalPlayer → Player
-}
-
 Game::Game() {
-    sprites[0] = nullptr;
-    for (int i = 1; i < NB_SPRITE; ++i)
-        sprites[i] = nullptr;
 }
 
 Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
@@ -57,7 +24,6 @@ Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
             }
         }
     }
-    initSprites();
 }
 
 Game::Game(const Game& other)
@@ -70,13 +36,11 @@ Game::Game(const Game& other)
         for (int i = 0; i < size; ++i)
             cases[i] = other.cases[i];
     }
-    cloneSprites(other);
 }
 
 Game& Game::operator=(const Game& other) {
     if (this == &other) return *this;
     delete[] cases;
-    freeSprites();
     largeur = other.largeur;
     hauteur = other.hauteur;
     size = other.size;
@@ -92,36 +56,15 @@ Game& Game::operator=(const Game& other) {
         cases = nullptr;
     }
 
-    cloneSprites(other);
     return *this;
 }
 
 Game::~Game() {
     delete[] cases;
-    freeSprites();
 }
 
 bool Game::isLoaded() const {
     return cases != nullptr;
-}
-
-void Game::draw(QPainter *painter) const {
-    QSize pSize = painter->window().size();
-    int margX = (pSize.width() - largeur * SPRITE_WIDTH) / 2;
-    int margY = (pSize.height() - hauteur * SPRITE_HEIGHT) / 2;
-
-    for (int y = 0; y < hauteur; y++) {
-        for (int x = 0; x < largeur; x++) {
-            int idx = x + y * largeur;
-            Sprite *s = sprites[(int)cases[idx]];
-            int idxS = cases[idx] == Level::tcPlayer || cases[idx] == Level::tcGoalPlayer ? playerDirection : 0;
-
-            if (s) {
-                painter->drawImage(QPoint(margX + x * SPRITE_WIDTH, margY + y * SPRITE_HEIGHT), s->getImage(idxS));
-            }
-
-        }
-    }
 }
 
 bool Game::haut() {
