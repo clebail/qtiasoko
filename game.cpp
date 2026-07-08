@@ -37,7 +37,7 @@ Game::Game(const Game& other)
     : largeur(other.largeur), hauteur(other.hauteur), size(other.size),
       playerPoint(other.playerPoint), playerDirection(other.playerDirection),
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
-    gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes)
+    gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes), distanceButs(other.distanceButs)
 {
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -61,6 +61,7 @@ Game& Game::operator=(const Game& other) {
     perdu = other.perdu;
     goals = other.goals;
     casesMortes = other.casesMortes;
+    distanceButs = other.distanceButs;
 
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -317,8 +318,11 @@ QVector<quint8> Game::getCaissesDeplacable(const QVector<bool>& zone) const {
 void Game::calculCaseMorte()  {
     const SDirection offsetsTirage[NB_DIRECTION] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
     QList<int> file(goals);
-    QList<int> vivant(goals);
-    casesMortes = QVector<bool>(size, false);
+    distanceButs = QVector<int>(size, -1);
+
+    for (int g : goals) {
+        distanceButs[g] = 0;
+    }
 
     while(file.size()) {
         int idx = file.takeFirst();
@@ -333,21 +337,34 @@ void Game::calculCaseMorte()  {
             int idxP = xP + yP * largeur;
 
             if (cases[idxD] != Level::tcMur && cases[idxP] != Level::tcMur) {
-                if (!vivant.contains(idxD)) {
-                    vivant.append(idxD);
+                if (distanceButs[idxD] == -1) {
+                    distanceButs[idxD] = distanceButs[idx] + 1;
                     file.append((idxD));
                 }
             }
         }
     }
 
+    casesMortes = QVector<bool>(size, false);
     for(int y=0;y<hauteur;y++) {
         for(int x=0;x<largeur;x++) {
             int idx = x + y * largeur;
 
-            if(cases[idx] != Level::tcMur && !vivant.contains(idx)) {
+            if(cases[idx] != Level::tcMur && distanceButs[idx] == -1) {
                 casesMortes[idx] = true;
             }
         }
     }
+}
+
+int Game::getHeuristique() const {
+    int h = 0;
+
+    for (int i = 0; i < size; ++i) {
+        if (cases[i] == Level::tcCaisse || cases[i] == Level::tcGoalCaisse) {
+            h += distanceButs[i];
+        }
+    }
+
+    return h;
 }

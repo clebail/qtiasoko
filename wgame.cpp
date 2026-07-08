@@ -72,7 +72,7 @@ void WGame::paintEvent(QPaintEvent *) {
         painter.drawText(9, 69, statCaisse);
         painter.drawText(9, 91, statEtats);
 
-        painter.setPen(QColorConstants::White);
+        painter.setPen(QColor(0x29, 0x80, 0xb9));
         painter.drawText(8, 24, statNiveau);
         painter.drawText(8, 46, statDep);
         painter.drawText(8, 68, statCaisse);

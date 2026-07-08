@@ -58,6 +58,10 @@ public:
     QVector<quint8> getCaissesDeplacable() const { return getCaissesDeplacable(getZoneJoueur()); }
     QVector<quint8> getCaissesDeplacable(const QVector<bool>& zone) const;
     bool isLibre(const QPoint& p) const;
+    // Somme, pour chaque caisse actuellement sur le plateau, de sa distance
+    // (en tirages) au but le plus proche — ignore les autres caisses, donc
+    // toujours <= au coût réel : heuristique admissible pour A*/IDA*.
+    int getHeuristique() const;
 private:
     int largeur = 0;
     int hauteur = 0;
@@ -72,6 +76,7 @@ private:
     bool perdu = false;
     QList<int> goals;
     QVector<bool> casesMortes;
+    QVector<int> distanceButs;
 
     bool move(EDirection dir);
     bool moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction);
