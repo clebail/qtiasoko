@@ -41,8 +41,16 @@ public:
     int getNumNiveau() const { return numNiveau; }
     bool isGagne() const { return gagne; }
     bool isPerdu() const { return perdu; }
-    QByteArray getEtat() const;
-    QVector<quint8> getCaissesDeplacable() const;
+    // Zone atteignable par le joueur sans pousser de caisse (flood-fill sur
+    // les cases libres). Coûteuse à calculer : à réutiliser via les surcharges
+    // ci-dessous quand plusieurs requêtes portent sur le même état (le
+    // solveur appelle typiquement getEtat() ET getCaissesDeplacable() par
+    // état exploré).
+    QVector<bool> getZoneJoueur() const;
+    QByteArray getEtat() const { return getEtat(getZoneJoueur()); }
+    QByteArray getEtat(const QVector<bool>& zone) const;
+    QVector<quint8> getCaissesDeplacable() const { return getCaissesDeplacable(getZoneJoueur()); }
+    QVector<quint8> getCaissesDeplacable(const QVector<bool>& zone) const;
     bool isLibre(const QPoint& p) const;
 private:
     int largeur = 0;
@@ -65,9 +73,8 @@ private:
     bool moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction);
     void checkVictoire();
     void checkDefaite();
-    short getMinIdx() const;
+    short getMinIdx(const QVector<bool>& zone) const;
     bool isLibre(int idx) const;
-    QVector<bool> getZoneJoueur() const;
 };
 
 #endif // GAME_H

@@ -260,9 +260,9 @@ bool Game::moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caisse
     return true;
 }
 
-QByteArray Game::getEtat() const {
+QByteArray Game::getEtat(const QVector<bool>& zone) const {
     QByteArray etat;
-    const short idxPalyer= getMinIdx();
+    const short idxPalyer= getMinIdx(zone);
 
     for (int y = 0; y < hauteur; y++) {
         for (int x = 0; x < largeur; x++) {
@@ -280,12 +280,11 @@ QByteArray Game::getEtat() const {
     return etat;
 }
 
-short Game::getMinIdx() const {
-    const QVector<bool> visite = getZoneJoueur();
+short Game::getMinIdx(const QVector<bool>& zone) const {
     short result = (short)SHRT_MAX;
 
     for (int i = 0; i < size; ++i) {
-        if (visite[i] && i < result) {
+        if (zone[i] && i < result) {
             result = i;
         }
     }
@@ -343,15 +342,10 @@ bool Game::isLibre(int idx) const {
     return cases[idx] == Level::tcNone || cases[idx] == Level::tcGoal;
 }
 
-QVector<quint8> Game::getCaissesDeplacable() const {
+QVector<quint8> Game::getCaissesDeplacable(const QVector<bool>& zone) const {
     QVector<quint8> result(size, 0);
     const SDirection offsetsPousse[NB_DIRECTION] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
     const int idxPlayer = playerPoint.x() + playerPoint.y() * largeur;
-    // Zone atteignable calculée une seule fois pour tout le plateau : un
-    // lookup O(1) par direction remplace une recherche AStar dédiée par
-    // (caisse, direction). Le joueur y figure toujours (case de départ du
-    // flood-fill), ce qui couvre aussi le cas où il est déjà en position.
-    const QVector<bool> zone = getZoneJoueur();
 
     for(int y = 0; y < hauteur; y++) {
         for(int x = 0; x < largeur; x++) {
