@@ -42,9 +42,12 @@ public:
     bool isGagne() const { return gagne; }
     bool isPerdu() const { return perdu; }
     QByteArray getEtat() const;
+    QVector<quint8> getCaissesDeplacable() const;
+    bool isLibre(const QPoint& p) const;
 private:
     int largeur = 0;
     int hauteur = 0;
+    int size = 0;
     QPoint playerPoint;
     int playerDirection = 0;
     Level::ETypeCase *cases = nullptr;
@@ -63,6 +66,7 @@ private:
     void checkVictoire();
     void checkDefaite();
     short getMinIdx() const;
+    bool isLibre(int idx) const;
 };
 
 #endif // GAME_H

@@ -6,8 +6,10 @@
 #include "caisse.h"
 #include "goal.h"
 #include "goalcaisse.h"
+#include "astar.h"
 
 static const Game::SPlayerDirection playerDirections[NB_DIRECTION] = {{{0, -1}, 0}, {{1, 0}, 2}, {{0, 1}, 0}, {{-1, 0}, 1}};
+static const Game::SDirection directions[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
 
 void Game::initSprites() {
     sprites[0] = nullptr;
@@ -43,8 +45,9 @@ Game::Game() {
 Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
     largeur = level.getLargeur();
     hauteur = level.getHauteur();
+    size = largeur * hauteur;
 
-    cases = new Level::ETypeCase[largeur * hauteur];
+    cases = new Level::ETypeCase[size];
     for (int y = 0; y < hauteur; y++) {
         for (int x = 0; x < largeur; x++) {
             int idx = x + y * largeur;
@@ -59,13 +62,13 @@ Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
 }
 
 Game::Game(const Game& other)
-    : largeur(other.largeur), hauteur(other.hauteur),
+    : largeur(other.largeur), hauteur(other.hauteur), size(other.size),
       playerPoint(other.playerPoint), playerDirection(other.playerDirection),
       numNiveau(other.numNiveau)
 {
     if (other.cases) {
-        cases = new Level::ETypeCase[largeur * hauteur];
-        for (int i = 0; i < largeur * hauteur; ++i)
+        cases = new Level::ETypeCase[size];
+        for (int i = 0; i < size; ++i)
             cases[i] = other.cases[i];
     }
     cloneSprites(other);
@@ -77,13 +80,14 @@ Game& Game::operator=(const Game& other) {
     freeSprites();
     largeur = other.largeur;
     hauteur = other.hauteur;
+    size = other.size;
     playerPoint = other.playerPoint;
     playerDirection = other.playerDirection;
     numNiveau = other.numNiveau;
 
     if (other.cases) {
-        cases = new Level::ETypeCase[largeur * hauteur];
-        for (int i = 0; i < largeur * hauteur; ++i)
+        cases = new Level::ETypeCase[size];
+        for (int i = 0; i < size; ++i)
             cases[i] = other.cases[i];
     } else {
         cases = nullptr;
@@ -138,7 +142,7 @@ bool Game::gauche() {
 }
 
 void Game::checkVictoire() {
-    for (int i = 0; i < largeur * hauteur; ++i) {
+    for (int i = 0; i < size; ++i) {
         if (cases[i] == Level::tcCaisse) return;
     }
     qDebug() << "Victoire";
@@ -213,7 +217,7 @@ bool Game::move(EDirection dir) {
     int idxNew = playerPointNew.x() + playerPointNew.y() * largeur;
 
     // Déplacement vers case vide ou goal
-    if (cases[idxNew] == Level::tcNone || cases[idxNew] == Level::tcGoal) {
+    if (isLibre(idxNew)) {
         cases[idxNew] = cases[idxNew] == Level::tcGoal ? Level::tcGoalPlayer : Level::tcPlayer;
         cases[idx]    = cases[idx]    == Level::tcPlayer ? Level::tcNone : Level::tcGoal;
         playerPoint     = playerPointNew;
@@ -247,7 +251,7 @@ bool Game::moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caisse
     int idxCaisseNew = caissePointNew.x() + caissePointNew.y() * largeur;
     int idxPlayer    = playerPoint.x()    + playerPoint.y()    * largeur;
 
-    if (cases[idxCaisseNew] != Level::tcNone && cases[idxCaisseNew] != Level::tcGoal)
+    if (!isLibre(idxCaisseNew))
         return false;
 
     cases[idxCaisseNew] = cases[idxCaisseNew] == Level::tcGoal ? Level::tcGoalCaisse : Level::tcCaisse;
@@ -279,7 +283,7 @@ QByteArray Game::getEtat() const {
 
 short Game::getMinIdx() const {
     QList<short> file;
-    QVector<bool> visite(largeur*hauteur, false);
+    QVector<bool> visite(size, false);
     short idx = playerPoint.x() + playerPoint.y() * largeur;
     short result = (short)SHRT_MAX;
 
@@ -295,27 +299,73 @@ short Game::getMinIdx() const {
         }
 
         vHaut = idx - largeur;
-        if(vHaut >= 0 && (cases[vHaut] == Level::tcNone || cases[vHaut] == Level::tcGoal) && !visite[vHaut]) {
+        if(vHaut >= 0 && isLibre(vHaut) && !visite[vHaut]) {
             file.append(vHaut);
             visite[vHaut] = true;
         }
 
         vDroite = idx + 1;
-        if((idx % largeur) != largeur -1  && (cases[vDroite] == Level::tcNone || cases[vDroite] == Level::tcGoal) && !visite[vDroite]) {
+        if((idx % largeur) != largeur -1  && isLibre(vDroite) && !visite[vDroite]) {
             file.append(vDroite);
             visite[vDroite] = true;
         }
 
         vBas = idx + largeur;
-        if(vBas < largeur * hauteur && (cases[vBas] == Level::tcNone || cases[vBas] == Level::tcGoal) && !visite[vBas]) {
+        if(vBas < largeur * hauteur && isLibre(vBas) && !visite[vBas]) {
             file.append(vBas);
             visite[vBas] = true;
         }
 
         vGauche = idx - 1;
-        if(idx % largeur != 0 && (cases[vGauche] == Level::tcNone || cases[vGauche] == Level::tcGoal) && !visite[vGauche]) {
+        if(idx % largeur != 0 && isLibre(vGauche) && !visite[vGauche]) {
             file.append(vGauche);
             visite[vGauche] = true;
+        }
+    }
+
+    return result;
+}
+
+bool Game::isLibre(const QPoint& p) const {
+    return isLibre(p.x() + p.y() * largeur);
+}
+
+bool Game::isLibre(int idx) const {
+    // Pas de test de bornes : la bordure du niveau est toujours en murs.
+    return cases[idx] == Level::tcNone || cases[idx] == Level::tcGoal;
+}
+
+QVector<quint8> Game::getCaissesDeplacable() const {
+    QVector<quint8> result(size, 0);
+    const SDirection offsetsPousse[NB_DIRECTION] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
+    const int idxPlayer = playerPoint.x() + playerPoint.y() * largeur;
+
+    for(int y = 0; y < hauteur; y++) {
+        for(int x = 0; x < largeur; x++) {
+            int idx = x + y * largeur;
+            quint8 mask = 0;
+
+            if (cases[idx] != Level::tcCaisse && cases[idx] != Level::tcGoalCaisse) continue;
+
+            for(int d = 0; d < NB_DIRECTION; d++) {
+                int idxDestination = (x + directions[d].dx) + (y + directions[d].dy) * largeur;
+
+                // Le joueur libère sa propre case en marchant vers le point de
+                // poussée avant de pousser : elle compte comme libre même si
+                // elle est actuellement occupée par lui.
+                if(isLibre(idxDestination) || idxDestination == idxPlayer) {
+                    int xPousse = x + offsetsPousse[d].dx;
+                    int yPousse = y + offsetsPousse[d].dy;
+                    int idxPousse = xPousse + yPousse * largeur;
+
+                    if(isLibre(idxPousse) || idxPousse == idxPlayer) {
+                        if(idxPousse == idxPlayer || AStar(this).getChemin(playerPoint, QPoint(xPousse, yPousse)).size()) {
+                            mask |= (1 << d);
+                        }
+                    }
+                }
+            }
+            result[idx] = mask;
         }
     }
 

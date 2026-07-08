@@ -21,7 +21,8 @@ SOURCES += \
     ../mur.cpp \
     ../caisse.cpp \
     ../goal.cpp \
-    ../goalcaisse.cpp
+    ../goalcaisse.cpp \
+    ../astar.cpp
 
 HEADERS += \
     ../game.h \
@@ -31,4 +32,5 @@ HEADERS += \
     ../mur.h \
     ../caisse.h \
     ../goal.h \
-    ../goalcaisse.h
+    ../goalcaisse.h \
+    ../astar.h

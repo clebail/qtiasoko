@@ -183,6 +183,16 @@ private slots:
     //       perpendiculaire (mur/caisse des deux côtés).
     void adjacentDeadlock_data();
     void adjacentDeadlock();
+
+    // getCaissesDeplacable() : direction poussable = case d'arrivée libre +
+    // point de poussée atteignable par le joueur sans traverser de caisse.
+    void caissesDeplacables_data();
+    void caissesDeplacables();
+
+    // Cas limite : le joueur est déjà sur le point de poussée. AStar::getChemin
+    // renvoie un chemin vide dans ce cas (start == goal) ; la direction doit
+    // quand même être marquée poussable.
+    void caissePousseeDejaEnPosition();
 };
 
 void TestGetEtat::renduFidele_data() {
@@ -429,6 +439,67 @@ void TestGetEtat::adjacentDeadlock() {
     g.checkDefaite();
 
     QCOMPARE(g.isPerdu(), perduAttendu);
+}
+
+void TestGetEtat::caissesDeplacables_data() {
+    QTest::addColumn<QString>("grille");
+    QTest::addColumn<int>("idxCaisse");
+    QTest::addColumn<quint8>("masqueAttendu");
+
+    // Pièce ouverte : les 4 poussées sont valides (case d'arrivée libre, et le
+    // joueur peut atteindre chaque point de poussée en marchant autour de la
+    // caisse — AStar::getChemin fait le vrai trajet, pas juste un test local).
+    QTest::newRow("quatre directions, piece ouverte")
+        << QString("#######\n#     #\n#  $  #\n#     #\n#  @  #\n#     #\n#######")
+        << (3 + 2 * 7)
+        << quint8((1 << Game::dHaut) | (1 << Game::dDroite) | (1 << Game::dBas) | (1 << Game::dGauche));
+
+    // Caisse collée au mur du haut : la poussée vers le haut est bloquée (case
+    // d'arrivée = mur), la poussée vers le bas aussi (le joueur devrait se
+    // tenir dans le mur pour la faire). Seules les poussées parallèles au mur
+    // restent valides.
+    QTest::newRow("contre un mur, poussees paralleles uniquement")
+        << QString("#######\n#  $  #\n#     #\n#  @  #\n#     #\n#######")
+        << (3 + 1 * 7)
+        << quint8((1 << Game::dDroite) | (1 << Game::dGauche));
+
+    // Caisse sur goal (tcGoalCaisse) : traitée comme une caisse normale.
+    QTest::newRow("caisse sur goal, piece ouverte")
+        << QString("#######\n#     #\n#  *  #\n#     #\n#  @  #\n#     #\n#######")
+        << (3 + 2 * 7)
+        << quint8((1 << Game::dHaut) | (1 << Game::dDroite) | (1 << Game::dBas) | (1 << Game::dGauche));
+
+    // Point de poussée du haut : une case au sol, mais scellée par des murs de
+    // tous les côtés sauf la caisse elle-même (obstacle) → jamais atteignable.
+    // La poussée vers le bas doit être exclue même si la case est "libre".
+    QTest::newRow("origine hors zone : alcove scellee")
+        << QString("#####\n## ##\n# $ #\n#   #\n#   #\n# @ #\n#####")
+        << (2 + 2 * 5)
+        << quint8((1 << Game::dHaut) | (1 << Game::dDroite) | (1 << Game::dGauche));
+}
+
+void TestGetEtat::caissesDeplacables() {
+    QFETCH(QString, grille);
+    QFETCH(int, idxCaisse);
+    QFETCH(quint8, masqueAttendu);
+
+    Game g = makeGame(grille.split('\n'));
+    const QVector<quint8> masques = g.getCaissesDeplacable();
+
+    QCOMPARE(masques[idxCaisse], masqueAttendu);
+}
+
+void TestGetEtat::caissePousseeDejaEnPosition() {
+    // Le joueur est juste sous la caisse : c'est à la fois le point de
+    // poussée pour dHaut (chemin vide, start == goal) ET la case d'arrivée
+    // pour dBas (le joueur la libère en marchant vers son point de poussée
+    // avant de pousser). Les 4 directions doivent être valides.
+    Game g = makeGame(QString("#####\n#   #\n# $ #\n# @ #\n#####").split('\n'));
+    const QVector<quint8> masques = g.getCaissesDeplacable();
+    const int idxCaisse = 2 + 2 * 5;
+
+    QCOMPARE(masques[idxCaisse],
+             quint8((1 << Game::dHaut) | (1 << Game::dDroite) | (1 << Game::dBas) | (1 << Game::dGauche)));
 }
 
 QTEST_GUILESS_MAIN(TestGetEtat)

@@ -10,6 +10,7 @@ CONFIG -= release
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    astar.cpp \
     caisse.cpp \
     game.cpp \
     goal.cpp \
@@ -23,6 +24,7 @@ SOURCES += \
     wgame.cpp
 
 HEADERS += \
+    astar.h \
     caisse.h \
     game.h \
     goal.h \
