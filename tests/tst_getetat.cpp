@@ -371,12 +371,17 @@ void TestGetEtat::cornerDeadlock_data() {
     // Caisse dans un coin mais SUR un goal (tcGoalCaisse, exclu du test).
     QTest::newRow("coin mais sur goal")
         << QString("####\n#* #\n# @#\n####") << false;
-    // Caisse contre un seul mur : encore poussable, pas de coin.
+    // Caisse contre un seul mur : encore poussable, pas de coin. Un but est
+    // nécessaire sur la même colonne : une caisse collée à un mur ne peut
+    // plus s'en éloigner (le joueur ne peut jamais se placer de l'autre côté),
+    // donc sans but atteignable le long de ce mur, checkDefaite() la
+    // considère à raison comme morte via casesMortes.
     QTest::newRow("un seul mur")
-        << QString("######\n#    #\n#$ @ #\n#    #\n######") << false;
-    // Caisse au centre, aucun mur adjacent.
+        << QString("######\n#    #\n#$ @ #\n#.   #\n######") << false;
+    // Caisse au centre, aucun mur adjacent. But atteignable ajouté pour que
+    // casesMortes ne la marque pas morte (aucun but = tout est mort).
     QTest::newRow("au centre")
-        << QString("#####\n#   #\n# $ #\n# @ #\n#####") << false;
+        << QString("#####\n# . #\n# $ #\n# @ #\n#####") << false;
 }
 
 void TestGetEtat::cornerDeadlock() {
@@ -418,11 +423,14 @@ void TestGetEtat::adjacentDeadlock_data() {
     // --- Pas de deadlock.
 
     // Paire horizontale en espace ouvert : chaque caisse est poussable verticalement.
+    // But ajouté au-dessus de la caisse de gauche pour que casesMortes ne
+    // marque mort ni l'une ni l'autre (sans but, tout le plateau est mort).
     QTest::newRow("horizontale espace ouvert")
-        << QString("######\n#    #\n# $$ #\n#  @ #\n######") << false;
-    // Paire verticale en espace ouvert : poussable horizontalement.
+        << QString("######\n# .  #\n# $$ #\n#  @ #\n######") << false;
+    // Paire verticale en espace ouvert : poussable horizontalement. Même
+    // raison pour le but au-dessus de la caisse du haut.
     QTest::newRow("verticale espace ouvert")
-        << QString("######\n#    #\n# $  #\n# $  #\n#  @ #\n######") << false;
+        << QString("######\n# .  #\n# $  #\n# $  #\n#  @ #\n######") << false;
     // Deux caisses sur goals adossées à un mur : déjà résolues (tcGoalCaisse,
     // exclues du test) → pas de défaite.
     QTest::newRow("paire sur goals adossee au mur")

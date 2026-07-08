@@ -346,10 +346,8 @@ void Game::calculCaseMorte()  {
             int idx = x + y * largeur;
 
             if(cases[idx] != Level::tcMur && !vivant.contains(idx)) {
-                result[idx] = true;
+                casesMortes[idx] = true;
             }
         }
     }
-
-    return result;
 }
