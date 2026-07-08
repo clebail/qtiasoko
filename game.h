@@ -67,6 +67,7 @@ private:
     void checkDefaite();
     short getMinIdx() const;
     bool isLibre(int idx) const;
+    QVector<bool> getZoneJoueur() const;
 };
 
 #endif // GAME_H

@@ -6,7 +6,6 @@
 #include "caisse.h"
 #include "goal.h"
 #include "goalcaisse.h"
-#include "astar.h"
 
 static const Game::SPlayerDirection playerDirections[NB_DIRECTION] = {{{0, -1}, 0}, {{1, 0}, 2}, {{0, 1}, 0}, {{-1, 0}, 1}};
 static const Game::SDirection directions[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
@@ -282,10 +281,22 @@ QByteArray Game::getEtat() const {
 }
 
 short Game::getMinIdx() const {
+    const QVector<bool> visite = getZoneJoueur();
+    short result = (short)SHRT_MAX;
+
+    for (int i = 0; i < size; ++i) {
+        if (visite[i] && i < result) {
+            result = i;
+        }
+    }
+
+    return result;
+}
+
+QVector<bool> Game::getZoneJoueur() const {
     QList<short> file;
     QVector<bool> visite(size, false);
     short idx = playerPoint.x() + playerPoint.y() * largeur;
-    short result = (short)SHRT_MAX;
 
     file.append(idx);
     visite[idx] = true;
@@ -294,9 +305,6 @@ short Game::getMinIdx() const {
         short vHaut, vDroite, vBas, vGauche;
 
         idx = file.takeFirst();
-        if(idx < result) {
-            result = idx;
-        }
 
         vHaut = idx - largeur;
         if(vHaut >= 0 && isLibre(vHaut) && !visite[vHaut]) {
@@ -323,7 +331,7 @@ short Game::getMinIdx() const {
         }
     }
 
-    return result;
+    return visite;
 }
 
 bool Game::isLibre(const QPoint& p) const {
@@ -339,6 +347,11 @@ QVector<quint8> Game::getCaissesDeplacable() const {
     QVector<quint8> result(size, 0);
     const SDirection offsetsPousse[NB_DIRECTION] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
     const int idxPlayer = playerPoint.x() + playerPoint.y() * largeur;
+    // Zone atteignable calculée une seule fois pour tout le plateau : un
+    // lookup O(1) par direction remplace une recherche AStar dédiée par
+    // (caisse, direction). Le joueur y figure toujours (case de départ du
+    // flood-fill), ce qui couvre aussi le cas où il est déjà en position.
+    const QVector<bool> zone = getZoneJoueur();
 
     for(int y = 0; y < hauteur; y++) {
         for(int x = 0; x < largeur; x++) {
@@ -358,10 +371,8 @@ QVector<quint8> Game::getCaissesDeplacable() const {
                     int yPousse = y + offsetsPousse[d].dy;
                     int idxPousse = xPousse + yPousse * largeur;
 
-                    if(isLibre(idxPousse) || idxPousse == idxPlayer) {
-                        if(idxPousse == idxPlayer || AStar(this).getChemin(playerPoint, QPoint(xPousse, yPousse)).size()) {
-                            mask |= (1 << d);
-                        }
+                    if(zone[idxPousse]) {
+                        mask |= (1 << d);
                     }
                 }
             }
