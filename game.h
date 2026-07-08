@@ -70,6 +70,8 @@ private:
     int numNiveau = 1;
     bool gagne = false;
     bool perdu = false;
+    QList<int> goals;
+    QVector<bool> casesMortes;
 
     bool move(EDirection dir);
     bool moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction);
@@ -77,6 +79,7 @@ private:
     void checkDefaite();
     short getMinIdx(const QVector<bool>& zone) const;
     bool isLibre(int idx) const;
+    void calculCaseMorte();
 };
 
 Q_DECLARE_METATYPE(Game::EDirection)

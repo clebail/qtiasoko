@@ -21,16 +21,23 @@ Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
             cases[idx] = c.typeCase;
             if (c.typeCase == Level::tcPlayer || c.typeCase == Level::tcGoalPlayer) {
                 playerPoint = QPoint(x, y);
+                if (c.typeCase == Level::tcGoalPlayer) {
+                    goals.append(idx);
+                }
+            } else if(c.typeCase == Level::tcGoal || c.typeCase == Level::tcGoalCaisse) {
+                goals.append(idx);
             }
         }
     }
+
+    calculCaseMorte();
 }
 
 Game::Game(const Game& other)
     : largeur(other.largeur), hauteur(other.hauteur), size(other.size),
       playerPoint(other.playerPoint), playerDirection(other.playerDirection),
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
-      gagne(other.gagne), perdu(other.perdu)
+    gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes)
 {
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -52,6 +59,8 @@ Game& Game::operator=(const Game& other) {
     numNiveau = other.numNiveau;
     gagne = other.gagne;
     perdu = other.perdu;
+    goals = other.goals;
+    casesMortes = other.casesMortes;
 
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -96,39 +105,20 @@ void Game::checkVictoire() {
 }
 
 void Game::checkDefaite() {
-    const SDirection coins[NB_DIRECTION][NB_COIN_TO_CHECK] = {{{0, -1}, {1, 0}}, {{1, 0}, {0, 1}}, {{0, 1}, {-1, 0}}, {{-1, 0}, {0, -1}}};
     const SDirection adjacents[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
     const SDirection adjacentsMur[NB_DIRECTION][NB_MUR_TO_CHECK] = {{{1, 0}, {-1, 0}}, {{0, -1}, {0, 1}}, {{1, 0}, {-1, 0}}, {{0, -1}, {0, 1}}};
 
-    // Test des corners deadlocks (caisse coincée dans un coin)
     for (int y = 0; y < hauteur; y++) {
         for (int x = 0; x < largeur; x++) {
             int idx = x + y * largeur;
 
             if (cases[idx] == Level::tcCaisse) {
-                for(int d = 0; d < NB_DIRECTION; d++) {
-                    bool bloque = true;
-                    for(int c = 0; c < NB_COIN_TO_CHECK ; c++) {
-                        int idxC = (x + coins[d][c].dx) + (y + coins[d][c].dy) * largeur;
-
-                        bloque &= cases[idxC] == Level::tcMur;
-                    }
-
-                    if (bloque) {
-                        perdu = true;
-                        return;
-                    }
+                if(casesMortes[idx]) {
+                    perdu = true;
+                    return;
                 }
-            };
-        }
-    }
 
-    // Test des adjacents deadlocks (2 caisses adjacentes collées à un mur)
-    for (int y = 0; y < hauteur; y++) {
-        for (int x = 0; x < largeur; x++) {
-            int idx = x + y * largeur;
-
-            if (cases[idx] == Level::tcCaisse) {
+                // Test des adjacents deadlocks (2 caisses adjacentes collées à un mur)
                 for(int d = 0; d < NB_DIRECTION; d++) {
                     int xC = x + adjacents[d].dx;
                     int yC = y + adjacents[d].dy;
@@ -318,6 +308,46 @@ QVector<quint8> Game::getCaissesDeplacable(const QVector<bool>& zone) const {
                 }
             }
             result[idx] = mask;
+        }
+    }
+
+    return result;
+}
+
+void Game::calculCaseMorte()  {
+    const SDirection offsetsTirage[NB_DIRECTION] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
+    QList<int> file(goals);
+    QList<int> vivant(goals);
+    casesMortes = QVector<bool>(size, false);
+
+    while(file.size()) {
+        int idx = file.takeFirst();
+        for (int d=0;d<NB_DIRECTION;d++) {
+            int x = idx % largeur;
+            int y = idx / largeur;
+            int xD = x + offsetsTirage[d].dx;
+            int yD = y + offsetsTirage[d].dy;
+            int xP = x + 2 * offsetsTirage[d].dx;
+            int yP = y + 2 * offsetsTirage[d].dy;
+            int idxD = xD + yD * largeur;
+            int idxP = xP + yP * largeur;
+
+            if (cases[idxD] != Level::tcMur && cases[idxP] != Level::tcMur) {
+                if (!vivant.contains(idxD)) {
+                    vivant.append(idxD);
+                    file.append((idxD));
+                }
+            }
+        }
+    }
+
+    for(int y=0;y<hauteur;y++) {
+        for(int x=0;x<largeur;x++) {
+            int idx = x + y * largeur;
+
+            if(cases[idx] != Level::tcMur && !vivant.contains(idx)) {
+                result[idx] = true;
+            }
         }
     }
 
