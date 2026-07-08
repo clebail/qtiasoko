@@ -12,6 +12,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // flèches ne remontent plus jusqu'à l'eventFilter pour faire jouer le joueur.
     cbNiveau->setFocusPolicy(Qt::NoFocus);
     pbIA->setFocusPolicy(Qt::NoFocus);
+    pbRevoir->setFocusPolicy(Qt::NoFocus);
 
     const QStringList fichiers = QDir::current().entryList(QStringList() << "level????.xsb", QDir::Files, QDir::Name);
     for (const QString& fichier : fichiers) {
@@ -22,6 +23,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     connect(cbNiveau, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onNiveauChange);
     connect(pbIA, &QPushButton::clicked, this, &MainWindow::onIALance);
+    connect(pbRevoir, &QPushButton::clicked, this, &MainWindow::onRevoir);
     connect(&timerRejeu, &QTimer::timeout, this, &MainWindow::rejouerCoup);
     timerRejeu.setInterval(150);
 
@@ -39,6 +41,9 @@ void MainWindow::onNiveauChange(int index) {
     Level lvl;
     lvl.load(cbNiveau->itemData(index).toString());
     game = Game(lvl, index + 1);
+
+    derniereSolutionCoups.clear();
+    pbRevoir->setEnabled(false);
 
     wGame->setGame(&game);
     wGame->setEtatsExplores(0);
@@ -60,9 +65,29 @@ void MainWindow::onIALance() {
 
 void MainWindow::onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsExplores) {
     solveur = nullptr;
-    coupsRestants = chemin;
+
+    // 'game' n'a pas encore bougé (le solveur travaillait sur sa propre copie) :
+    // c'est le point de départ à conserver pour pouvoir revisionner plus tard.
+    derniereSolutionDepart = game;
+    derniereSolutionCoups = chemin;
+    derniereSolutionEtats = etatsExplores;
+    pbRevoir->setEnabled(true);
+
     wGame->setEtatsExplores(etatsExplores);
-    timerRejeu.start();   // laisse cbNiveau/pbIA désactivés le temps du rejeu
+
+    const QMessageBox::StandardButton reponse = QMessageBox::question(
+        this, "Solveur",
+        QString("Solution trouvée : %1 coups (%2 états explorés).\nVoir la résolution ?")
+            .arg(chemin.size())
+            .arg(WGame::formaterMillier(etatsExplores)));
+
+    if (reponse == QMessageBox::Yes) {
+        coupsRestants = chemin;
+        timerRejeu.start();   // laisse cbNiveau/pbIA désactivés le temps du rejeu
+    } else {
+        cbNiveau->setEnabled(true);
+        pbIA->setEnabled(true);
+    }
 }
 
 void MainWindow::onAucuneSolution() {
@@ -73,11 +98,27 @@ void MainWindow::onAucuneSolution() {
     QMessageBox::information(this, "Solveur", "Aucune solution trouvée pour ce niveau.");
 }
 
+void MainWindow::onRevoir() {
+    if (timerRejeu.isActive() || derniereSolutionCoups.isEmpty()) return;
+
+    game = derniereSolutionDepart;
+    coupsRestants = derniereSolutionCoups;
+    wGame->setGame(&game);
+    wGame->setEtatsExplores(derniereSolutionEtats);
+
+    cbNiveau->setEnabled(false);
+    pbIA->setEnabled(false);
+    pbRevoir->setEnabled(false);
+
+    timerRejeu.start();
+}
+
 void MainWindow::rejouerCoup() {
     if (coupsRestants.isEmpty()) {
         timerRejeu.stop();
         cbNiveau->setEnabled(true);
         pbIA->setEnabled(true);
+        pbRevoir->setEnabled(!derniereSolutionCoups.isEmpty());
         return;
     }
 

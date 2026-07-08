@@ -42,6 +42,14 @@ void WGame::setEtatsExplores(qint64 n) {
     update();
 }
 
+QString WGame::formaterMillier(qint64 n) {
+    QString s = QString::number(n);
+    for (int i = s.length() - 3; i > 0; i -= 3) {
+        s.insert(i, ' ');
+    }
+    return s;
+}
+
 void WGame::paintEvent(QPaintEvent *) {
     QPainter painter(this);
 
@@ -51,7 +59,7 @@ void WGame::paintEvent(QPaintEvent *) {
         QString statNiveau = QString("Niveau : %1").arg(game->getNumNiveau());
         QString statDep    = QString("Déplacements : %1").arg(game->getNbDep());
         QString statCaisse = QString("Caisses : %1").arg(game->getNbDepCaisse());
-        QString statEtats  = QString("Etats explores : %1").arg(etatsExplores);
+        QString statEtats  = QString("Etats explores : %1").arg(formaterMillier(etatsExplores));
 
         QFont font = painter.font();
         font.setPointSize(14);

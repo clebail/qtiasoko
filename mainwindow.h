@@ -21,11 +21,19 @@ private slots:
     void onIALance();
     void onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsExplores);
     void onAucuneSolution();
+    void onRevoir();
     void rejouerCoup();
 private:
     Game game;
     Solveur *solveur = nullptr;
     QTimer timerRejeu;
     QList<Game::EDirection> coupsRestants;
+
+    // Dernière solution trouvée pour le niveau courant, conservée intacte
+    // (indépendamment de coupsRestants, consommée pendant le rejeu) pour
+    // permettre de la revisionner via pbRevoir.
+    Game derniereSolutionDepart;
+    QList<Game::EDirection> derniereSolutionCoups;
+    qint64 derniereSolutionEtats = 0;
 };
 #endif // MAINWINDOW_H

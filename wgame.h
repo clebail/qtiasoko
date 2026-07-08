@@ -15,6 +15,7 @@ public:
 
     void setGame(const Game *game);
     void setEtatsExplores(qint64 n);
+    static QString formaterMillier(qint64 n);
 protected:
     virtual void paintEvent(QPaintEvent *);
 private:

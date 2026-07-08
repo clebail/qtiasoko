@@ -69,6 +69,16 @@
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QPushButton" name="pbRevoir">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+         <property name="text">
+          <string>Revoir</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </item>

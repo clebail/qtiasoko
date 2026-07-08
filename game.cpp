@@ -92,7 +92,6 @@ void Game::checkVictoire() {
     for (int i = 0; i < size; ++i) {
         if (cases[i] == Level::tcCaisse) return;
     }
-    qDebug() << "Victoire";
     gagne = true;
 }
 
