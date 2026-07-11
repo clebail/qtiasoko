@@ -27,6 +27,8 @@ private:
     // Rôle du numéro de niveau dans cbNiveau (Qt::UserRole sert déjà au nom de fichier).
     static constexpr int RoleNumero = Qt::UserRole + 1;
 
+    void setControlesActifs(bool actifs);
+
     Game game;
     Solveur *solveur = nullptr;
     QTimer timerRejeu;

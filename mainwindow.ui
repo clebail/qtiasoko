@@ -63,6 +63,16 @@
         </spacer>
        </item>
        <item>
+        <widget class="QLabel" name="labelSolveur">
+         <property name="text">
+          <string>Solveur</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="cbSolveur"/>
+       </item>
+       <item>
         <widget class="QPushButton" name="pbIA">
          <property name="text">
           <string>IA</string>

@@ -21,6 +21,7 @@ SOURCES += \
     mur.cpp \
     player.cpp \
     solveur.cpp \
+    solveurbfs.cpp \
     sprite.cpp \
     wgame.cpp
 
@@ -35,6 +36,7 @@ HEADERS += \
     mur.h \
     player.h \
     solveur.h \
+    solveurbfs.h \
     sprite.h \
     wgame.h
 

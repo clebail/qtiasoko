@@ -11,8 +11,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Sinon le combo/bouton gardent le focus clavier après un clic, et les
     // flèches ne remontent plus jusqu'à l'eventFilter pour faire jouer le joueur.
     cbNiveau->setFocusPolicy(Qt::NoFocus);
+    cbSolveur->setFocusPolicy(Qt::NoFocus);
     pbIA->setFocusPolicy(Qt::NoFocus);
     pbRevoir->setFocusPolicy(Qt::NoFocus);
+
+    for (const Solveur::SType& t : Solveur::types()) {
+        cbSolveur->addItem(t.libelle, static_cast<int>(t.type));
+    }
 
     // Niveaux lus depuis les ressources et non depuis QDir::current() : le
     // répertoire courant n'est pas celui des sources (shadow build de Qt Creator,
@@ -62,13 +67,22 @@ void MainWindow::onNiveauChange(int index) {
     wGame->update();
 }
 
+// Contrôles verrouillés pendant qu'un solveur tourne ou qu'une solution se
+// rejoue : changer de niveau ou de solveur sous les pieds du thread laisserait
+// 'game' et le rejeu désynchronisés.
+void MainWindow::setControlesActifs(bool actifs) {
+    cbNiveau->setEnabled(actifs);
+    cbSolveur->setEnabled(actifs);
+    pbIA->setEnabled(actifs);
+}
+
 void MainWindow::onIALance() {
     if (solveur) return;   // résolution déjà en cours
 
-    cbNiveau->setEnabled(false);
-    pbIA->setEnabled(false);
+    setControlesActifs(false);
 
-    solveur = new Solveur(game, this);
+    const auto type = static_cast<Solveur::EType>(cbSolveur->currentData().toInt());
+    solveur = Solveur::creer(type, game, this);
     connect(solveur, &Solveur::solutionTrouvee, this, &MainWindow::onSolutionTrouvee);
     connect(solveur, &Solveur::aucuneSolution, this, &MainWindow::onAucuneSolution);
     connect(solveur, &QThread::finished, solveur, &QObject::deleteLater);
@@ -95,17 +109,15 @@ void MainWindow::onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsE
 
     if (reponse == QMessageBox::Yes) {
         coupsRestants = chemin;
-        timerRejeu.start();   // laisse cbNiveau/pbIA désactivés le temps du rejeu
+        timerRejeu.start();   // laisse les contrôles désactivés le temps du rejeu
     } else {
-        cbNiveau->setEnabled(true);
-        pbIA->setEnabled(true);
+        setControlesActifs(true);
     }
 }
 
 void MainWindow::onAucuneSolution() {
     solveur = nullptr;
-    cbNiveau->setEnabled(true);
-    pbIA->setEnabled(true);
+    setControlesActifs(true);
     wGame->setEtatsExplores(0);
     QMessageBox::information(this, "Solveur", "Aucune solution trouvée pour ce niveau.");
 }
@@ -118,8 +130,7 @@ void MainWindow::onRevoir() {
     wGame->setGame(&game);
     wGame->setEtatsExplores(derniereSolutionEtats);
 
-    cbNiveau->setEnabled(false);
-    pbIA->setEnabled(false);
+    setControlesActifs(false);
     pbRevoir->setEnabled(false);
 
     timerRejeu.start();
@@ -128,8 +139,7 @@ void MainWindow::onRevoir() {
 void MainWindow::rejouerCoup() {
     if (coupsRestants.isEmpty()) {
         timerRejeu.stop();
-        cbNiveau->setEnabled(true);
-        pbIA->setEnabled(true);
+        setControlesActifs(true);
         pbRevoir->setEnabled(!derniereSolutionCoups.isEmpty());
         return;
     }
