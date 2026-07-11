@@ -50,3 +50,14 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 RESOURCES += \
     qtiasoko.qrc
+
+# Icône de l'application, un mécanisme par plateforme :
+#  - macOS  : ICON, un .icns que qmake copie dans Contents/Resources et déclare
+#             dans le CFBundleIconFile de l'Info.plist ;
+#  - Windows: RC_ICONS, un .ico dont qmake tire une ressource Win32, ce qui donne
+#             son icône au .exe lui-même ;
+#  - Linux  : rien d'embarquable dans le binaire — l'icône de fenêtre/barre des
+#             tâches vient de la propriété windowIcon de mainwindow.ui (qui
+#             pointe sur :/icone.png), et l'icône du lanceur d'un .desktop.
+macx:  ICON     = qtiasoko.icns
+win32: RC_ICONS = qtiasoko.ico

@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file>sprites.png</file>
+        <file>icone.png</file>
     </qresource>
     <qresource prefix="/levels">
         <file>level0000.xsb</file>

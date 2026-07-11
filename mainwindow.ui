@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>IA Sokoban</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="qtiasoko.qrc">
+    <normaloff>:/icone.png</normaloff>:/icone.png</iconset>
+  </property>
   <widget class="WGame" name="centralWidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <property name="spacing">
@@ -106,6 +110,8 @@
    <container>1</container>
   </customwidget>
  </customwidgets>
- <resources/>
+ <resources>
+  <include location="qtiasoko.qrc"/>
+ </resources>
  <connections/>
 </ui>
