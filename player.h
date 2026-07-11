@@ -9,8 +9,8 @@ public:
     Player();
     Sprite* clone() const override { return new Player(*this); }
 protected:
-    virtual int getNbImage() const;
-    virtual QPoint getOrigine(int idx) const;
+    int getNbImage() const override;
+    QPoint getOrigine(int idx) const override;
 };
 
 #endif // PLAYER_H

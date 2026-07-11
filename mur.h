@@ -8,8 +8,8 @@ public:
     Mur();
     Sprite* clone() const override { return new Mur(*this); }
 protected:
-    virtual int getNbImage() const;
-    virtual QPoint getOrigine(int idx) const;
+    int getNbImage() const override;
+    QPoint getOrigine(int idx) const override;
 };
 
 #endif // MUR_H

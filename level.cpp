@@ -38,7 +38,6 @@ void Level::load(const QString& fileName) {
 
     hauteur = lines.size();
     cases.clear();
-    int y = 0;
     for (const QString& line : lines) {
         for (int x = 0; x < largeur; x++) {
             char car = (x < line.size()) ? line[x].toLatin1() : ' ';
@@ -51,7 +50,6 @@ void Level::load(const QString& fileName) {
             }
             cases.append({static_cast<ETypeCase>(idx), car, idx});
         }
-        y++;
     }
     loaded = true;
 }

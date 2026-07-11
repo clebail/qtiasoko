@@ -14,11 +14,23 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     pbIA->setFocusPolicy(Qt::NoFocus);
     pbRevoir->setFocusPolicy(Qt::NoFocus);
 
-    const QStringList fichiers = QDir::current().entryList(QStringList() << "level????.xsb", QDir::Files, QDir::Name);
+    // Niveaux lus depuis les ressources et non depuis QDir::current() : le
+    // répertoire courant n'est pas celui des sources (shadow build de Qt Creator,
+    // ou '/' quand le .app est lancé depuis le Finder) et aucun niveau n'était
+    // trouvé. Embarqués dans le binaire, ils sont indépendants du cwd.
+    //
+    // Le numéro du fichier est la seule source de vérité : il nomme l'entrée du
+    // combo *et* alimente Game, sinon l'overlay de WGame affiche un autre numéro
+    // que celui sélectionné.
+    const QDir dossier(":/levels");
+    const QStringList fichiers = dossier.entryList(QStringList() << "level????.xsb", QDir::Files, QDir::Name);
     for (const QString& fichier : fichiers) {
         bool ok = false;
-        int numero = fichier.mid(5, 4).toInt(&ok);
-        cbNiveau->addItem(QString("Niveau %1").arg(ok ? numero : cbNiveau->count() + 1), fichier);
+        const int numero = fichier.mid(5, 4).toInt(&ok);
+        if (!ok) continue;   // les ???? du filtre ne sont pas forcément des chiffres
+
+        cbNiveau->addItem(QString("Niveau %1").arg(numero), dossier.filePath(fichier));
+        cbNiveau->setItemData(cbNiveau->count() - 1, numero, RoleNumero);
     }
 
     connect(cbNiveau, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onNiveauChange);
@@ -40,7 +52,7 @@ void MainWindow::onNiveauChange(int index) {
 
     Level lvl;
     lvl.load(cbNiveau->itemData(index).toString());
-    game = Game(lvl, index + 1);
+    game = Game(lvl, cbNiveau->itemData(index, RoleNumero).toInt());
 
     derniereSolutionCoups.clear();
     pbRevoir->setEnabled(false);

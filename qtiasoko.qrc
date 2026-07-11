@@ -2,4 +2,39 @@
     <qresource prefix="/">
         <file>sprites.png</file>
     </qresource>
+    <qresource prefix="/levels">
+        <file>level0000.xsb</file>
+        <file>level0001.xsb</file>
+        <file>level0002.xsb</file>
+        <file>level0003.xsb</file>
+        <file>level0004.xsb</file>
+        <file>level0005.xsb</file>
+        <file>level0006.xsb</file>
+        <file>level0007.xsb</file>
+        <file>level0008.xsb</file>
+        <file>level0009.xsb</file>
+        <file>level0010.xsb</file>
+        <file>level0011.xsb</file>
+        <file>level0012.xsb</file>
+        <file>level0013.xsb</file>
+        <file>level0014.xsb</file>
+        <file>level0015.xsb</file>
+        <file>level0016.xsb</file>
+        <file>level0017.xsb</file>
+        <file>level0018.xsb</file>
+        <file>level0019.xsb</file>
+        <file>level0020.xsb</file>
+        <file>level0021.xsb</file>
+        <file>level0022.xsb</file>
+        <file>level0023.xsb</file>
+        <file>level0024.xsb</file>
+        <file>level0025.xsb</file>
+        <file>level0026.xsb</file>
+        <file>level0027.xsb</file>
+        <file>level0028.xsb</file>
+        <file>level0029.xsb</file>
+        <file>level0030.xsb</file>
+        <file>level0031.xsb</file>
+        <file>level0032.xsb</file>
+    </qresource>
 </RCC>

@@ -8,8 +8,8 @@ public:
     Goal();
     Sprite* clone() const override { return new Goal(*this); }
 protected:
-    virtual int getNbImage() const;
-    virtual QPoint getOrigine(int idx) const;
+    int getNbImage() const override;
+    QPoint getOrigine(int idx) const override;
 };
 
 #endif // GOAL_H

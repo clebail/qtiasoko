@@ -15,7 +15,7 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 protected:
-    bool eventFilter(QObject *obj, QEvent *event);
+    bool eventFilter(QObject *obj, QEvent *event) override;
 private slots:
     void onNiveauChange(int index);
     void onIALance();
@@ -24,6 +24,9 @@ private slots:
     void onRevoir();
     void rejouerCoup();
 private:
+    // Rôle du numéro de niveau dans cbNiveau (Qt::UserRole sert déjà au nom de fichier).
+    static constexpr int RoleNumero = Qt::UserRole + 1;
+
     Game game;
     Solveur *solveur = nullptr;
     QTimer timerRejeu;

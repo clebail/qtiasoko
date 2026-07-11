@@ -8,8 +8,8 @@ public:
     Caisse();
     Sprite* clone() const override { return new Caisse(*this); }
 protected:
-    virtual int getNbImage() const;
-    virtual QPoint getOrigine(int idx) const;
+    int getNbImage() const override;
+    QPoint getOrigine(int idx) const override;
 };
 
 #endif // CAISSE_H

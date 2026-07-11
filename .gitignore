@@ -9,3 +9,5 @@ qrc_*.*
 qtiasoko
 qtiasoko.pro.user
 tests/tst_getetat
+.qtc_clangd/
+qtiasoko.app/
