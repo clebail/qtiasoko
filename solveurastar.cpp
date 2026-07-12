@@ -1,5 +1,6 @@
 #include <QtDebug>
 #include <QHash>
+#include <QSet>
 #include <algorithm>
 #include <climits>
 #include <utility>
@@ -28,6 +29,28 @@ void SolveurAStar::run() {
     QHash<QByteArray,int> meilleurG;
     qint64 compteur = 0;
 
+    // Ensemble des états DÉJÀ DÉVELOPPÉS. Uniquement en mode pondéré.
+    //
+    // Depuis que h tient compte de l'accessibilité du joueur, elle n'est plus
+    // COHÉRENTE : une poussée déplace le joueur, or la contribution de TOUTES les
+    // autres caisses dépend de sa position (elle se lit dans leur région). h peut
+    // donc sauter de plusieurs unités en une seule poussée, alors que le coût, lui,
+    // n'augmente que de 1. Elle reste admissible (jamais de surestimation), mais la
+    // garantie « premier dépilement = g optimal » tombe.
+    //
+    // Conséquence : un état est développé, puis redécouvert par un meilleur chemin,
+    // ré-enfilé, redéveloppé. Mesuré sur le niveau 17 : 4 264 544 dépilements pour
+    // 1 659 245 états distincts — 2,6x de travail en pur re-développement.
+    //
+    // En mode OPTIMAL (poids == 1), ce re-développement n'est pas du gaspillage :
+    // c'est LUI qui rétablit l'optimalité face à une h incohérente. On le garde.
+    //
+    // En mode PONDÉRÉ, l'optimalité est déjà abandonnée. On interdit donc le
+    // re-développement : la solution reste bornée par w * C*, et on récupère le
+    // facteur 2,6.
+    const bool interditRedeveloppement = (poids > 1);
+    QSet<QByteArray> ferme;
+
     // 'noeuds' appartient à la classe de base et survit d'une résolution à
     // l'autre : sans ce reset, la racine ne serait pas à l'indice 0 et le premier
     // enfant deviendrait son propre parent — reconstruire() boucherait à l'infini.
@@ -43,8 +66,8 @@ void SolveurAStar::run() {
     // État de travail RÉUTILISÉ d'un dépilement à l'autre : appliqueEtat()
     // réécrit intégralement le plateau, donc pas besoin d'un Game neuf à chaque
     // tour. Surtout, on part d'une copie de 'depart' pour hériter de casesMortes
-    // et distanceButs (QVector en partage implicite → copie quasi gratuite) sans
-    // jamais relancer calculCaseMorte(), qui est un flood-fill complet.
+    // et distancePoussee (QVector en partage implicite → copie quasi gratuite)
+    // sans jamais relancer calculDistancePoussee(), qui est en O(size²).
     Game etat(depart);
 
     while(file.size()) {
@@ -58,6 +81,11 @@ void SolveurAStar::run() {
         // Entrée périmée : un meilleur chemin vers ce même état a été trouvé
         // APRÈS qu'on ait enfilé celle-ci. On la jette sans la compter.
         if(cur.g > meilleurG.value(cur.cle, INT_MAX)) continue;
+
+        if (interditRedeveloppement) {
+            if (ferme.contains(cur.cle)) continue;
+            ferme.insert(cur.cle);
+        }
 
         compteur++;
         if (compteur % 1000 == 0) {
@@ -89,6 +117,10 @@ void SolveurAStar::run() {
                     if(!e.isPerdu()) {
                         auto cle = e.getEtat();
                         int gE = cur.g + 1;   // une poussée = un pas, toujours
+
+                        // Déjà développé : inutile de le ré-enfiler, on le
+                        // jetterait au dépilement — et la file gonflerait pour rien.
+                        if (interditRedeveloppement && ferme.contains(cle)) continue;
 
                         // Ce test commande l'ENFILAGE, pas seulement l'insertion
                         // dans meilleurG : on n'enfile que si l'état est inconnu,

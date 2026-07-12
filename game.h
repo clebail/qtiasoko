@@ -72,9 +72,15 @@ public:
     QVector<quint8> getCaissesDeplacable() const { return getCaissesDeplacable(getZoneJoueur()); }
     QVector<quint8> getCaissesDeplacable(const QVector<bool>& zone) const;
     bool isLibre(const QPoint& p) const;
-    // Somme, pour chaque caisse actuellement sur le plateau, de sa distance
-    // (en tirages) au but le plus proche — ignore les autres caisses, donc
-    // toujours <= au coût réel : heuristique admissible pour A*/IDA*.
+    // Somme, pour chaque caisse du plateau, de sa distance EXACTE au but le plus
+    // proche — celle d'une caisse SEULE, mais en tenant compte de l'accessibilité
+    // du joueur : une caisse coupe le plateau, et selon le côté où il se trouve
+    // elle n'est pas poussable dans les mêmes sens (cf. distancePoussee).
+    //
+    // Admissible : retirer les autres caisses ne fait que LIBÉRER le joueur (elles
+    // ne sont que des obstacles), donc la distance calculée seule est toujours <=
+    // au coût réel. Et chaque poussée ne déplaçant qu'une caisse, la somme reste
+    // une borne inférieure.
     int getHeuristique() const;
     // Applique une poussée sans faire marcher le joueur : le TÉLÉPORTE sur la
     // case d'appui, puis pousse via move() (qui fait checkVictoire/checkDefaite).
@@ -108,7 +114,18 @@ private:
     bool perdu = false;
     QList<int> goals;
     QVector<bool> casesMortes;
-    QVector<int> distanceButs;
+
+    // regions[CASE * size + CAISSE] = id de la composante connexe de CASE, sur un
+    // plateau où le seul obstacle (hors murs) est une caisse posée en CAISSE.
+    //
+    // ⚠️ L'ordre des indices n'est PAS arbitraire : la CASE est en index majeur.
+    // Le chemin chaud (getHeuristique, checkDefaite) interroge toujours avec la
+    // case du JOUEUR fixe et la caisse qui varie — cet ordre rend ces lectures
+    // contiguës. L'ordre inverse coûtait un défaut de cache par caisse, et
+    // doublait le temps par état.
+    QVector<qint16> regions, nbRegions;
+    QVector<int> distancePoussee;
+    int maxRegions = 0;
 
     bool move(EDirection dir);
     bool moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction);
@@ -122,6 +139,7 @@ private:
     bool caisseGelee(int idxCaisse, QVector<bool>& enCours) const;
     bool bloqueeSurAxe(int idxCaisse, EDirection dirA, EDirection dirB, QVector<bool>& enCours) const;
     bool estCaisse(int idx) const;
+    void calculDistancePoussee();
 };
 
 Q_DECLARE_METATYPE(Game::EDirection)

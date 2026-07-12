@@ -37,5 +37,15 @@
         <file>level0030.xsb</file>
         <file>level0031.xsb</file>
         <file>level0032.xsb</file>
+        <file>level0100.xsb</file>
+        <file>level0101.xsb</file>
+        <file>level0102.xsb</file>
+        <file>level0103.xsb</file>
+        <file>level0104.xsb</file>
+        <file>level0105.xsb</file>
+        <file>level0106.xsb</file>
+        <file>level0107.xsb</file>
+        <file>level0108.xsb</file>
+        <file>level0109.xsb</file>
     </qresource>
 </RCC>

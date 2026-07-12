@@ -38,6 +38,7 @@ Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
         }
     }
 
+    calculDistancePoussee();
     calculCaseMorte();
 }
 
@@ -45,7 +46,9 @@ Game::Game(const Game& other)
     : largeur(other.largeur), hauteur(other.hauteur), size(other.size),
       playerPoint(other.playerPoint), playerDirection(other.playerDirection),
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
-    gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes), distanceButs(other.distanceButs)
+    gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes),
+    regions(other.regions), nbRegions(other.nbRegions), distancePoussee(other.distancePoussee),
+    maxRegions(other.maxRegions)
 {
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -69,7 +72,10 @@ Game& Game::operator=(const Game& other) {
     perdu = other.perdu;
     goals = other.goals;
     casesMortes = other.casesMortes;
-    distanceButs = other.distanceButs;
+    maxRegions = other.maxRegions;
+    regions = other.regions;
+    nbRegions = other.nbRegions;
+    distancePoussee = other.distancePoussee;
 
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -89,7 +95,8 @@ Game::Game(Game&& other) noexcept
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
       gagne(other.gagne), perdu(other.perdu),
       goals(std::move(other.goals)), casesMortes(std::move(other.casesMortes)),
-      distanceButs(std::move(other.distanceButs))
+      regions(std::move(other.regions)), nbRegions(std::move(other.nbRegions)),
+      distancePoussee(std::move(other.distancePoussee)), maxRegions(other.maxRegions)
 {
     other.cases = nullptr;   // sinon les deux destructeurs libéreraient le même tableau
 }
@@ -109,7 +116,10 @@ Game& Game::operator=(Game&& other) noexcept {
     perdu = other.perdu;
     goals = std::move(other.goals);
     casesMortes = std::move(other.casesMortes);
-    distanceButs = std::move(other.distanceButs);
+    maxRegions = other.maxRegions;
+    regions = std::move(other.regions);
+    nbRegions = std::move(other.nbRegions);
+    distancePoussee = std::move(other.distancePoussee);
 
     cases = other.cases;
 
@@ -153,13 +163,34 @@ void Game::checkDefaite() {
     // Ne teste que les tcCaisse : une caisse gelée SUR un but est parfaitement
     // légitime, c'est un morceau de la solution.
     QVector<bool> enCours(size, false);
+    const int idxJoueur = playerPoint.x() + playerPoint.y() * largeur;
 
     for (int y = 0; y < hauteur; y++) {
         for (int x = 0; x < largeur; x++) {
             int idx = x + y * largeur;
 
             if (cases[idx] == Level::tcCaisse) {
-                if(casesMortes[idx] || caisseGelee(idx, enCours)) {
+                // Deadlock DYNAMIQUE : cette caisse ne peut plus atteindre aucun
+                // but avec le joueur de CE côté-ci. casesMortes ne peut pas le
+                // voir — elle n'est vraie que si la caisse est perdue pour TOUTES
+                // les régions. Sain pour la même raison que l'admissibilité de h :
+                // dans le vrai jeu le joueur est encore plus contraint (les autres
+                // caisses le gênent), donc une caisse déjà condamnée seule l'est
+                // a fortiori avec les autres.
+                //
+                // Ce test n'est pas qu'un bonus d'élagage : sans lui,
+                // getHeuristique() ajouterait ce -1 et se mettrait à SOUSTRAIRE.
+                // .at() et NON operator[] : checkDefaite() n'est pas const, donc
+                // l'operator[] non-const de QVector appelle detach(). Ces vecteurs
+                // sont partagés par COW entre tous les clones du solveur (refcount
+                // > 1), si bien que chaque lecture en faisait une COPIE PROFONDE —
+                // 97 Ko pour 'regions', à chaque poussée, des millions de fois.
+                // .at() est const et ne détache jamais.
+                const qint16 r = regions.at(idxJoueur * size + idx);
+
+                if(casesMortes.at(idx)
+                   || distancePoussee.at(idx * maxRegions + r) == -1
+                   || caisseGelee(idx, enCours)) {
                     perdu = true;
                     return;
                 }
@@ -341,55 +372,24 @@ QVector<quint8> Game::getCaissesDeplacable(const QVector<bool>& zone) const {
 }
 
 void Game::calculCaseMorte()  {
-    QList<int> file(goals);
-    distanceButs = QVector<int>(size, -1);
-
-    for (int g : goals) {
-        distanceButs[g] = 0;
-    }
-
-    while(file.size()) {
-        int idx = file.takeFirst();
-        for (int d=0;d<NB_DIRECTION;d++) {
-            int x = idx % largeur;
-            int y = idx / largeur;
-            int xD = x + opposees[d].dx;
-            int yD = y + opposees[d].dy;
-            int xP = x + 2 * opposees[d].dx;
-            int yP = y + 2 * opposees[d].dy;
-            int idxD = xD + yD * largeur;
-            int idxP = xP + yP * largeur;
-
-            if (cases[idxD] != Level::tcMur && cases[idxP] != Level::tcMur) {
-                if (distanceButs[idxD] == -1) {
-                    distanceButs[idxD] = distanceButs[idx] + 1;
-                    file.append((idxD));
-                }
-            }
-        }
-    }
-
     casesMortes = QVector<bool>(size, false);
-    for(int y=0;y<hauteur;y++) {
-        for(int x=0;x<largeur;x++) {
-            int idx = x + y * largeur;
-
-            if(cases[idx] != Level::tcMur && distanceButs[idx] == -1) {
-                casesMortes[idx] = true;
-            }
-        }
+    for (int b = 0; b < size; b++) {
+        if (cases[b] == Level::tcMur) continue;
+        bool jamais = true;
+        for (int r = 0; r < nbRegions[b]; r++)
+            if (distancePoussee[b * maxRegions + r] != -1) jamais = false;
+        casesMortes[b] = jamais;
     }
 }
 
 int Game::getHeuristique() const {
     int h = 0;
 
-    for (int i = 0; i < size; ++i) {
-        if (cases[i] == Level::tcCaisse || cases[i] == Level::tcGoalCaisse) {
-            h += distanceButs[i];
-        }
+    const int j = playerPoint.x() + playerPoint.y() * largeur;
+    for (int i = 0; i < size; i++) {
+        if (cases[i] != Level::tcCaisse && cases[i] != Level::tcGoalCaisse) continue;
+        h += distancePoussee[i * maxRegions + regions[j * size + i]];
     }
-
     return h;
 }
 
@@ -495,4 +495,95 @@ bool Game::bloqueeSurAxe(int idxCaisse, EDirection dirA, EDirection dirB, QVecto
 
 bool Game::estCaisse(int idx) const {
     return cases[idx] == Level::tcCaisse || cases[idx] == Level::tcGoalCaisse;
+}
+
+void Game::calculDistancePoussee() {
+    maxRegions = 0;
+    regions   = QVector<qint16>(size * size, -1);
+    nbRegions = QVector<qint16>(size, 0);
+
+    for (int b = 0; b < size; b++) {
+        if (cases[b] == Level::tcMur) continue;      // pas de caisse sur un mur
+
+        qint16 nb = 0;
+        for (int depart = 0; depart < size; depart++) {
+            if (cases[depart] == Level::tcMur || depart == b) continue;
+            if (regions[depart * size + b] != -1) continue;      // déjà colorié
+
+            QList<int> file;
+            file.append(depart);
+            regions[depart * size + b] = nb;
+
+            while (!file.isEmpty()) {
+                const int i = file.takeFirst();
+                const int x = i % largeur, y = i / largeur;
+                for (int d = 0; d < NB_DIRECTION; d++) {
+                    // Tests de bornes INDISPENSABLES ici, contrairement au reste du
+                    // fichier. La bordure n'est PAS toujours en murs : Level::load()
+                    // complète les lignes courtes par des espaces (tcNone), et
+                    // certains .xsb commencent leurs lignes par des espaces. Ces
+                    // cases de remplissage, hors du contour du niveau, sont
+                    // inatteignables pour le joueur — d'où l'hypothèse tenue
+                    // ailleurs — mais ici on balaie TOUTES les cases non-mur.
+                    const int nx = x + directions[d].dx;
+                    const int ny = y + directions[d].dy;
+                    if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+
+                    const int ni = nx + ny * largeur;
+                    if (cases[ni] == Level::tcMur || ni == b) continue;   // la caisse bloque
+                    if (regions[ni * size + b] != -1) continue;
+                    regions[ni * size + b] = nb;
+                    file.append(ni);
+                }
+            }
+            nb++;
+        }
+        nbRegions[b] = nb;
+        maxRegions = qMax(maxRegions, (int)nb);
+    }
+
+    distancePoussee = QVector<int>(size * maxRegions, -1);
+
+    QList<QPair<int,int>> file;                       // (case de la caisse, région du joueur)
+    for (int g : goals) {
+        for (int r = 0; r < nbRegions[g]; r++) {      // un but, quel que soit le côté du joueur
+            distancePoussee[g * maxRegions + r] = 0;
+            file.append({g, r});
+        }
+    }
+
+    while (!file.isEmpty()) {
+        const auto [c, rc] = file.takeFirst();
+        const int cx = c % largeur, cy = c / largeur;
+
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            // On remonte une poussée : la caisse venait de b, poussée vers c dans la
+            // direction d. Le joueur se tenait donc en p, deux cases en arrière.
+            const int bx = cx -     directions[d].dx, by = cy -     directions[d].dy;
+            const int px = cx - 2 * directions[d].dx, py = cy - 2 * directions[d].dy;
+
+            // Bornes : cf. le flood-fill ci-dessus, la bordure n'est pas garantie
+            // en murs (cases de remplissage hors contour).
+            if (bx < 0 || bx >= largeur || by < 0 || by >= hauteur) continue;
+            if (px < 0 || px >= largeur || py < 0 || py >= hauteur) continue;
+
+            const int b = bx + by * largeur;
+            const int p = px + py * largeur;
+
+            if (cases[b] == Level::tcMur || cases[p] == Level::tcMur) continue;
+
+            // APRÈS la poussée, le joueur se retrouve en b. Il doit donc appartenir à
+            // la région rc — celle mesurée avec la caisse en c.
+            if (regions[b * size + c] != rc) continue;
+
+            // AVANT la poussée : caisse en b, joueur en p.
+            const qint16 r = regions[p * size + b];
+            if (r < 0) continue;
+
+            if (distancePoussee[b * maxRegions + r] == -1) {
+                distancePoussee[b * maxRegions + r] = distancePoussee[c * maxRegions + rc] + 1;
+                file.append({b, r});
+            }
+        }
+    }
 }

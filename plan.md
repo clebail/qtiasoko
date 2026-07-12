@@ -263,10 +263,24 @@ Libellés volontairement explicites (« optimal » / « rapide, approché ») : 
 
 À noter : l'A* optimal rend 560 coups là où le BFS en rend 506, **à nombre de poussées identique (97)**. Normal — on optimise les poussées, pas la marche ; deux solutions à 97 poussées sont également optimales au sens du solveur.
 
-### 4.6 À reprendre plus tard
-- [ ] Heuristique par **couplage de coût minimal** (Hongrois) caisses↔buts au lieu de « chaque caisse vers son but le plus proche » : force des buts distincts, donc `h` plus haute et toujours admissible. Ne réglera pas le problème de fond (cf. §4.3) mais resserrerait le niveau 17, où `h` n'est tendue qu'à 54 %.
+### 4.6 Le couplage hongrois : ÉCARTÉ, sur mesure
+- [x] Mesuré avant d'écrire une ligne (matrice `distance[but][case]` = un flood-fill **par but**, puis affectation de coût minimal) :
+
+| niveau | caisses | `h` actuelle | `h` couplage | coût réel | tension |
+|---|---|---|---|---|---|
+| 0  | 3  | 3   | **4**   | 4   | 75 % → **100 %** |
+| 1  | 6  | 88  | **95**  | 97  | 91 % → **98 %** |
+| 17 | 6  | 114 | **121** | 213 | 54 % → **57 %** |
+| 2  | 10 | 100 | **119** | ?   | +19 % |
+
+**Le couplage rend `h` exacte sur le niveau 0 et quasi parfaite sur le 1 — et ne fait rien sur le 17 (54 → 57 %), qui est justement celui qui résiste.**
+
+Raison, et elle est décisive : le couplage ne corrige que les **collisions de buts** (N caisses qui prétendent viser le même but). Sur le 17, il ne récupère que 7 poussées sur les 99 manquantes. Les 92 autres sont du **coût de manœuvre** — pousser une caisse *loin* de son but pour dégager un passage, faire le tour, repositionner. C'est de l'interaction caisse↔caisse et caisse↔joueur, et **aucune heuristique fondée sur des distances caisse↔but ne peut la voir** : elle relaxe précisément cette interaction, c'est ce qui la rend admissible.
+
+Coût : ~7× plus cher par état (O(n³) au lieu de O(cases)), pour un seuil de rentabilité à ÷3 du nombre d'états. **Écarté** : le quatrième pansement, et la mesure dit qu'il ne colle pas là où ça saigne.
+
 - [x] ~~Deadlock adjacent diagonal~~ → traité par le test de gel de §3bis (gain réel : 2 à 6 %).
-- [x] ~~Trier les caisses par distance dans la génération des enfants~~ → sans objet depuis A* : le gain ne pouvait venir que d'une vraie file de priorité sur l'ensemble du front, ce qu'A* apporte.
+- [x] ~~Trier les caisses par distance dans la génération des enfants~~ → sans objet depuis A*.
 
 **État des lieux, sans complaisance.** Les niveaux 0, 1 et 17 sont résolus, avec un choix explicite entre optimal et rapide. Le **niveau 2 reste hors de portée**. Trois leviers ont été essayés contre lui :
 - heuristique admissible (A*) : **~0 %** — raison structurelle, cf. §4.3 ;
@@ -274,3 +288,200 @@ Libellés volontairement explicites (« optimal » / « rapide, approché ») : 
 - coût unitaire (`pousse()`, move ctor, release) : **×8,7 en temps**, mais **0 %** sur le nombre d'états.
 
 Seule la **pondération** a produit un ordre de grandeur (×34 sur le niveau 1), en renonçant à l'optimalité. Ce n'est pas un hasard : c'est le seul levier qui accepte de *ne pas explorer* des états qu'on ne peut pas prouver mauvais. Tout le reste ne peut couper que ce qui est démontrablement sans issue — et ce gisement est épuisé.
+
+---
+
+## 6. Heuristique joueur-aware — FAIT ✅ (le levier qui a enfin payé)
+
+### 6.A Résultats mesurés
+
+**Niveau 17** (celui qui résistait à tout) :
+
+| solveur | états | poussées |
+|---|---|---|
+| BFS (référence) | 30 093 130 | 213 |
+| A* optimal, ancienne `h` | 29 135 928 | 213 |
+| A* pondéré, ancienne `h` | 13 405 481 | 217 |
+| **A* optimal, nouvelle `h`** | **14 826 798** | **213** ✅ |
+| A* pondéré, nouvelle `h` | 4 264 544 | 225 |
+| **A* pondéré, nouvelle `h` + fermeture** | **1 636 218** | 227 |
+
+**×18 contre le BFS**, file ouverte tombée à ~24 000 éléments (le mur mémoire s'effondre). Niveau 0 : 111 → **8** états (×14). Niveau 1 : inchangé (`h` n'y bouge pas, sa géométrie ne piège jamais le joueur) — mais l'optimalité tient partout (4 / 97 / 213).
+
+### 6.B Les quatre pièges rencontrés (tous silencieux)
+
+- [x] **`h += -1`.** `distancePoussee[b][r]` vaut -1 quand la caisse ne peut plus atteindre aucun but *avec le joueur de ce côté*. `casesMortes` ne le voit pas (elle n'est vraie que si la caisse est perdue pour TOUTES les régions). Mesuré : 141 couples (case, région) concernés sur le niveau 1, jusqu'à 270 sur le 14. L'heuristique se mettait à **soustraire**. → Correctif = ajouter ce **deadlock dynamique** dans `checkDefaite()`. Ce n'est pas un bonus optionnel : sans lui, `h` est corrompue.
+- [x] **La bordure n'est PAS toujours en murs.** `Level::load()` complète les lignes courtes par des espaces (`tcNone`), et certains `.xsb` commencent leurs lignes par des espaces. Le commentaire « pas de test de bornes, la bordure est en murs » n'est vrai que parce que le joueur ne peut jamais atteindre ces cases de remplissage. Or `calculDistancePoussee()` balaie **toutes** les cases non-mur → index négatif → crash. **Tests de bornes indispensables dans ce précalcul, et là seulement.**
+- [x] **`QVector::operator[]` non-const appelle `detach()`.** `checkDefaite()` n'est pas const : chaque lecture de `regions[...]` faisait une **copie profonde de 97 Ko** (le vecteur est partagé par COW entre tous les clones du solveur), à chaque poussée. Coût : ×1,85 sur le temps total. → **`.at()`**, qui est const et ne détache jamais. `getHeuristique()`, `caisseGelee()` et `bloqueeSurAxe()` sont `const`, donc épargnés.
+- [x] **`h` n'est plus COHÉRENTE.** Une poussée déplace le joueur, et la contribution de *toutes* les autres caisses dépend de sa position (elle se lit dans leur région) : `h` peut sauter de plusieurs unités quand le coût n'augmente que de 1. Elle reste **admissible** (l'optimalité tient : 4 / 97 / 213), mais la garantie « premier dépilement = `g` optimal » tombe → re-développements massifs (4 264 544 dépilements pour 1 659 245 distincts sur le 17). Symptômes : la file gonfle, `f` fluctue, `vus` stagne.
+  → **Fermeture (ensemble des états déjà développés) en mode PONDÉRÉ uniquement** : solution bornée par `w × C*`, ×2,6 récupéré. **Surtout pas en mode optimal** : là, le re-développement n'est pas du gaspillage, c'est LUI qui rétablit l'optimalité face à une `h` incohérente.
+
+### 6.C Disposition mémoire
+`regions[CASE * size + CAISSE]` — la **case en index majeur**, pas la caisse. Le chemin chaud interroge toujours avec le joueur fixe et la caisse variable ; cet ordre rend les lectures contiguës. (Mesuré : sans effet en pratique une fois le `detach()` corrigé — le vrai coupable était ailleurs. Gardé quand même, la disposition est plus saine.)
+
+---
+
+### Spécification d'origine
+
+### 6.0 Correction de §4.3 : j'avais tort
+
+§4.3 affirmait que « la tension d'une heuristique ne fait pas sa capacité à discriminer », et en concluait qu'aucune heuristique admissible ne sauverait le projet. **C'était trop pessimiste et théoriquement bancal.**
+
+Un état est élagué si `g + h > C*`. Pour un état qui n'est PAS sur un chemin optimal, le vrai coût qui le traverse dépasse `C*`. Donc **si `h` était parfaite, A\* n'explorerait QUE les chemins optimaux.** Ce qui empêchait l'élagage n'était pas une propriété structurelle du Sokoban — c'était simplement que `h` était trop lâche : avec 46 % de mou sur le niveau 17, n'importe quel état pouvait se faire passer pour prometteur.
+
+### 6.1 Le point aveugle réel
+
+`distanceButs` n'est **pas** une distance à vol d'oiseau (contresens fréquent) : `calculCaseMorte()` fait déjà un BFS sur la grille, en vérifiant que la case d'arrivée *et* la case derrière ne sont pas des murs. C'est le vrai nombre de poussées d'une caisse seule, murs et détours compris.
+
+**Mais elle ignore que le joueur doit pouvoir ALLER derrière la caisse.** Elle vérifie que la case d'appui n'est pas un mur — pas qu'elle est *atteignable*.
+
+Or une caisse dans un couloir **coupe le niveau en deux** : le joueur ne peut plus passer de l'autre côté, donc la caisse n'est plus poussable que dans un seul sens. `distanceButs` croit qu'elle peut revenir en arrière. Elle sous-estime massivement.
+
+### 6.2 L'idée : distance d'une caisse SEULE, avec accessibilité du joueur
+
+L'état d'une caisse seule = **(case de la caisse, RÉGION où se trouve le joueur)**. Selon le côté où le joueur se trouve, la caisse n'est pas poussable dans les mêmes directions. Il n'y a que quelques centaines de tels couples par niveau → **table précalculée une fois**, lecture O(1) ensuite.
+
+**Admissible** : retirer les autres caisses ne fait que *libérer* le joueur (les caisses ne sont que des obstacles), donc la distance calculée seule est toujours ≤ au coût réel. Et la somme sur les caisses reste une borne inférieure : chaque poussée ne déplace qu'une caisse.
+
+**Mesuré — et c'est le meilleur résultat du projet :**
+
+| niveau | `h` actuelle | **`h` joueur** | `h` joueur + couplage | coût réel | tension |
+|---|---|---|---|---|---|
+| 0  | 3   | 3       | 4       | 4   | 75 % → 75 % → **100 %** |
+| 1  | 88  | 88      | 95      | 97  | 91 % → 91 % → **98 %** |
+| 17 | 114 | **194** | 201     | 213 | **54 % → 91 % → 94 %** |
+| 2  | 100 | 110     | 129     | ?   | +10 % → **+29 %** |
+| 6  | 87  | 87      | 104     | ?   | +0 % → +20 % |
+| 7  | 61  | 61      | 80      | ?   | +0 % → +31 % |
+
+Le **niveau 17** — celui qui a résisté à A*, au gel et au couplage — passe de 54 % à **91 %** : la relaxation récupère **80 des 99 poussées manquantes**. Les niveaux 1, 6, 7 ne bougent pas : leur géométrie ne piège pas le joueur.
+
+Les deux relaxations sont **orthogonales** (manœuvres du joueur vs collisions de buts) et se composent → 94-100 % de tension partout.
+
+### 6.3 Étape 9 — Implémentation (version joueur-aware seule, sans couplage)
+Cette version est **plus informative que l'actuelle ET moins chère** : `getHeuristique()` devient une somme de lectures de table.
+
+**Précalcul, une fois à la construction (dans/à côté de `calculCaseMorte()`) :**
+- [ ] `comp[caisse][case]` = id de la composante connexe des cases libres, **la caisse comptant comme un obstacle** (`-1` pour un mur ou la caisse elle-même). Un flood-fill par case candidate → O(size²), soit ~100 k opérations. Négligeable, une seule fois.
+- [ ] `distJoueur[caisse][region]` = poussées minimales vers un but quelconque. **BFS à rebours** depuis tous les couples `(but, region)`, distance 0.
+- [ ] Transition arrière : le prédécesseur de `(c, rc)` est `(b, r)` avec `b = c - d` (la caisse venait de `b`, poussée vers `c`) et `p = c - 2d` (le joueur s'y tenait). Conditions :
+  - `b` et `p` ne sont pas des murs ;
+  - après la poussée le joueur est en `b`, qui doit être dans la région `rc` → `comp[c][b] == rc` ;
+  - `r = comp[b][p]`.
+
+**À l'exécution :**
+- [ ] `getHeuristique()` = `Σ` sur les caisses de `distJoueur[caisse][ comp[caisse][playerPoint] ]`.
+
+**⚠️ Pièges**
+- [ ] **`h` doit rester une fonction de l'ÉTAT NORMALISÉ** (§1), sinon deux positions du joueur dans la même zone donneraient des `h` différentes et A* deviendrait incohérent. C'est vrai, mais il faut le savoir : la zone réelle du joueur (toutes caisses en obstacles) est connexe, donc **entièrement contenue dans UNE seule composante** de `plateau-moins-cette-caisse` (qui a moins d'obstacles). `comp[caisse][playerCell]` est donc invariant sur toute la zone. ✅
+- [ ] **Mémoire** : `comp` fait `size × size` entiers — 410 Ko pour un niveau 20×16. À **aplatir en un seul `QVector<qint16>`** de `size*size` plutôt qu'un `QVector<QVector<int>>` (allocations imbriquées). Copié par COW entre tous les clones de `Game`, comme `casesMortes` — **surtout ne pas le recalculer par état**.
+- [ ] **Bonus deadlock** : `distJoueur[caisse][region] == -1` signifie que cette caisse ne peut plus JAMAIS atteindre un but avec le joueur de ce côté. C'est un deadlock **dynamique**, plus fort que `casesMortes` (qui est statique). Sain pour la même raison que l'admissibilité : retirer les autres caisses ne fait qu'aider. À tester dans `checkDefaite()` — mais **pas** à fusionner dans `casesMortes`, qui ne dépend pas du joueur.
+
+### 6.4 Vérification
+- [ ] **Poussées inchangées : 4 / 97 / 213.** Le canari. `h` reste admissible (vérifié : 3 ≤ 4, 88 ≤ 97, 194 ≤ 213), donc l'optimalité doit être préservée. Un écart = bug (table fausse, ou `h` qui surestime).
+- [ ] **Le nombre d'états doit chuter**, surtout sur le 17. C'est le seul verdict qui vaille.
+- [ ] ⚠️ **La tension au départ est un proxy IMPARFAIT.** Le niveau 1 avait déjà 91 % de tension… et A* n'y élaguait que 20 %. La tension initiale ne dit rien de la tension *en profondeur dans l'arbre*. **Ne rien conclure avant d'avoir compté les états.**
+
+### 6.5 Ensuite, si besoin
+- [ ] Ajouter le **couplage hongrois** par-dessus (distance joueur-aware *vers chaque but* → matrice `n×n` → affectation de coût minimal). Orthogonal, se cumule : 91 % → 94 % sur le 17, +29 % sur le 2. Coût : O(n³) par état au lieu de O(n).
+
+---
+
+## 7. Couplage hongrois par-dessus la table joueur-aware — PROCHAIN CHANTIER
+
+### 7.0 Où en est le niveau 2 (état des lieux après §6)
+
+Meilleure tentative à ce jour, A* pondéré w=2 + `h` joueur-aware + fermeture :
+```
+81 700 000 états découverts | 63 800 000 développés | file ouverte 20 600 000
+f = 203 (il REMONTE : 185 il y a une heure) | phys_footprint 14 Go / 18 (pic 15)
+→ arrêté avant saturation, aucune solution
+```
+**Mais la mécanique est enfin saine** : `vus` (81,7 M) > développés (63,8 M), et l'écart correspond exactement à la file. Plus aucun re-développement. On ne meurt plus d'un défaut du solveur — on meurt de la combinatoire.
+
+Et le progrès est réel : la tentative précédente était à 6,3 Go dès **3 minutes** pour 8,5 M d'états distincts, morte à 20,7 Go. Ici, 14 Go pour **81,7 M** — soit **~10× plus d'états pour la même mémoire**.
+
+Repère qui cadre l'échelle : le niveau 17 se résout en **1,6 M** d'états. Le 2 en a exploré 50× plus sans aboutir.
+
+### 7.1 Pourquoi celui-ci maintenant
+
+`h` joueur-aware fait viser à chaque caisse son but **le plus proche**. Sur un niveau à **10 caisses**, dix caisses peuvent réclamer le même but — alors qu'un but n'en accueille qu'une. La sous-estimation est grossière, et elle croît avec le nombre de caisses. C'est *l'erreur dominante du niveau 2*.
+
+Les deux relaxations sont **orthogonales** : la table joueur-aware corrige les **manœuvres du joueur**, le couplage corrige les **collisions de buts**. Mesuré (tension `h(départ)` / `C*`) :
+
+| niveau | `h` actuelle | `h` joueur | **joueur + couplage** | `C*` |
+|---|---|---|---|---|
+| 0  | 3   | 3   | **4**   | 4   (100 %) |
+| 1  | 88  | 88  | **95**  | 97  (98 %) |
+| 17 | 114 | 194 | **201** | 213 (94 %) |
+| 2  | 100 | 110 | **129** | ?   (+17 % sur la joueur-aware) |
+
+**C'est le seul levier restant qui réduise le NOMBRE d'états** (les clés compactes, §7.4, ne font que mieux les stocker).
+
+### 7.2 Étape 10 — Implémentation
+- [ ] **Une table de distances PAR BUT** : `distanceParBut[but][case][region]`. Un BFS à rebours par but, au lieu d'un seul depuis tous les buts. Même transition qu'en §6 (double vérification de régions).
+  - Mémoire : `nbButs × size × maxRegions` entiers. Niveau 2 : 10 × 140 × 4 × 4 o ≈ **22 Ko**. Un 20×16 à 20 buts : ~205 Ko. Négligeable, partagé par COW.
+- [ ] **`distancePoussee` en devient un sous-produit** : `distancePoussee[b][r] = min sur les buts de distanceParBut[j][b][r]`. Ne PAS le recalculer par un BFS séparé — une seule source de vérité, sinon les deux divergeront.
+- [ ] **`getHeuristique()`** : construire la matrice `n×n` (`n` = caisses), `cout[i][j] = distanceParBut[j][ caisse_i ][ regions[joueur][caisse_i] ]`, puis **affectation de coût minimal** (hongrois, O(n³), variante Jonker-Volgenant).
+  - ✅ Vérifié : sur les 43 niveaux, **nb caisses == nb buts**. La matrice est carrée, pas de cas rectangulaire. (Garder tout de même un garde-fou si un `.xsb` futur en amenait un.)
+
+**⚠️ Pièges**
+- [ ] **Paires inatteignables** (`distanceParBut == -1`) : mettre un coût **grand mais FINI** (ex. 100000), jamais `INT_MAX` — le hongrois additionne, et `INT_MAX` déborderait.
+- [ ] **Bonus deadlock, plus fort que celui de §6** : si le couplage optimal contient au moins une paire à coût infini, **aucune affectation bijective n'est possible** → deadlock. Exemple que rien ne détecte aujourd'hui : deux caisses qui ne peuvent atteindre qu'un seul et même but. À tester dans `checkDefaite()`.
+- [ ] **`h` reste incohérente** (elle l'était déjà depuis §6) → garder la **fermeture en pondéré**, et le **re-développement en optimal**. Ne pas y toucher.
+- [ ] **Admissible** : toute solution réelle réalise une bijection caisses↔buts ; son coût est ≥ la somme de cette affectation ; on prend le **minimum sur toutes** les affectations. Donc `h_couplage ≤ C*`. Et comme la version « but le plus proche » relâche la contrainte de distinction, `h_joueur ≤ h_couplage` : le couplage **domine**, il ne peut pas être pire.
+
+### 7.3 Vérification
+- [ ] **Poussées inchangées en optimal : 4 / 97 / 213.** Le canari. Un écart = `h` qui surestime (bug du hongrois ou de la matrice).
+- [ ] **Le pari est un échange temps ↔ états** : `getHeuristique()` passe de O(n) à O(n³) (≈ 1 000 opérations pour 10 caisses). Il faut que les états baissent **plus** que le coût par état ne monte. Mesurer les DEUX sur les niveaux 1 et 17 avant de juger.
+- [ ] Puis le niveau 2, en surveillant `footprint -p PID` (**jamais `ps rss`**, cf. §6.B).
+
+### 7.4 Si la mémoire redevient le mur
+- [ ] **Clés compactes.** Les 11 Go de `MALLOC_SMALL` du niveau 2 sont 81,7 M de `QByteArray` : 22 octets utiles, mais un en-tête `QArrayData` de 24 o plus un bloc `malloc` arrondi, plus le nœud de hachage. Un **hachage 128 bits** (valeur plate, zéro allocation) ferait tomber ces 11 Go à ~3 → **~3× de piste**. Risque de collision négligeable en 128 bits (en 64 bits : ~1,8·10⁻⁴ pour 82 M de clés — une collision élaguerait silencieusement une branche).
+- [ ] ~~Fusionner `ferme` dans `meilleurG`~~ → **ne rapporte que ~2 Go** : les `QByteArray` sont déjà partagés par COW entre les deux tables, seuls les *nœuds* sont dupliqués. Bien moins rentable que les clés compactes.
+
+---
+
+## 5. Recherche en faisceau (beam search) — EN RÉSERVE
+*(Déclassé : §6 attaque la cause — une `h` trop lâche — là où le faisceau renonce à l'optimalité. À reprendre seulement si §6 ne suffit pas.)*
+
+### 5.1 L'erreur de cadrage qu'on vient de comprendre
+
+Depuis le début, on demande à `h` d'être une **borne**. C'est ce qu'exige A* : pour garantir l'optimalité, `h` doit sous-estimer, et A* doit développer *tout* état de `f ≤ C*`. D'où l'impasse de §4.3 — une poussée utile fait `g+1, h−1`, `f` ne bouge pas, rien n'est élaguable.
+
+Mais on peut aussi lui demander d'être un **classeur** : non pas « combien de poussées reste-t-il ? », mais « entre ces deux états, lequel a l'air plus prometteur ? ».
+
+**Ce sont deux exigences très différentes, et on n'a jamais testé la seconde.** Notre `h` est une mauvaise *borne* sur le niveau 17 (54 % de tension, mesuré). Rien ne dit qu'elle est un mauvais *classeur* : une heuristique qui sous-estime systématiquement de 46 % peut parfaitement ordonner correctement les états entre eux.
+
+### 5.2 Le principe
+
+Exploration par **paliers de profondeur** (comme un BFS), mais à chaque palier on ne garde que les **W meilleurs** états selon `h`. Le reste est jeté définitivement.
+
+- **La mémoire devient bornée *a priori*** : elle dépend de `W`, pas du nombre d'états du problème. Le mur des 20,7 Go ne recule pas — il n'existe plus.
+- **`h` n'a plus besoin de discriminer globalement**, seulement de séparer les frères d'un même palier.
+- **Le prix, franc et total** : ni optimalité, ni **complétude**. Si la solution passe par un état jeté, on ne la trouvera jamais — on peut rendre « aucune solution » sur un niveau soluble. Mais c'est un renoncement *paramétrable* : plus `W` est grand, plus on est prudent.
+
+**Simplification élégante** : toutes les arêtes coûtent 1 poussée, donc **tous les états d'un même palier ont le même `g`**. Trier par `h` ≡ trier par `f`. Pas de `f` à calculer.
+
+### 5.3 Étape 8 — `SolveurFaisceau`
+- [ ] `solveurfaisceau.h/.cpp`, `class SolveurFaisceau : public Solveur`, **`Q_OBJECT`** (oublié sur `SolveurAStar`, le `moc` le signale par « No relevant classes found »). Paramètre `W` au constructeur, comme `poids` pour `SolveurAStar`.
+- [ ] Boucle, par palier :
+  1. `QVector<SCandidat>` des enfants de **tous** les états du palier courant. `SCandidat = {int h; int parent; int idxCaisse; EDirection dir; QByteArray cle;}` — **pas de `Game`** (cf. étape 7) et **pas encore de `Noeud`**.
+  2. Élaguer : `isPerdu()` (gel + `casesMortes`), puis l'ensemble des états **déjà vus** (global).
+  3. **Dédupliquer par clé À L'INTÉRIEUR du palier** — sinon le faisceau se remplit de W copies du même état et l'exploration s'effondre. Piège n°1.
+  4. `std::partial_sort` sur `h` croissant, garder les **W premiers** (`partial_sort`, pas `sort` : on n'a besoin que des W meilleurs sur potentiellement des centaines de milliers de candidats).
+  5. **Seulement pour les survivants** : `noeuds.append(Noeud{parent, idxCaisse, dir})`. Sinon `noeuds` grossirait avec tous les candidats jetés. Piège n°2.
+  6. Victoire testée à la génération (`e.isGagne()`), pas au dépilement : il n'y a plus de dépilement.
+- [ ] **Départage à `h` égal** : beaucoup d'états partageront la même `h`. Sans critère secondaire, le faisceau se remplit d'états quasi identiques et perd sa diversité. Piste : nombre de caisses déjà sur des buts, décroissant.
+- [ ] **Relance automatique avec `W` doublé** si le faisceau meurt sans solution (« anytime ») : c'est ce qui rend l'incomplétude acceptable en pratique.
+- [ ] Ensemble des vus : borné par `W × profondeur` (W=100 k, profondeur 300 → 30 M clés). Reste le poste mémoire dominant → candidat naturel pour le hachage 64 bits (§5.5).
+
+### 5.4 Vérification
+- [ ] Doit **trouver** une solution sur 0 / 1 / 17. Comparer aux optima connus (**4 / 97 / 213**) pour chiffrer la perte de qualité — c'est le prix du renoncement, il doit être mesuré, pas supposé.
+- [ ] Mémoire **plate** en fonction du niveau, à `W` fixé : c'est LA propriété à vérifier. Si elle croît avec la taille du problème, l'implémentation a un défaut (ensemble des vus non borné, ou `noeuds` alimenté par les candidats jetés).
+- [ ] Puis le **niveau 2**, avec W croissant : 10 k, 50 k, 100 k, 500 k.
+- [ ] `footprint -p PID`, **jamais `ps rss`** (cf. étape 7 : le compresseur macOS fausse tout).
+
+### 5.5 Gains annexes, gratuits
+- [ ] **Pas de re-développement en A\* pondéré** : mesuré 119 M dépilés pour 74 M distincts, soit **1,6× de travail gaspillé**. Un simple ensemble « déjà développé » (skip au dépilement si l'état a déjà été étendu) l'élimine, au prix d'une sous-optimalité *bornée* — qu'on accepte déjà puisque le solveur est explicitement approché.
+- [ ] **`QHash<quint64,int>`** au lieu de `QHash<QByteArray,int>` : ~16-24 o/entrée au lieu de ~80-110. C'est le poste mémoire dominant (74 M clés ≈ 6-8 Go des 20,7 Go du niveau 2). Prix : une collision ferait silencieusement manquer une branche — probabilité ~1,5·10⁻⁴ pour 74 M clés sur 64 bits (paradoxe des anniversaires). Passer à 128 bits la rend négligeable.
