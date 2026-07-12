@@ -2,8 +2,16 @@ QT       += core gui
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-CONFIG += c++17 debug
-CONFIG -= release
+# Release (-O2) et non debug (-O0) : le solveur passe l'essentiel de son temps
+# dans des boucles serrées (getZoneJoueur, getEtat, getCaissesDeplacable) que
+# l'optimiseur transforme complètement. Un build debug fait tourner le solveur
+# plusieurs fois moins vite, pour rien.
+#
+# force_debug_info garde les symboles (-g) : on reste débogable et profilable,
+# on ne perd que les variables optimisées. Retire-le si tu veux poser des points
+# d'arrêt fiables ligne à ligne — mais alors ne juge plus les perfs du solveur.
+CONFIG += c++17 release force_debug_info
+CONFIG -= debug
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.

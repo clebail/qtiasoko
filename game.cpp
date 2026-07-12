@@ -1,9 +1,17 @@
 #include <QtDebug>
 #include <climits>
+#include <utility>
 #include "game.h"
 
 static const Game::SPlayerDirection playerDirections[NB_DIRECTION] = {{{0, -1}, 0}, {{1, 0}, 2}, {{0, 1}, 0}, {{-1, 0}, 1}};
 static const Game::SDirection directions[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+
+// L'opposé de directions[], sous ses deux lectures — c'est la même table, et la
+// dupliquer localement ferait diverger les copies au premier changement :
+//  - case d'appui : où le joueur doit se tenir pour pousser dans la direction d ;
+//  - sens du tirage : l'inverse d'une poussée, pour le flood-fill à rebours
+//    depuis les buts (calculCaseMorte).
+static const Game::SDirection opposees[NB_DIRECTION] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
 
 Game::Game() {
 }
@@ -70,6 +78,42 @@ Game& Game::operator=(const Game& other) {
     } else {
         cases = nullptr;
     }
+
+    return *this;
+}
+
+Game::Game(Game&& other) noexcept
+    : largeur(other.largeur), hauteur(other.hauteur), size(other.size),
+      playerPoint(other.playerPoint), playerDirection(other.playerDirection),
+      cases(other.cases),
+      nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
+      gagne(other.gagne), perdu(other.perdu),
+      goals(std::move(other.goals)), casesMortes(std::move(other.casesMortes)),
+      distanceButs(std::move(other.distanceButs))
+{
+    other.cases = nullptr;   // sinon les deux destructeurs libéreraient le même tableau
+}
+
+Game& Game::operator=(Game&& other) noexcept {
+    if (this == &other) return *this;
+    delete[] cases;
+    largeur = other.largeur;
+    hauteur = other.hauteur;
+    size = other.size;
+    playerPoint = other.playerPoint;
+    playerDirection = other.playerDirection;
+    nbDep = other.nbDep;
+    nbDepCaisse = other.nbDepCaisse;
+    numNiveau = other.numNiveau;
+    gagne = other.gagne;
+    perdu = other.perdu;
+    goals = std::move(other.goals);
+    casesMortes = std::move(other.casesMortes);
+    distanceButs = std::move(other.distanceButs);
+
+    cases = other.cases;
+
+    other.cases = nullptr;
 
     return *this;
 }
@@ -282,7 +326,6 @@ bool Game::isLibre(int idx) const {
 
 QVector<quint8> Game::getCaissesDeplacable(const QVector<bool>& zone) const {
     QVector<quint8> result(size, 0);
-    const SDirection offsetsPousse[NB_DIRECTION] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
     const int idxPlayer = playerPoint.x() + playerPoint.y() * largeur;
 
     for(int y = 0; y < hauteur; y++) {
@@ -299,8 +342,8 @@ QVector<quint8> Game::getCaissesDeplacable(const QVector<bool>& zone) const {
                 // poussée avant de pousser : elle compte comme libre même si
                 // elle est actuellement occupée par lui.
                 if(isLibre(idxDestination) || idxDestination == idxPlayer) {
-                    int xPousse = x + offsetsPousse[d].dx;
-                    int yPousse = y + offsetsPousse[d].dy;
+                    int xPousse = x + opposees[d].dx;
+                    int yPousse = y + opposees[d].dy;
                     int idxPousse = xPousse + yPousse * largeur;
 
                     if(zone[idxPousse]) {
@@ -316,7 +359,6 @@ QVector<quint8> Game::getCaissesDeplacable(const QVector<bool>& zone) const {
 }
 
 void Game::calculCaseMorte()  {
-    const SDirection offsetsTirage[NB_DIRECTION] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
     QList<int> file(goals);
     distanceButs = QVector<int>(size, -1);
 
@@ -329,10 +371,10 @@ void Game::calculCaseMorte()  {
         for (int d=0;d<NB_DIRECTION;d++) {
             int x = idx % largeur;
             int y = idx / largeur;
-            int xD = x + offsetsTirage[d].dx;
-            int yD = y + offsetsTirage[d].dy;
-            int xP = x + 2 * offsetsTirage[d].dx;
-            int yP = y + 2 * offsetsTirage[d].dy;
+            int xD = x + opposees[d].dx;
+            int yD = y + opposees[d].dy;
+            int xP = x + 2 * opposees[d].dx;
+            int yP = y + 2 * opposees[d].dy;
             int idxD = xD + yD * largeur;
             int idxP = xP + yP * largeur;
 
@@ -367,4 +409,19 @@ int Game::getHeuristique() const {
     }
 
     return h;
+}
+
+bool Game::pousse(int idxCaisse, EDirection dir) {
+    const int x = idxCaisse % largeur;
+    const int y = idxCaisse / largeur;
+    int idxPlayer = playerPoint.x() + playerPoint.y() * largeur;
+
+    cases[idxPlayer] = cases[idxPlayer] == Level::tcGoalPlayer ? Level::tcGoal : Level::tcNone;
+
+    playerPoint = QPoint(x + opposees[(int)dir].dx, y + opposees[(int)dir].dy);
+    idxPlayer = playerPoint.x() + playerPoint.y() * largeur;
+
+    cases[idxPlayer] = cases[idxPlayer] == Level::tcGoal ? Level::tcGoalPlayer : Level::tcPlayer;
+
+    return move(dir);
 }

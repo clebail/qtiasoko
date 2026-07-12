@@ -30,6 +30,20 @@ public:
     Game(const Level& level, int numNiveau = 1);
     Game(const Game& other);
     Game& operator=(const Game& other);
+
+    // Sémantique de déplacement : vole le tableau 'cases' de 'other', puis remet
+    // son pointeur à nullptr. Pas de 'const' sur le paramètre — on doit MODIFIER
+    // la source pour lui prendre son pointeur ; un 'const Game&&' compilerait
+    // mais forcerait une copie profonde, donc ne servirait à rien.
+    //
+    // 'noexcept' n'est pas décoratif : std::vector n'utilise le déplacement lors
+    // d'une réallocation QUE si le move ctor est noexcept — sinon il recopie
+    // silencieusement, pour conserver sa garantie forte en cas d'exception. Sans
+    // ce mot-clé, le vecteur qui porte le tas d'A* recopierait profondément tous
+    // ses états à chaque doublement, et le move ctor n'aurait servi à rien.
+    Game(Game&& other) noexcept;
+    Game& operator=(Game&& other) noexcept;
+
     ~Game();
     bool isLoaded() const;
     bool haut();
@@ -62,6 +76,14 @@ public:
     // (en tirages) au but le plus proche — ignore les autres caisses, donc
     // toujours <= au coût réel : heuristique admissible pour A*/IDA*.
     int getHeuristique() const;
+    // Applique une poussée sans faire marcher le joueur : le TÉLÉPORTE sur la
+    // case d'appui, puis pousse via move() (qui fait checkVictoire/checkDefaite).
+    // Précondition, NON vérifiée : la case d'appui doit être dans la zone du
+    // joueur — ce que getCaissesDeplacable() garantit déjà pour tout bit qu'elle
+    // pose. Permet au solveur de ne calculer le chemin de marche (coûteux) que
+    // sur les enfants réellement retenus, et non sur tous les doublons.
+    // 'nbDep' ne comptera qu'un coup au lieu de la marche complète.
+    bool pousse(int idxCaisse, EDirection dir);
 private:
     int largeur = 0;
     int hauteur = 0;

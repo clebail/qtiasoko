@@ -58,20 +58,20 @@ C'est déjà ce que fait le BFS actuel : chaque arête de la file est « marche 
 
 **`h` est cohérente (monotone), pas seulement admissible.** Une poussée déplace une caisse d'une case ; `distanceButs` étant une distance de graphe sur les tirages, elle ne varie que de ±1 pour cette caisse, les autres ne bougeant pas. `h` décroît donc d'au plus 1 par poussée, qui coûte exactement 1. **Conséquence exploitée : quand A* dépile un état pour la première fois, son `g` est déjà optimal → aucun état fermé à rouvrir.**
 
-#### Étape 1 — `Game` : sémantique de déplacement
-- [ ] Ajouter `Game(Game&&) noexcept` et `Game& operator=(Game&&) noexcept` : voler le pointeur `cases` (puis `other.cases = nullptr`), `std::move` sur `goals`/`casesMortes`/`distanceButs`, copie des scalaires. Ne pas oublier `gagne`/`perdu`/`nbDep`/`nbDepCaisse`/`numNiveau` (cf. le bug de §4.1, même piège).
+#### Étape 1 — `Game` : sémantique de déplacement ✅
+- [x] Ajouter `Game(Game&&) noexcept` et `Game& operator=(Game&&) noexcept` : voler le pointeur `cases` (puis `other.cases = nullptr`), `std::move` sur `goals`/`casesMortes`/`distanceButs`, copie des scalaires. Ne pas oublier `gagne`/`perdu`/`nbDep`/`nbDepCaisse`/`numNiveau` (cf. le bug de §4.1, même piège).
 - **Pourquoi c'est indispensable et pas cosmétique** : une FIFO copie chaque `Game` une fois et n'y retouche jamais ; un tas binaire, lui, réarrange ses éléments — un `pop` fait redescendre un élément sur ~log₂(n) ≈ 18 niveaux et chaque échange est un `tmp = a; a = b; b = tmp`, soit 3 copies profondes. Sans move ctor on passe de ~2 copies profondes par état à plusieurs dizaines.
 - **Mesuré** (level0002, 14×10, 300k états, `-O2`, à nombre d'états identique — seul le conteneur varie) : `QQueue<QPair<Game,int>>` = **66 ms**, `std::priority_queue` contenant des `Game` = **567 ms** (×8,6), tas ne contenant que des poignées `{f, idx}` = **27 ms**. Le ×8,6 est un impôt sur le gain d'A*, pas forcément une perte nette — mais sur un niveau où `h` réduit l'espace de moins de 8,6× on verrait *le compteur d'états baisser pendant que le chrono monte*, le pire des signaux à diagnostiquer.
 
-#### Étape 2 — `Game` : poussée directe, sans marche
-- [ ] Ajouter `bool pousse(int idxCaisse, EDirection dir)` : **téléporte** le joueur sur la case d'appui puis appelle `move(dir)` (qui fait la vraie poussée, `checkVictoire()`/`checkDefaite()` compris).
+#### Étape 2 — `Game` : poussée directe, sans marche ✅
+- [x] Ajouter `bool pousse(int idxCaisse, EDirection dir)` : **téléporte** le joueur sur la case d'appui puis appelle `move(dir)` (qui fait la vraie poussée, `checkVictoire()`/`checkDefaite()` compris).
 - Case d'appui = `idxCaisse - directions[dir]` (l'opposé du vecteur de déplacement — cf. `offsetsPousse` dans `getCaissesDeplacable()`). Mise à jour de `cases` : libérer l'ancienne case du joueur (`tcPlayer→tcNone`, `tcGoalPlayer→tcGoal`), occuper la case d'appui (`tcNone→tcPlayer`, `tcGoal→tcGoalPlayer`), déplacer `playerPoint`. Si le joueur est **déjà** sur la case d'appui, ne rien faire avant le `move()`.
 - **Légitimité de la téléportation** : `getCaissesDeplacable(zone)` garantit déjà que la case d'appui est dans la zone du joueur — donc joignable sans pousser. La méthode ne *vérifie pas* cette accessibilité, elle la suppose : à documenter dans le header, c'est une précondition de l'appelant. Garde-fou bon marché : retourner `false` si la case d'appui n'est ni libre ni la case courante du joueur.
 - `nbDep` ne comptera qu'un coup au lieu de la marche complète. Sans conséquence : `nbDep` n'entre pas dans `getEtat()`, et l'affichage porte sur le `game` de `MainWindow`, piloté par de vrais `deplace()` pendant le rejeu.
 - **Pourquoi ça vaut le coup** : aujourd'hui `AStar(&e).getChemin(...)` (un parcours complet de la grille) est appelé pour **chaque enfant généré**, donc *avant* de savoir s'il est un doublon — et sur un niveau à 10 caisses l'écrasante majorité des enfants sont des doublons. Ce chemin de marche ne sert qu'à reconstruire la solution finale, jamais à l'identité de l'état. Gain indépendant d'A*, cumulable avec.
 
-#### Étape 3 — `Solveur` : renommer la table de directions
-- [ ] `Solveur::directions` (`{{0,1},{-1,0},{0,-1},{1,0}}`) n'est **pas** un vecteur de déplacement : c'est l'opposé, c'est-à-dire l'offset de la **case d'appui** relative à la caisse (il coïncide avec `offsetsPousse` de `game.cpp`, pas avec `directions` de `game.cpp` qui vaut `{{0,-1},{1,0},{0,1},{-1,0}}`). Le renommer (`appuis`) avant d'écrire A*, sinon la poussée directe est un nid à bugs. Répercuter dans `solveurbfs.cpp`.
+#### Étape 3 — `Solveur` : renommer la table de directions ✅
+- [x] `Solveur::directions` (`{{0,1},{-1,0},{0,-1},{1,0}}`) n'est **pas** un vecteur de déplacement : c'est l'opposé, c'est-à-dire l'offset de la **case d'appui** relative à la caisse (il coïncide avec `offsetsPousse` de `game.cpp`, pas avec `directions` de `game.cpp` qui vaut `{{0,-1},{1,0},{0,1},{-1,0}}`). Le renommer (`appuis`) avant d'écrire A*, sinon la poussée directe est un nid à bugs. Répercuter dans `solveurbfs.cpp`.
 
 #### Étape 4 — `SolveurAStar`
 - [ ] Nouveaux fichiers `solveurastar.h/.cpp`, `class SolveurAStar : public Solveur`, `Q_OBJECT`, seul `run()` à écrire.
@@ -86,7 +86,7 @@ C'est déjà ce que fait le BFS actuel : chaque arête de la file est « marche 
   3. `compteur++`, test `cur.etat.isGagne()` → `emit solutionTrouvee(reconstruire(cur.idxNoeud), compteur)`.
   4. `zone = cur.etat.getZoneJoueur()` **une fois**, puis `getCaissesDeplacable(zone)` (l'overload prenant la zone existe exactement pour ça).
   5. Pour chaque caisse × direction poussable : `Game e(cur.etat)` ; `e.pousse(i, d)` ; écarter si `e.isPerdu()` ; `cle = e.getEtat()` ; `gE = cur.g + 1` ; écarter si `gE >= meilleurG.value(cle, INT_MAX)` ; sinon `meilleurG.insert(cle, gE)`.
-  6. **Seulement ici**, sur un enfant réellement retenu : calculer la marche `AStar(&cur.etat).getChemin(cur.etat.getPlayerPoint(), appui)` — **sur l'état PARENT** (avant poussée), depuis la position du joueur parent jusqu'à la case d'appui — puis `coups.append(d)`, `noeuds.append(Noeud{cur.idxNoeud, coups})`.
+  6. `noeuds.append(Noeud{cur.idxNoeud, i, (Game::EDirection)d})` — **aucun `AStar` ici** : `Noeud` ne porte que la poussée, et `Solveur::reconstruire()` (déjà écrit, hérité) recalcule les trajets de marche une seule fois sur la solution retenue.
   7. `file.push_back(Element{gE + e.getHeuristique(), gE, std::move(e), noeuds.size()-1, cle})` + `push_heap`.
 - `#include <climits>` pour `INT_MAX`.
 
@@ -95,9 +95,25 @@ C'est déjà ce que fait le BFS actuel : chaque arête de la file est « marche 
 - [ ] `qtiasoko.pro` : `solveurastar.cpp` dans `SOURCES`, `solveurastar.h` dans `HEADERS`.
 
 #### Étape 6 — Vérification
-- [ ] À solution trouvée, **le nombre de poussées doit être identique entre BFS et A*** sur les niveaux que le BFS boucle (c'est la même garantie d'optimalité) ; seul le nombre d'états explorés doit chuter. Un écart = bug dans `meilleurG` ou dans la cohérence de `h`.
-- [ ] Le nombre de *coups* peut différer entre les deux : normal, l'optimalité porte sur les poussées.
-- [ ] Mesurer états explorés **et** temps sur level0002 (10 caisses, le BFS y arrête sa file à 600k éléments) — les deux doivent baisser. Si les états baissent mais pas le temps, l'étape 1 a été ratée.
+**Référence BFS mesurée (build `-O2`, M3 Pro 18 Go)** — c'est l'étalon à battre :
+
+| niveau | caisses | états | temps | mémoire | solution |
+|---|---|---|---|---|---|
+| 0  | 3  | 111        | ~1 ms  | —      | 4 poussées / 17 coups   |
+| 1  | 6  | 1 040 235  | 7,2 s  | 188 Mo | 97 poussées / 506 coups |
+| 17 | 6  | 30 093 130 | 225 s  | 4,0 Go | 213 poussées / 584 coups |
+| 2  | 10 | —          | ne termine pas (espace ~2 500× celui du niveau 1) | | |
+
+- Niveau **1** = niveau de mise au point (assez gros pour voir le gain, assez rapide pour itérer). Niveau **17** = niveau de démonstration. Niveau **2** = objectif, mais **aucune référence** pour y valider l'optimalité.
+- [ ] **Le nombre de poussées doit être IDENTIQUE entre BFS et A*** (97 sur le 1, 213 sur le 17) — c'est le test le plus discriminant. Moins de poussées ⇒ bug du BFS ; plus ⇒ bug d'A* (`meilleurG` mal géré, ou `h` qui surestime).
+- [ ] Le nombre de *coups* peut différer : normal, l'optimalité porte sur les poussées.
+- [ ] États **et** temps doivent baisser ensemble. Si les états baissent mais pas le temps, l'étape 1 a été ratée.
+- Observation qui cadre l'enjeu : sur le niveau 1, au moment où le BFS trouve la solution, `file = 88`. Il n'explore donc pas « beaucoup d'états avant de trouver » — il **épuise la quasi-totalité de l'espace atteignable**, la solution étant dans les couches les plus profondes (97 poussées). Ces millions d'états ne sont pas le coût du BFS, c'est la taille du problème. La marge d'A* est donc énorme.
+- Mémoire : ~134 o/état, **linéaire**, et dominée par le `QSet<QByteArray>` de dédup (une clé de 14 o utiles coûte ~110 o entre l'en-tête `QArrayData` et le nœud de hachage). Diviser les états par N divise la mémoire par N.
+
+#### Réalisé en cours de route (hors plan initial)
+- [x] **Accélération du BFS** (indépendante d'A*, cumulable) : `pousse()` remplace « `AStar` de marche + `deplace()` » dans la génération des enfants, et `Noeud` passe de `{parent, QList<EDirection> coups}` à `{parent, idxCaisse, dir}` — 12 octets plats, zéro allocation. Le trajet de marche ne sert qu'à l'affichage : `Solveur::reconstruire()` le recalcule une seule fois, en rejouant les poussées depuis `depart`. Niveau 1 : **62,9 s → 7,2 s** (×8,7) et **378 Mo → 188 Mo**, à solution rigoureusement identique. Vérifié : 136 791 poussées comparées sur les 33 niveaux, `pousse()` ≡ marche+poussée, zéro divergence ; et le chemin reconstruit rejoué coup par coup aboutit bien à la victoire.
+- [x] **Build en release** : le `.pro` était en `CONFIG += debug` / `-= release`, donc `-O0`. Passé en `release force_debug_info` (`-O2 -g` : optimisé mais toujours profilable). Toutes les mesures ci-dessus sont en `-O2` — un build debug fausse complètement le jugement sur les perfs du solveur.
 
 ### 4.3 À reprendre plus tard
 - [ ] IDA* envisagé en repli si la mémoire devient le facteur limitant plutôt que le temps.

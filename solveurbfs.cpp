@@ -1,8 +1,8 @@
 #include <QQueue>
 #include <QSet>
 #include <QtDebug>
+#include <utility>
 #include "solveurbfs.h"
-#include "astar.h"
 
 SolveurBFS::SolveurBFS(const Game& etatDepart, QObject* parent) : Solveur(etatDepart, parent) {
 }
@@ -13,7 +13,7 @@ void SolveurBFS::run() {
     qint64 compteur = 0;
 
     noeuds.clear();
-    noeuds.append(Noeud{-1, {}});
+    noeuds.append(Noeud{-1, -1, Game::dHaut});   // racine : aucune poussée ne la précède
 
     file.enqueue({depart, 0});
     vus.insert(depart.getEtat());
@@ -39,25 +39,20 @@ void SolveurBFS::run() {
             for (int d = 0; d < NB_DIRECTION; d++) {
                 quint8 mask = 1 << d;
                 if (dirPoussePossible & mask) {
+                    // Poussée par téléportation : aucun trajet de marche calculé
+                    // ici. Il ne servirait qu'à l'affichage, et la plupart de ces
+                    // enfants vont être jetés comme doublons. reconstruire() s'en
+                    // charge, une seule fois, sur la solution retenue.
                     Game e(g);
-                    int x = (i % e.getLargeur()) + directions[d].dx;
-                    int y = (i / e.getLargeur()) + directions[d].dy;
-                    QPoint p(x, y);
-
-                    QList<Game::EDirection> coups = AStar(&e).getChemin(e.getPlayerPoint(), p);
-                    for (Game::EDirection dir : coups) {
-                        e.deplace(dir);
-                    }
-                    e.deplace((Game::EDirection)d);
-                    coups.append((Game::EDirection)d);
+                    e.pousse(i, (Game::EDirection)d);
 
                     if (!e.isPerdu()) {
                         auto key = e.getEtat();
 
                         if (!vus.contains(key)) {
                             vus.insert(key);
-                            noeuds.append(Noeud{idx, coups});
-                            file.enqueue({e, noeuds.size() - 1});
+                            noeuds.append(Noeud{idx, i, (Game::EDirection)d});
+                            file.enqueue({std::move(e), noeuds.size() - 1});
                         }
                     }
                 }

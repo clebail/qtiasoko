@@ -41,16 +41,26 @@ signals:
 protected:
     void run() override = 0;
 
-    // Un noeud par état enfilé : 'parent' pointe vers son index dans
-    // 'noeuds' (-1 pour la racine), 'coups' est la marche + poussée qui y
-    // mène depuis ce parent. Permet de reconstruire le chemin complet une
-    // fois un état gagnant trouvé, sans le porter dans la file elle-même.
+    // Un noeud par état enfilé : 'parent' pointe vers son index dans 'noeuds'
+    // (-1 pour la racine), et (idxCaisse, dir) est la POUSSÉE qui y mène depuis
+    // ce parent.
+    //
+    // On n'y stocke délibérément PAS le trajet de marche : le calculer pour
+    // chaque enfant généré revenait à lancer un AStar complet sur la grille
+    // avant même de savoir si l'enfant était un doublon — et l'immense majorité
+    // le sont. Ce trajet ne sert qu'à l'affichage, jamais à l'identité d'un
+    // état : reconstruire() le recalcule donc une seule fois, le long de la
+    // solution, en rejouant les poussées depuis 'depart'.
     struct Noeud {
         int parent;
-        QList<Game::EDirection> coups;
+        int idxCaisse;
+        Game::EDirection dir;
     };
 
-    static const Game::SDirection directions[NB_DIRECTION];
+    // Offset de la case d'APPUI relative à la caisse — l'opposé du vecteur de
+    // déplacement, pas le vecteur lui-même : pour pousser vers 'd', le joueur se
+    // tient derrière la caisse.
+    static const Game::SDirection appuis[NB_DIRECTION];
 
     Game depart;
     QVector<Noeud> noeuds;
