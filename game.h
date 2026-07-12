@@ -84,6 +84,16 @@ public:
     // sur les enfants réellement retenus, et non sur tous les doublons.
     // 'nbDep' ne comptera qu'un coup au lieu de la marche complète.
     bool pousse(int idxCaisse, EDirection dir);
+    // Réécrit le plateau à partir d'une clé getEtat() : les caisses et le joueur
+    // sont replacés, les murs et les buts ne bougent pas. Permet au solveur de ne
+    // PAS transporter un Game complet (~700 o) dans sa file ouverte, mais juste la
+    // clé (~22 o) — la file d'A* est le principal poste mémoire.
+    //
+    // Le joueur est replacé sur la case CANONIQUE de sa zone (le min des ids
+    // atteignables, cf. getMinIdx), pas forcément là où il était. Sans effet :
+    // getEtat() normalise déjà à cette case, pousse() téléporte, et
+    // checkVictoire()/checkDefaite() ne dépendent que des caisses.
+    void appliqueEtat(const QByteArray& cle);
 private:
     int largeur = 0;
     int hauteur = 0;
@@ -107,6 +117,11 @@ private:
     short getMinIdx(const QVector<bool>& zone) const;
     bool isLibre(int idx) const;
     void calculCaseMorte();
+    // Test de gel : une caisse est gelée si elle est bloquée sur LES DEUX axes.
+    // 'enCours' est la garde de récursion (cf. game.cpp).
+    bool caisseGelee(int idxCaisse, QVector<bool>& enCours) const;
+    bool bloqueeSurAxe(int idxCaisse, EDirection dirA, EDirection dirB, QVector<bool>& enCours) const;
+    bool estCaisse(int idx) const;
 };
 
 Q_DECLARE_METATYPE(Game::EDirection)

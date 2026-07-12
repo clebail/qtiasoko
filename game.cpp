@@ -150,36 +150,18 @@ void Game::checkVictoire() {
 }
 
 void Game::checkDefaite() {
-    const SDirection adjacents[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
-    const SDirection adjacentsMur[NB_DIRECTION][NB_MUR_TO_CHECK] = {{{1, 0}, {-1, 0}}, {{0, -1}, {0, 1}}, {{1, 0}, {-1, 0}}, {{0, -1}, {0, 1}}};
+    // Ne teste que les tcCaisse : une caisse gelée SUR un but est parfaitement
+    // légitime, c'est un morceau de la solution.
+    QVector<bool> enCours(size, false);
 
     for (int y = 0; y < hauteur; y++) {
         for (int x = 0; x < largeur; x++) {
             int idx = x + y * largeur;
 
             if (cases[idx] == Level::tcCaisse) {
-                if(casesMortes[idx]) {
+                if(casesMortes[idx] || caisseGelee(idx, enCours)) {
                     perdu = true;
                     return;
-                }
-
-                // Test des adjacents deadlocks (2 caisses adjacentes collées à un mur)
-                for(int d = 0; d < NB_DIRECTION; d++) {
-                    int xC = x + adjacents[d].dx;
-                    int yC = y + adjacents[d].dy;
-                    int idxC = xC + yC * largeur;
-
-                    if (cases[idxC] == Level::tcCaisse || cases[idxC] == Level::tcGoalCaisse) {
-                        for(int m = 0; m < NB_MUR_TO_CHECK; m++) {
-                            int idxM1 = (x + adjacentsMur[d][m].dx) + (y + adjacentsMur[d][m].dy) * largeur;
-                            int idxM2 = (xC + adjacentsMur[d][m].dx) + (yC + adjacentsMur[d][m].dy) * largeur;
-
-                            if ((cases[idxM1] == Level::tcMur || cases[idxM1] == Level::tcCaisse || cases[idxM1] == Level::tcGoalCaisse) && (cases[idxM2] == Level::tcMur || cases[idxM2] == Level::tcCaisse || cases[idxM2] == Level::tcGoalCaisse)) {
-                                perdu = true;
-                                return;
-                            }
-                        }
-                    }
                 }
             };
         }
@@ -411,6 +393,44 @@ int Game::getHeuristique() const {
     return h;
 }
 
+void Game::appliqueEtat(const QByteArray& cle) {
+    // 1. Plateau à nu. Mapping LOCAL, case par case : surtout pas de
+    //    goals.contains(i), qui serait une recherche linéaire dans une QList —
+    //    donc O(n²) sur l'ensemble du plateau.
+    for (int i = 0; i < size; ++i) {
+        switch (cases[i]) {
+            case Level::tcCaisse:
+            case Level::tcPlayer:     cases[i] = Level::tcNone; break;
+            case Level::tcGoalCaisse:
+            case Level::tcGoalPlayer: cases[i] = Level::tcGoal; break;
+            default: break;   // mur, case vide, but : inchangés
+        }
+    }
+
+    // 2. La clé = [id des N caisses triés] + [id canonique de la zone du joueur],
+    //    un short big-endian par case (cf. getEtat()). Le dernier est le joueur.
+    const int nb = cle.size() / 2;
+    for (int k = 0; k < nb; ++k) {
+        const int idx = (static_cast<quint8>(cle[2 * k]) << 8) | static_cast<quint8>(cle[2 * k + 1]);
+
+        if (k < nb - 1) {
+            cases[idx] = (cases[idx] == Level::tcGoal) ? Level::tcGoalCaisse : Level::tcCaisse;
+        } else {
+            cases[idx] = (cases[idx] == Level::tcGoal) ? Level::tcGoalPlayer : Level::tcPlayer;
+            playerPoint = QPoint(idx % largeur, idx / largeur);
+        }
+    }
+
+    nbDep = 0;
+    nbDepCaisse = 0;
+    perdu = false;
+    gagne = false;
+
+    // Indispensable : sans ça 'gagne' resterait celui du modèle (faux), et le
+    // solveur ne reconnaîtrait JAMAIS l'état gagnant qu'il vient de reconstruire.
+    checkVictoire();
+}
+
 bool Game::pousse(int idxCaisse, EDirection dir) {
     const int x = idxCaisse % largeur;
     const int y = idxCaisse / largeur;
@@ -424,4 +444,55 @@ bool Game::pousse(int idxCaisse, EDirection dir) {
     cases[idxPlayer] = cases[idxPlayer] == Level::tcGoal ? Level::tcGoalPlayer : Level::tcPlayer;
 
     return move(dir);
+}
+
+// Test de gel (« freeze deadlock »). Distingue « bloquée maintenant » de
+// « bloquée pour toujours » : une caisse voisine ne bloque durablement que si
+// elle est ELLE-MÊME gelée — sinon elle peut s'en aller et tout libérer.
+//
+// 'enCours' est la garde de récursion : la caisse en cours d'examen y est
+// marquée, et compte alors comme un mur pour ses voisines. Sans ça, A interroge
+// B qui réinterroge A, indéfiniment. C'est aussi ce qui rend le raisonnement
+// juste : on demande « B serait-elle gelée si A ne bougeait pas ? », ce qui est
+// exactement la question posée.
+bool Game::caisseGelee(int idxCaisse, QVector<bool>& enCours) const {
+    if (enCours[idxCaisse]) return true;   // traitée en mur par l'appelant
+
+    enCours[idxCaisse] = true;
+    // Les deux axes, dans l'ordre des 'directions' : {haut, droite, bas, gauche}
+    // → axe vertical = (dHaut, dBas), axe horizontal = (dDroite, dGauche).
+    const bool gel = bloqueeSurAxe(idxCaisse, dDroite, dGauche, enCours)
+                  && bloqueeSurAxe(idxCaisse, dHaut,   dBas,    enCours);
+    enCours[idxCaisse] = false;
+
+    return gel;
+}
+
+// Une caisse ne peut se déplacer sur un axe que si les DEUX cases de cet axe
+// sont libres : l'une pour la destination, l'autre pour que le joueur s'y tienne.
+// Donc un seul côté bloqué suffit à bloquer tout l'axe.
+bool Game::bloqueeSurAxe(int idxCaisse, EDirection dirA, EDirection dirB, QVector<bool>& enCours) const {
+    const int x = idxCaisse % largeur;
+    const int y = idxCaisse / largeur;
+    const int a = (x + directions[dirA].dx) + (y + directions[dirA].dy) * largeur;
+    const int b = (x + directions[dirB].dx) + (y + directions[dirB].dy) * largeur;
+
+    // 1. Un mur d'un côté (ou une caisse que l'appelant traite en mur).
+    if (cases[a] == Level::tcMur || enCours[a]) return true;
+    if (cases[b] == Level::tcMur || enCours[b]) return true;
+
+    // 2. Les deux destinations sont des cases mortes : pousser sur cet axe mène
+    //    à un deadlock de toute façon, l'axe est donc inutilisable.
+    if (casesMortes[a] && casesMortes[b]) return true;
+
+    // 3. Une caisse voisine ELLE-MÊME gelée. C'est la récursion, et c'est ce qui
+    //    évite le faux positif : « il y a une caisse à côté » ne suffit pas.
+    if (estCaisse(a) && caisseGelee(a, enCours)) return true;
+    if (estCaisse(b) && caisseGelee(b, enCours)) return true;
+
+    return false;
+}
+
+bool Game::estCaisse(int idx) const {
+    return cases[idx] == Level::tcCaisse || cases[idx] == Level::tcGoalCaisse;
 }

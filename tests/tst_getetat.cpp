@@ -184,6 +184,17 @@ private slots:
     void adjacentDeadlock_data();
     void adjacentDeadlock();
 
+    // §3bis — Test de gel (freeze deadlock), appelé DIRECTEMENT sur caisseGelee()
+    //         plutôt que via checkDefaite() : sinon casesMortes pourrait faire
+    //         passer un test pour la mauvaise raison, et on ne testerait rien.
+    void gel_data();
+    void gel();
+
+    // §3bis — Le même, intégré : checkDefaite() doit conclure à la défaite (ou
+    //         non) sur ces plateaux.
+    void gelDeadlock_data();
+    void gelDeadlock();
+
     // getCaissesDeplacable() : direction poussable = case d'arrivée libre +
     // point de poussée atteignable par le joueur sans traverser de caisse.
     void caissesDeplacables_data();
@@ -438,6 +449,144 @@ void TestGetEtat::adjacentDeadlock_data() {
 }
 
 void TestGetEtat::adjacentDeadlock() {
+    QFETCH(QString, grille);
+    QFETCH(bool, perduAttendu);
+
+    Game g = makeGame(grille.split('\n'));
+    QVERIFY2(!g.isPerdu(), "un jeu neuf ne doit pas etre perdu avant evaluation");
+
+    g.checkDefaite();
+
+    QCOMPARE(g.isPerdu(), perduAttendu);
+}
+
+// --- §3bis : test de gel ----------------------------------------------------
+//
+// Une caisse est GELÉE si elle est bloquée sur LES DEUX axes. Elle est bloquée
+// sur un axe si l'un des deux voisins de cet axe est un mur, ou si les deux sont
+// des cases mortes, ou si l'un est une caisse ELLE-MÊME GELÉE (récursion).
+//
+// Le point crucial : il faut les DEUX cases d'un axe libres pour s'y déplacer
+// (une pour la destination, une pour que le joueur s'y tienne). Un seul côté
+// bloqué suffit donc à condamner l'axe — mais condamner UN axe ne gèle pas la
+// caisse, il en faut deux.
+
+void TestGetEtat::gel_data() {
+    QTest::addColumn<QString>("grille");
+    QTest::addColumn<int>("xCaisse");
+    QTest::addColumn<int>("yCaisse");
+    QTest::addColumn<bool>("geleeAttendu");
+
+    // --- GELÉES.
+
+    // Coin : mur à gauche (axe X) + mur au-dessus (axe Y).
+    QTest::newRow("coin")
+        << QString("#####\n#$  #\n# . #\n# @ #\n#####") << 1 << 1 << true;
+
+    // LE CAS QUE L'ANCIEN CODE RATAIT : paire verticale, mur à GAUCHE de la
+    // caisse du haut et mur à DROITE de celle du bas. Aucune des deux ne peut
+    // bouger, mais les murs sont de côtés OPPOSÉS.
+    //   ##$    A en (2,2), mur à sa gauche
+    //   # $#   B en (2,3), mur à sa droite
+    QTest::newRow("diagonale, murs opposes (A)")
+        << QString("######\n#  . #\n##$  #\n# $# #\n#  @ #\n######") << 2 << 2 << true;
+    QTest::newRow("diagonale, murs opposes (B)")
+        << QString("######\n#  . #\n##$  #\n# $# #\n#  @ #\n######") << 2 << 3 << true;
+
+    // Bloc 2x2 : chaque caisse est bloquée par ses deux voisines, récursivement.
+    QTest::newRow("bloc 2x2")
+        << QString("######\n# .  #\n# $$ #\n# $$ #\n#  @ #\n######") << 2 << 2 << true;
+
+    // Paire horizontale sous un mur : la voisine est gelée, donc elle bloque.
+    QTest::newRow("paire sous un mur")
+        << QString("######\n# ## #\n# $$ #\n#  @ #\n######") << 2 << 2 << true;
+
+    // --- NON GELÉES. Ce sont les tests qui protègent des FAUX POSITIFS, et un
+    //     faux positif est bien pire qu'une non-détection : il fait disparaître
+    //     la solution sans le moindre signal.
+
+    // COULOIR HORIZONTAL — la régression qui rendait le niveau 1 insoluble.
+    // Murs au-dessus ET en dessous : deux bloqueurs, mais sur le MÊME axe. La
+    // caisse glisse librement à gauche et à droite. Un décompte « >= 2 voisins
+    // bloquants » la déclarerait gelée à tort.
+    QTest::newRow("couloir horizontal")
+        << QString("######\n# #  #\n#.$@ #\n# #  #\n######") << 2 << 2 << false;
+
+    // Couloir vertical : symétrique.
+    QTest::newRow("couloir vertical")
+        << QString("#####\n# . #\n##$##\n# @ #\n#####") << 2 << 2 << false;
+
+    // CONTRE-EXEMPLE EN S : une caisse voisine ne bloque PAS si elle n'est pas
+    // elle-même gelée. C borde A à gauche, D borde B à droite — un décompte naïf
+    // les croirait toutes coincées. Mais C peut monter ou descendre ; une fois
+    // partie, A se pousse à droite et tout se libère. Rien n'est gelé.
+    // Le motif est en ESPACE OUVERT à dessein : collé au mur gauche, C serait sur
+    // une colonne sans but donc une case morte, et le test passerait pour une
+    // tout autre raison que celle qu'on veut éprouver.
+    //    $$     C=(2,3)  A=(3,3)
+    //     $$    B=(3,4)  D=(4,4)
+    QTest::newRow("contre-exemple S (A)")
+        << QString("########\n#  ..  #\n#      #\n# $$   #\n#  $$  #\n#  @   #\n########") << 3 << 3 << false;
+    QTest::newRow("contre-exemple S (C)")
+        << QString("########\n#  ..  #\n#      #\n# $$   #\n#  $$  #\n#  @   #\n########") << 2 << 3 << false;
+    QTest::newRow("contre-exemple S (D)")
+        << QString("########\n#  ..  #\n#      #\n# $$   #\n#  $$  #\n#  @   #\n########") << 4 << 4 << false;
+
+    // Un seul mur : l'axe X est condamné, mais l'axe Y reste libre. Le but doit
+    // être SUR la colonne du mur : une caisse collée à un mur ne peut plus s'en
+    // écarter (le joueur ne peut jamais se placer de l'autre côté), donc sans but
+    // atteignable le long de ce mur elle est de toute façon sur une case morte.
+    QTest::newRow("un seul mur")
+        << QString("######\n#    #\n#$ @ #\n#.   #\n######") << 1 << 2 << false;
+
+    // Espace ouvert.
+    QTest::newRow("espace ouvert")
+        << QString("#####\n# . #\n# $ #\n# @ #\n#####") << 2 << 2 << false;
+}
+
+void TestGetEtat::gel() {
+    QFETCH(QString, grille);
+    QFETCH(int, xCaisse);
+    QFETCH(int, yCaisse);
+    QFETCH(bool, geleeAttendu);
+
+    Game g = makeGame(grille.split('\n'));
+    const int idx = xCaisse + yCaisse * g.getLargeur();
+
+    QVERIFY2(g.getCase(idx) == Level::tcCaisse || g.getCase(idx) == Level::tcGoalCaisse,
+             "la grille de test ne place pas de caisse a la position indiquee");
+
+    // Membres privés, accessibles via friend class TestGetEtat.
+    QVector<bool> enCours(g.size, false);
+    QCOMPARE(g.caisseGelee(idx, enCours), geleeAttendu);
+
+    // La garde de récursion doit être rendue propre : si caisseGelee() laissait
+    // des cases marquées, l'appel suivant verrait des murs fantômes.
+    for (int i = 0; i < g.size; ++i) {
+        QVERIFY2(!enCours[i], "caisseGelee() a laisse la garde de recursion marquee");
+    }
+}
+
+void TestGetEtat::gelDeadlock_data() {
+    QTest::addColumn<QString>("grille");
+    QTest::addColumn<bool>("perduAttendu");
+
+    // Le cas diagonal : checkDefaite() doit désormais conclure à la défaite.
+    QTest::newRow("diagonale, murs opposes")
+        << QString("######\n#  . #\n##$  #\n# $# #\n#  @ #\n######") << true;
+
+    // Une caisse gelée SUR un but n'est pas une défaite : c'est la solution.
+    QTest::newRow("coin mais sur goal")
+        << QString("#####\n#*  #\n# . #\n# @ #\n#####") << false;
+
+    // Régressions : ces plateaux ne doivent PAS être perdus.
+    QTest::newRow("couloir horizontal")
+        << QString("######\n# #  #\n#.$@ #\n# #  #\n######") << false;
+    QTest::newRow("contre-exemple S")
+        << QString("########\n#  ..  #\n#      #\n# $$   #\n#  $$  #\n#  @   #\n########") << false;
+}
+
+void TestGetEtat::gelDeadlock() {
     QFETCH(QString, grille);
     QFETCH(bool, perduAttendu);
 

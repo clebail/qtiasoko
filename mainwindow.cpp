@@ -12,7 +12,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // flèches ne remontent plus jusqu'à l'eventFilter pour faire jouer le joueur.
     cbNiveau->setFocusPolicy(Qt::NoFocus);
     cbSolveur->setFocusPolicy(Qt::NoFocus);
-    pbIA->setFocusPolicy(Qt::NoFocus);
+    pbResoudre->setFocusPolicy(Qt::NoFocus);
     pbRevoir->setFocusPolicy(Qt::NoFocus);
 
     for (const Solveur::SType& t : Solveur::types()) {
@@ -39,7 +39,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     }
 
     connect(cbNiveau, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onNiveauChange);
-    connect(pbIA, &QPushButton::clicked, this, &MainWindow::onIALance);
+    connect(pbResoudre, &QPushButton::clicked, this, &MainWindow::onIALance);
     connect(pbRevoir, &QPushButton::clicked, this, &MainWindow::onRevoir);
     connect(&timerRejeu, &QTimer::timeout, this, &MainWindow::rejouerCoup);
     timerRejeu.setInterval(150);
@@ -73,7 +73,7 @@ void MainWindow::onNiveauChange(int index) {
 void MainWindow::setControlesActifs(bool actifs) {
     cbNiveau->setEnabled(actifs);
     cbSolveur->setEnabled(actifs);
-    pbIA->setEnabled(actifs);
+    pbResoudre->setEnabled(actifs);
 }
 
 void MainWindow::onIALance() {

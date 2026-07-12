@@ -20,8 +20,13 @@ public:
     // Stratégies disponibles. L'UI peuple son select à partir de types() et
     // instancie via creer() : ajouter un solveur = une entrée ici, une ligne
     // dans types() et un cas dans creer(), rien à toucher côté MainWindow.
+    // 'Astar' et non 'AStar' : la classe de pathfinding d'astar.h porte déjà ce
+    // nom, et un énumérateur homonyme le masquerait dans toute la portée de
+    // Solveur — reconstruire() ne pourrait plus construire un AStar.
     enum EType {
-        Bfs
+        Bfs,
+        Astar,
+        AstarPondere
     };
 
     struct SType {

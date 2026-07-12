@@ -77,9 +77,9 @@
         <widget class="QComboBox" name="cbSolveur"/>
        </item>
        <item>
-        <widget class="QPushButton" name="pbIA">
+        <widget class="QPushButton" name="pbResoudre">
          <property name="text">
-          <string>IA</string>
+          <string>Résoudre</string>
          </property>
         </widget>
        </item>

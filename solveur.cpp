@@ -1,6 +1,7 @@
 #include <QPoint>
 #include "solveur.h"
 #include "solveurbfs.h"
+#include "solveurastar.h"
 #include "astar.h"
 
 const Game::SDirection Solveur::appuis[NB_DIRECTION] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
@@ -11,13 +12,19 @@ Solveur::Solveur(const Game& etatDepart, QObject* parent) : QThread(parent), dep
 
 QVector<Solveur::SType> Solveur::types() {
     return {
-        {Bfs, "BFS"}
+        {Bfs, "BFS (optimal)"},
+        {Astar, "A* (optimal)"},
+        {AstarPondere, "A* pondéré (rapide, approché)"}
     };
 }
 
 Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
     switch (type) {
-        case Bfs: return new SolveurBFS(etatDepart, parent);
+        case Bfs:          return new SolveurBFS(etatDepart, parent);
+        case Astar:        return new SolveurAStar(etatDepart, 1, parent);
+        // w=2 mesuré comme le meilleur compromis : w=3 et w=5 explorent PLUS
+        // d'états que w=2 (une h trop gonflée fait perdre le fil au lieu de guider).
+        case AstarPondere: return new SolveurAStar(etatDepart, 2, parent);
     }
     return nullptr;
 }
