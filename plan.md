@@ -409,6 +409,13 @@ matrice `n×n` puis résout l'affectation de coût minimal (hongrois par potenti
 | 17 | A* pondéré (+fermeture)  | 1 636 218  | **1 634 102** | 227 → 225 |
 | **2** | A* **optimal**        | ∞ (jamais résolu) | **591 138** | **131 🏆** |
 
+> ⚠️ **Les « états APRÈS » de ce tableau sont PÉRIMÉS** (constaté le 2026-07-13 en §7.4). Le code
+> actuel rend **15 596** sur le niveau 1 optimal (et non 13 208) et **1 091 295** sur le 17 (et non
+> 1 088 789). Vérifié : ce n'est **pas** une régression de la clé arène — l'ancien binaire,
+> reconstruit depuis `HEAD` via `git worktree`, rend exactement les mêmes chiffres. Ce sont les
+> valeurs du tableau qui datent d'un état antérieur du code. **Les POUSSÉES, elles, sont
+> inchangées** (97 / 213) : le canari n'a jamais menti. Références à jour en §7.4.
+
 ### 🏆 LE NIVEAU 2 EST RÉSOLU
 Le niveau 2 (10 caisses), « hors d'atteinte de cette approche » (§4.4, tué à 20,7 Go / 119 M
 d'états sans converger), tombe en **591 138 états, 131 poussées, en A* OPTIMAL**. Détail qui
@@ -500,45 +507,123 @@ Les deux relaxations sont **orthogonales** : la table joueur-aware corrige les *
 - [ ] **Admissible** : toute solution réelle réalise une bijection caisses↔buts ; son coût est ≥ la somme de cette affectation ; on prend le **minimum sur toutes** les affectations. Donc `h_couplage ≤ C*`. Et comme la version « but le plus proche » relâche la contrainte de distinction, `h_joueur ≤ h_couplage` : le couplage **domine**, il ne peut pas être pire.
 
 ### 7.3 Vérification
-- [ ] **Poussées inchangées en optimal : 4 / 97 / 213.** Le canari. **PAS ENCORE RELANCÉ** depuis le couplage. Un écart = `h` qui surestime (bug du hongrois ou de la matrice).
+- [x] **Poussées inchangées en optimal : 4 / 97 / 213.** Le canari. **RELANCÉ le 2026-07-13** (§7.4, harnais headless) : 4 / 97 / 213 confirmés, plus **134** sur le niveau 3. `h` ne surestime pas.
 - [~] **Le pari est un échange temps ↔ états** : mesuré en **pondéré** — niveau 1 ×1,9 d'états (23 072 → 12 184), niveau 17 ~0 % (1,636 M → 1,634 M). Le coût O(n³) par état n'a pas fait exploser le temps (à confirmer au chrono). Reste à mesurer en **optimal**.
 - [ ] Puis le niveau 2, en surveillant `footprint -p PID` (**jamais `ps rss`**, cf. §6.B).
 
-### 7.4 Clés compactes — LE MUR MÉMOIRE EST REVENU (niveau 3) → PROCHAIN CHANTIER
+### 7.4 Clés en arène — FAIT (gain : 1,3×, pas le ×3 annoncé)
 
-**Contexte (à reprendre cet après-midi, sur le Mac).** Niveaux 0/1/2/17 résolus en optimal grâce
-au couplage. **Niveau 3 (11 caisses) : tué franchement avant swap** sur la machine Linux — mur
-mémoire franc, exactement le cas prévu ici. Une caisse de plus que le 2 (résolu en 591 k états) ;
-reste à voir si sa géométrie est un « cas 2 » (collisions → s'effondre) ou un « cas 17 »
-(manœuvre → beaucoup d'états). Dans les deux cas, le poste qui sature est le **stockage des
-états**, pas le solveur ni la `h`.
+**Le niveau 3 (11 caisses) EST résolu : 7 280 104 états / 134 poussées, en A\* optimal.** Il ne
+mourait que sur la machine à **8 Go** ; sur les 18 Go du Mac il passe. Le mur mémoire était donc
+un mur de *machine*, pas d'algorithme — mais il reste le poste qui limite, et c'est lui qu'attaque
+cette étape.
 
-**DÉCISION : clé inline exacte, PAS hachage.** (Choisi le 2026-07-13, à implémenter.)
+#### Résultat mesuré (build `-O2`, M3 Pro 18 Go, `/usr/bin/time -l` → « peak memory footprint »)
 
-Le §7.4 d'origine proposait un **hachage 128 bits**. Écarté après avoir vu le piège : un hachage
-n'est **PAS réversible**, or `appliqueEtat(cle)` **reconstruit le plateau depuis la clé** au
-dépilement (mécanisme du §4.4 étape 7). Un hachage forcerait à re-stocker l'état complet ailleurs
-dans la file ouverte → gain annulé en partie + risque de collision (élagage silencieux d'une
-branche).
+| niveau | états / poussées | mémoire AVANT | APRÈS | gain |
+|---|---|---|---|---|
+| 0  | 5 / **4** ✅ | — | — | — |
+| 1  | 15 596 / **97** ✅ | — | — | — |
+| 17 | 1 091 295 / **213** ✅ | 204,6 Mo | 162,2 Mo | **1,26×** |
+| 3  | 7 280 104 / **134** ✅ | 3,37 Go | 2,49 Go | **1,35×** |
 
-- [ ] **Clé = valeur POD inline** (positions des N caisses + joueur en `quint16`, ~24-34 o), au
-  lieu de `QByteArray`. Supprime l'**allocation tas par clé**, l'en-tête `QArrayData` (24 o) et
-  l'arrondi `malloc` — c'est ça les 11 Go, pas les 22 o utiles. Vise le **~3×** annoncé (11 → ~4 Go),
-  en restant **exacte** (zéro collision) et **réversible** (`appliqueEtat` marche encore).
-  - Où : type `Cle` (struct avec `quint16 v[MAX]` ou taille fixée au chargement), remplace
-    `QByteArray` partout où `getEtat()` sert de clé — `SElement.cle`, `meilleurG`
-    (`QHash<Cle,int>`), `ferme` (`QSet<Cle>`), `getEtat()`/`appliqueEtat()`.
-  - À écrire : `qHash(Cle, seed)` et `operator==(Cle,Cle)` pour QHash/QSet. Longueur fixe par
-    niveau (N+1 shorts) → comparaison et hachage triviaux, pas de délimiteur (cf. §1.1).
-  - Vérif : canari **4 / 97 / 213 inchangé** + niveau 2 toujours **591 138 / 131** (la clé encode
-    exactement le même état, aucune raison que ça bouge — un écart = bug d'encodage/hachage).
-- [ ] **Si ça ne suffit toujours pas** pour le 3 : hachage 128 bits **par-dessus** l'inline, dans
-  les seules tables de dédup (`meilleurG`/`ferme`), en gardant la clé inline exacte dans la file
-  ouverte pour la reconstruction. Collision négligeable en 128 bits ; à ne faire que si mesuré
-  nécessaire.
-- [ ] ~~Fusionner `ferme` dans `meilleurG`~~ → **ne rapporte que ~2 Go** : les clés sont déjà
-  partagées entre les deux tables, seuls les *nœuds* sont dupliqués. Bien moins rentable que les
-  clés compactes.
+**Canari intact partout** (4 / 97 / 213 / 134), et le nombre d'états est identique **au chiffre
+près** avant/après — vérifié en construisant l'ancien binaire depuis un `git worktree` sur `HEAD`
+et en le rejouant sur les mêmes niveaux. La clé encode exactement le même espace d'états ; c'est
+la seule vérification qui vaille, un écart d'un seul état aurait signalé un bug d'encodage
+(clés qui se dédoublent) ou de hachage (clés qui se confondent). 131 tests unitaires passent.
+
+#### Ce qui a été fait : `Arene` (`cle.h`), et pas une clé inline à capacité fixe
+
+**Le §7.4 d'origine proposait un `struct` POD `quint16 v[MAX]`. Écarté après mesure.** Le nombre
+de caisses va de 3 à **32** selon le niveau : dimensionner `MAX` sur le pire cas ferait payer
+**68 o par clé** aux niveaux qui n'en demandent que 24 — une *régression* mémoire, la clé étant
+portée en entier par chaque nœud de table **et** chaque `SElement` de la file. Et la dimensionner
+au plus juste (16) aurait obligé à **refuser les 15 niveaux à plus de 15 caisses**.
+
+La bonne réponse est la seconde branche que le §7.4 avait entrevue sans la suivre — **« taille
+fixée au chargement »** : le nombre de caisses est **constant sur toute une résolution**, donc
+toutes les clés d'un niveau font exactement `N+1` shorts. On les range bout à bout dans **une
+seule zone contiguë** (`Arene`, un `std::vector<quint16>` qui double), et tables comme file ouverte
+ne portent plus qu'un **offset 32 bits** dedans (`struct Cle`, 4 o).
+
+- Coût d'une clé : **exactement `2·(N+1)` octets**, plus 4 par référence. Zéro `malloc` par clé,
+  zéro en-tête `QArrayData` (24 o), zéro arrondi d'allocateur.
+- **Aucun plafond** : la taille étant fixée à l'exécution, le niveau 10 et ses 32 caisses passent
+  sans une ligne de plus. C'est le seul point où l'arène bat *à la fois* la capacité fixe et la SBO.
+- `Game::tailleCle()`, `getEtat(quint16*)` (écrit directement dans l'arène) et
+  `appliqueEtat(const quint16*)`. La version `QByteArray` de `getEtat()` **reste**, pour les tests
+  seuls — elle est bâtie sur la version brute, une seule source de vérité.
+- `SElement` = `{int f; int g; int idxNoeud; Cle cle;}` → **16 o, entièrement POD** (donc
+  `memcpy`-able quand le tas se réalloue).
+- ⚠️ **`std::unordered_map`/`set` et non `QHash`/`QSet`** : hacher ou comparer une clé exige de
+  **lire l'arène**, or Qt passe par un `qHash(T)`/`operator==` **globaux**, à qui on n'a aucun
+  moyen de la transmettre. Les foncteurs de la STL sont des *objets* : ils la portent
+  (`CleHash{&arene}`), la dépendance reste explicite dans le type — pas de global ni de
+  `thread_local`.
+- ⚠️ **`annule()`** : la clé d'un enfant s'écrit en fin d'arène *avant* qu'on sache s'il est un
+  doublon. S'il l'est, il faut la **reprendre** — sinon l'arène enfle d'une clé par enfant généré
+  (et non par état distinct), ce qui annulerait le gain. Idem quand un état connu est réenfilé
+  avec un meilleur `g` : on réutilise **sa** clé (`it->first`), on rend celle qu'on venait
+  d'écrire.
+
+#### Pourquoi 1,3× et pas 3× — l'erreur d'estimation, à ne pas refaire
+
+**J'avais compté le `malloc` du `QByteArray`, mais oublié que la table de hachage en fait un
+SECOND par entrée** (le nœud), que l'arène ne touche pas. Le gain réel se calcule, et il tombe
+juste (niveau 4, 20 caisses → clé de 42 o utiles) :
+- avant : bloc tas du `QByteArray` (24 d'en-tête + 42 + arrondi ≈ **80 o**) + nœud de `QHash`
+  (**32 o**) + `Noeud` (12 o) ≈ **124 o/état** ;
+- après : clé dans l'arène (**42 o**, exactement) + nœud d'`unordered_map` (**32 o**) + seau
+  (**8 o**) + `Noeud` (12 o) ≈ **94 o/état**. → 1,32×, exactement ce qui est observé.
+
+Corollaire : **le `QByteArray` pénalise d'autant plus que les clés sont COURTES** (l'en-tête de
+24 o s'amortit mal sur 24 o utiles). Le gain est donc *plus* faible sur les niveaux à beaucoup de
+caisses — l'inverse de l'intuition.
+
+#### Où part vraiment la mémoire (instrumenté, niveau 3)
+
+**Piège de dénominateur** : 2,49 Go / 7,28 M donnait 342 o/état, incohérent avec le modèle. Faux —
+7,28 M est le nombre d'états **développés** ; les structures portent les états **découverts**. En
+A\* optimal avec une `h` incohérente (§6.B), un état est réenfilé chaque fois qu'on l'atteint par
+un meilleur chemin. Mesuré en fin de résolution :
+
+```
+arene = 18 503 173 cles | meilleurG = 18 503 173 | noeuds = 21 475 761 | file = 13 880 694 (capacite 16 777 216)
+```
+
+| poste | taille | coût |
+|---|---|---|
+| **`meilleurG`** | 18,5 M entrées | **~800 Mo** — nœud de 32 o alloué **un par un**, + tableau de seaux |
+| arène | 18,5 M × 24 o | **444 Mo** — les clés elles-mêmes, incompressibles |
+| `noeuds` | 21,5 M × 12 o | **~300 Mo** (capacité arrondie à la puissance de 2) |
+| file ouverte | capacité 16,8 M × 16 o | **268 Mo** |
+
+Soit ~1,8 Go + les pics transitoires de réallocation (un `std::vector` qui double détient
+brièvement l'ancien **et** le nouveau) → les 2,49 Go mesurés. Le modèle se referme : **~135 o par
+état découvert.**
+
+**Le poste dominant n'est plus la clé, c'est la TABLE qui la range** : `unordered_map` paie
+40 o d'infrastructure (nœud + seau) pour 8 o de contenu utile.
+
+#### Étape 11 — Adressage ouvert → PROCHAIN CHANTIER
+
+- [ ] **`meilleurG` en table à adressage ouvert** : un `std::vector` de slots `{Cle, g}` de **8 o**,
+  sans nœud alloué, sans liste chaînée, sans tableau de seaux. À 70 % de charge : **~210 Mo au lieu
+  de ~800**. C'est le plus gros gisement restant, et de loin.
+- [ ] **`Noeud` resserré** : `idxCaisse` (< 32) et `dir` (< 4) tiennent chacun dans un `quint8` →
+  `{qint32 parent; quint8 idxCaisse; quint8 dir;}` = **8 o au lieu de 12**.
+- [ ] `reserve()` sur l'arène et la file : supprime les pics transitoires de doublement.
+- Cible : **~1,6 Go**, soit **2,1× cumulé** sur les 3,37 Go d'origine.
+- Vérif : mêmes canaris (**4 / 97 / 213 / 134**) et **mêmes nombres d'états au chiffre près**
+  (7 280 104 pour le 3, 1 091 295 pour le 17) — comparés à l'ancien binaire via `git worktree`.
+
+- [ ] **Si ça ne suffit toujours pas** : hachage 128 bits **par-dessus** l'arène, dans les seules
+  tables de dédup, en gardant la clé exacte dans l'arène pour la reconstruction (`appliqueEtat` en
+  a besoin — un hachage n'est **pas réversible**, c'est ce qui l'avait fait écarter en premier
+  choix). Collision négligeable en 128 bits ; à ne faire que si mesuré nécessaire.
+- [ ] ~~Fusionner `ferme` dans `meilleurG`~~ → sans objet en mode optimal : `ferme` n'y est même
+  pas peuplée (le re-développement est ce qui rétablit l'optimalité, cf. §6.B).
 
 ---
 
