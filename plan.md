@@ -387,7 +387,39 @@ Cette version est **plus informative que l'actuelle ET moins chère** : `getHeur
 
 ---
 
-## 7. Couplage hongrois par-dessus la table joueur-aware — PROCHAIN CHANTIER
+## 7. Couplage hongrois par-dessus la table joueur-aware — IMPLÉMENTÉ
+
+### 7.-1 Résultats mesurés (couplage vs `h` joueur-aware seule)
+
+Implémentation en place : `distanceParBut[(but·size + case)·maxRegions + region]` (un BFS
+à rebours par but, `distancePoussee` en devient le min), et `getHeuristique()` construit la
+matrice `n×n` puis résout l'affectation de coût minimal (hongrois par potentiels, O(n³),
+`QVarLengthArray` sans allocation tas tant que n < 32).
+
+| niveau | mode | états AVANT | états APRÈS | poussées |
+|---|---|---|---|---|
+| 1  | A* pondéré (+fermeture)  | 23 072    | **12 184**    | 103 (inchangé) |
+| 17 | A* pondéré (+fermeture)  | 1 636 218 | **1 634 102** | **227 → 225** |
+
+**Le gain suit exactement la nature de l'erreur résiduelle**, comme prévu §7.1 :
+- **niveau 1** (erreur = collisions de buts) : **×1,9 d'états**, tension `h(départ)` 91 % → 98 %.
+- **niveau 17** (erreur = coût de manœuvre, déjà pris par la joueur-aware) : **~0 % d'états**
+  (+7 seulement sur `h`, 91 % → 94 %), mais solution un cran meilleure (227 → 225).
+
+**⚠️ Non encore vérifié :**
+- [ ] **Canari optimal** : le mode optimal doit toujours rendre **4 / 97 / 213**. Pas relancé
+  depuis le couplage — à confirmer avant de déclarer `h` admissible.
+- [ ] **Niveau 2** : le vrai juge (10 caisses → collisions dominantes). Pas encore lancé.
+- [ ] **Bonus deadlock du couplage** (§7.2, affectation à coût infini) : **pas implémenté**. Les
+  paires inatteignables valent `INF_COUPLAGE = 1 000 000` (grand mais fini) → un état sans
+  affectation finie reçoit un `h` énorme et n'est jamais développé (correct mais il encombre la
+  file au lieu d'être élagué dans `checkDefaite()`).
+
+**Niveaux de test 0100-0109** : dérivés de `level0002` (grille 10 caisses/10 buts), chacun ne
+gardant **qu'une caisse + un but** (caisse *k* appariée au but *k* dans l'ordre de balayage,
+joueur conservé). Isolent chaque distance caisse↔but individuelle pour valider la table avant
+de faire confiance à l'affectation globale. Certains couples sont volontairement insolubles
+(caisse coincée / but derrière un mur) → testent au passage la détection de deadlock.
 
 ### 7.0 Où en est le niveau 2 (état des lieux après §6)
 
@@ -419,26 +451,90 @@ Les deux relaxations sont **orthogonales** : la table joueur-aware corrige les *
 **C'est le seul levier restant qui réduise le NOMBRE d'états** (les clés compactes, §7.4, ne font que mieux les stocker).
 
 ### 7.2 Étape 10 — Implémentation
-- [ ] **Une table de distances PAR BUT** : `distanceParBut[but][case][region]`. Un BFS à rebours par but, au lieu d'un seul depuis tous les buts. Même transition qu'en §6 (double vérification de régions).
+- [x] **Une table de distances PAR BUT** : `distanceParBut[but][case][region]`. Un BFS à rebours par but, au lieu d'un seul depuis tous les buts. Même transition qu'en §6 (double vérification de régions). Aplati en un `QVector<int>` d'index `(but·size + case)·maxRegions + region`, ajouté aux ctors copie/déplacement (partage COW comme `distancePoussee`).
   - Mémoire : `nbButs × size × maxRegions` entiers. Niveau 2 : 10 × 140 × 4 × 4 o ≈ **22 Ko**. Un 20×16 à 20 buts : ~205 Ko. Négligeable, partagé par COW.
-- [ ] **`distancePoussee` en devient un sous-produit** : `distancePoussee[b][r] = min sur les buts de distanceParBut[j][b][r]`. Ne PAS le recalculer par un BFS séparé — une seule source de vérité, sinon les deux divergeront.
-- [ ] **`getHeuristique()`** : construire la matrice `n×n` (`n` = caisses), `cout[i][j] = distanceParBut[j][ caisse_i ][ regions[joueur][caisse_i] ]`, puis **affectation de coût minimal** (hongrois, O(n³), variante Jonker-Volgenant).
-  - ✅ Vérifié : sur les 43 niveaux, **nb caisses == nb buts**. La matrice est carrée, pas de cas rectangulaire. (Garder tout de même un garde-fou si un `.xsb` futur en amenait un.)
+- [x] **`distancePoussee` en devient un sous-produit** : `distancePoussee[b][r] = min sur les buts de distanceParBut[j][b][r]`, calculé dans la même boucle. Une seule source de vérité → `casesMortes`/`checkDefaite` inchangés (valeurs identiques à l'ancien BFS multi-but).
+- [x] **`getHeuristique()`** : construit la matrice `n×n` (`n` = caisses), `cout[i][j] = distanceParBut[j][ caisse_i ][ regions[joueur][caisse_i] ]`, puis **affectation de coût minimal** (hongrois par potentiels, O(n³)).
+  - ✅ Vérifié : sur les 43 niveaux, **nb caisses == nb buts**. La matrice est carrée, pas de cas rectangulaire. Garde-fou en place : si `n != nbButs`, repli sur l'ancienne borne « chaque caisse vise son but le plus proche ».
 
 **⚠️ Pièges**
-- [ ] **Paires inatteignables** (`distanceParBut == -1`) : mettre un coût **grand mais FINI** (ex. 100000), jamais `INT_MAX` — le hongrois additionne, et `INT_MAX` déborderait.
-- [ ] **Bonus deadlock, plus fort que celui de §6** : si le couplage optimal contient au moins une paire à coût infini, **aucune affectation bijective n'est possible** → deadlock. Exemple que rien ne détecte aujourd'hui : deux caisses qui ne peuvent atteindre qu'un seul et même but. À tester dans `checkDefaite()`.
-- [ ] **`h` reste incohérente** (elle l'était déjà depuis §6) → garder la **fermeture en pondéré**, et le **re-développement en optimal**. Ne pas y toucher.
+- [x] **Paires inatteignables** (`distanceParBut == -1`) : coût `INF_COUPLAGE = 1 000 000`, **grand mais FINI** (n ≤ ~30, la somme ne déborde jamais un `int`) — jamais `INT_MAX` qui déborderait dans l'addition du hongrois.
+- [ ] **Bonus deadlock, plus fort que celui de §6** : si le couplage optimal contient au moins une paire à coût infini, **aucune affectation bijective n'est possible** → deadlock. Exemple que rien ne détecte aujourd'hui : deux caisses qui ne peuvent atteindre qu'un seul et même but. À tester dans `checkDefaite()`. **PAS ENCORE FAIT** : pour l'instant l'état reçoit juste un `h` énorme (jamais développé, mais pas élagué).
+- [x] **`h` reste incohérente** (elle l'était déjà depuis §6) → fermeture en pondéré et re-développement en optimal **conservés à l'identique**. Rien touché dans `solveurastar.cpp`.
 - [ ] **Admissible** : toute solution réelle réalise une bijection caisses↔buts ; son coût est ≥ la somme de cette affectation ; on prend le **minimum sur toutes** les affectations. Donc `h_couplage ≤ C*`. Et comme la version « but le plus proche » relâche la contrainte de distinction, `h_joueur ≤ h_couplage` : le couplage **domine**, il ne peut pas être pire.
 
 ### 7.3 Vérification
-- [ ] **Poussées inchangées en optimal : 4 / 97 / 213.** Le canari. Un écart = `h` qui surestime (bug du hongrois ou de la matrice).
-- [ ] **Le pari est un échange temps ↔ états** : `getHeuristique()` passe de O(n) à O(n³) (≈ 1 000 opérations pour 10 caisses). Il faut que les états baissent **plus** que le coût par état ne monte. Mesurer les DEUX sur les niveaux 1 et 17 avant de juger.
+- [ ] **Poussées inchangées en optimal : 4 / 97 / 213.** Le canari. **PAS ENCORE RELANCÉ** depuis le couplage. Un écart = `h` qui surestime (bug du hongrois ou de la matrice).
+- [~] **Le pari est un échange temps ↔ états** : mesuré en **pondéré** — niveau 1 ×1,9 d'états (23 072 → 12 184), niveau 17 ~0 % (1,636 M → 1,634 M). Le coût O(n³) par état n'a pas fait exploser le temps (à confirmer au chrono). Reste à mesurer en **optimal**.
 - [ ] Puis le niveau 2, en surveillant `footprint -p PID` (**jamais `ps rss`**, cf. §6.B).
 
 ### 7.4 Si la mémoire redevient le mur
 - [ ] **Clés compactes.** Les 11 Go de `MALLOC_SMALL` du niveau 2 sont 81,7 M de `QByteArray` : 22 octets utiles, mais un en-tête `QArrayData` de 24 o plus un bloc `malloc` arrondi, plus le nœud de hachage. Un **hachage 128 bits** (valeur plate, zéro allocation) ferait tomber ces 11 Go à ~3 → **~3× de piste**. Risque de collision négligeable en 128 bits (en 64 bits : ~1,8·10⁻⁴ pour 82 M de clés — une collision élaguerait silencieusement une branche).
 - [ ] ~~Fusionner `ferme` dans `meilleurG`~~ → **ne rapporte que ~2 Go** : les `QByteArray` sont déjà partagés par COW entre les deux tables, seuls les *nœuds* sont dupliqués. Bien moins rentable que les clés compactes.
+
+---
+
+## 8. Découpage « une caisse à la fois » (goal ordering) — ANALYSÉ, EN RÉSERVE
+
+Idée : découper le gros problème en petits (maxime classique « diviser pour régner »).
+1. Trouver l'**ordre** de rangement des caisses (se concentrer sur une caisse à la fois).
+2. Une fois l'ordre fixé, positionner le joueur pour ranger cette caisse **sans créer de
+   deadlock** avec les autres.
+3. Recommencer pour chaque caisse restante.
+
+### 8.1 La clause oubliée de « diviser pour régner »
+Diviser-pour-régner et la prog. dynamique marchent quand les sous-problèmes sont
+**indépendants** et **recombinables** proprement (tri fusion…). **Sokoban est PSPACE-complet
+précisément parce que les coups interagissent globalement** : pas de coupe nette. Le découpage
+suppose deux indépendances, toutes deux fausses ici.
+
+### 8.2 Couture n°1 — temporelle : « poser puis figer » est INCOMPLET
+Ranger chaque caisse définitivement interdit deux manœuvres parfois **obligatoires** :
+- **Parquer une caisse sur une case non-but**, temporairement, pour que le joueur passe de
+  l'autre côté (il ne traverse pas une caisse).
+- **Ressortir une caisse d'un but** : quand un but est sur l'unique passage vers un autre but,
+  il faut l'y poser, l'en retirer pour laisser passer la suivante, puis la remettre.
+
+Un algo qui fige toute caisse rangée **ne peut pas exprimer** ces solutions → « aucune solution »
+sur des niveaux solubles. Limite d'expressivité, pas bug réparable. **⇒ incomplet.**
+
+### 8.3 Couture n°2 — spatiale : « trouver l'ordre » EST le problème dur
+- Une caisse posée devient un **obstacle** — pour le joueur ET pour les caisses suivantes. Donc
+  l'étape 2 (« sans deadlock ») n'est pas un test local : un placement peut condamner une caisse
+  pas encore traitée.
+- Pour savoir qu'un ordre est **valide**, il faut vérifier que le sous-problème restant est
+  soluble = **le problème d'origine**. « Trouver l'ordre » cache toute la difficulté.
+- `n!` ordres (niveau 2 : 10! = 3,6 M), *fois* la recherche de placement pour chacun.
+
+### 8.4 Ce qui est récupérable
+- **Les niveaux de test 011x SONT les sous-problèmes de ce découpage.** Traiter les autres
+  caisses comme des murs était faux *en heuristique A\* admissible* (§7 / cf. ci-dessous), mais
+  **à l'intérieur d'un sous-solve** — où l'on a décidé de ne pas toucher les autres caisses —
+  elles ne bougent pas : les murs sont alors un modèle **correct**. Les 010x/011x sont les tests
+  unitaires du « une caisse à la fois » (010x = autres caisses retirées, 011x = autres caisses
+  figées en murs).
+- **Le goal ordering marche comme GUIDE, pas comme solveur complet** — technique réelle des
+  solveurs de compétition. Sortie propre = un **nouveau solveur explicitement approché** (comme
+  le « rapide, approché » du §4.5, ou le beam §5) :
+  - choisir un ordre gloutonnement (buts en cul-de-sac d'abord, ou distance joueur-aware
+    croissante) ;
+  - résoudre caisse par caisse avec le petit A\* existant (un sous-solve à 1 caisse est minuscule) ;
+  - **backtrack borné sur l'ordre** quand un sous-problème échoue.
+  Ni complet ni optimal — mais peut-être ce qui fait enfin **avancer le niveau 2** là où l'A\*
+  global se noie. Même renoncement que §4.5/§5, rendu explicite dans le libellé.
+
+### 8.5 Rappel — pourquoi « caisses manquantes = murs » est FAUX comme heuristique
+(Piège rencontré en montant les niveaux 011x, à ne pas refaire.)
+- **010x (autres caisses = sol)** = ce que fait `distanceParBut`. On *retire* des obstacles → la
+  distance ne peut que raccourcir → borne **inférieure** → **admissible**. Optimiste mais sûr.
+- **011x (autres caisses = murs)** = on *ajoute* des obstacles → la distance ne peut que
+  s'allonger (voire ∞). Or **un mur est permanent, une caisse non** : dans la vraie solution la
+  caisse gênante se pousse hors du chemin. `h_murs` peut donc **surestimer `C*`** → A\* élague un
+  état du chemin optimal (`g+h > C*`) → **solution non optimale ou "aucune solution"**. Le canari
+  4/97/213 tombe. Même famille de faute que le faux positif de deadlock (§3bis) et la `h` qui
+  soustrait (§6.B), en pire : ici on **invente une borne fausse**.
+- La distinction qui réconcilie tout : *les murs comme obstacles sont valides DANS un sous-solve
+  figé (§8.4), invalides comme borne inférieure GLOBALE (ici)*.
 
 ---
 

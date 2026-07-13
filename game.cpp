@@ -1,4 +1,5 @@
 #include <QtDebug>
+#include <QVarLengthArray>
 #include <climits>
 #include <utility>
 #include "game.h"
@@ -48,6 +49,7 @@ Game::Game(const Game& other)
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
     gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes),
     regions(other.regions), nbRegions(other.nbRegions), distancePoussee(other.distancePoussee),
+    distanceParBut(other.distanceParBut), nbButs(other.nbButs),
     maxRegions(other.maxRegions)
 {
     if (other.cases) {
@@ -76,6 +78,8 @@ Game& Game::operator=(const Game& other) {
     regions = other.regions;
     nbRegions = other.nbRegions;
     distancePoussee = other.distancePoussee;
+    distanceParBut = other.distanceParBut;
+    nbButs = other.nbButs;
 
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -96,7 +100,9 @@ Game::Game(Game&& other) noexcept
       gagne(other.gagne), perdu(other.perdu),
       goals(std::move(other.goals)), casesMortes(std::move(other.casesMortes)),
       regions(std::move(other.regions)), nbRegions(std::move(other.nbRegions)),
-      distancePoussee(std::move(other.distancePoussee)), maxRegions(other.maxRegions)
+      distancePoussee(std::move(other.distancePoussee)),
+      distanceParBut(std::move(other.distanceParBut)), nbButs(other.nbButs),
+      maxRegions(other.maxRegions)
 {
     other.cases = nullptr;   // sinon les deux destructeurs libéreraient le même tableau
 }
@@ -120,6 +126,8 @@ Game& Game::operator=(Game&& other) noexcept {
     regions = std::move(other.regions);
     nbRegions = std::move(other.nbRegions);
     distancePoussee = std::move(other.distancePoussee);
+    distanceParBut = std::move(other.distanceParBut);
+    nbButs = other.nbButs;
 
     cases = other.cases;
 
@@ -382,15 +390,97 @@ void Game::calculCaseMorte()  {
     }
 }
 
-int Game::getHeuristique() const {
-    int h = 0;
+// Coût d'une paire caisse->but inatteignable dans la matrice du couplage. GRAND
+// mais FINI (§7.2) : le hongrois ADDITIONNE des coûts, INT_MAX déborderait. Avec
+// n <= ~30 caisses, n * INF_COUPLAGE reste très loin de la limite d'un int.
+static const int INF_COUPLAGE = 1000000;
 
-    const int j = playerPoint.x() + playerPoint.y() * largeur;
-    for (int i = 0; i < size; i++) {
-        if (cases[i] != Level::tcCaisse && cases[i] != Level::tcGoalCaisse) continue;
-        h += distancePoussee[i * maxRegions + regions[j * size + i]];
+// Affectation de coût minimal (hongrois, méthode des potentiels, O(n^3)) sur une
+// matrice n x n donnée à plat en ligne-major. Renvoie la somme minimale.
+// Implémentation classique 1-indexée (u/v potentiels, p affectation, way chemin).
+static int hongrois(const int* cout, int n) {
+    // Qt 5.15 : QVarLengthArray n'a pas de constructeur de remplissage, on initialise
+    // à la main. Prealloc = 32 -> pas d'allocation tas tant que n < 32.
+    QVarLengthArray<int, 32> u(n + 1), v(n + 1), p(n + 1), way(n + 1);
+    for (int k = 0; k <= n; k++) { u[k] = 0; v[k] = 0; p[k] = 0; way[k] = 0; }
+
+    QVarLengthArray<int, 32>  minv(n + 1);
+    QVarLengthArray<bool, 32> used(n + 1);
+
+    for (int i = 1; i <= n; i++) {
+        p[0] = i;
+        int j0 = 0;
+        for (int k = 0; k <= n; k++) { minv[k] = INT_MAX; used[k] = false; }
+
+        do {
+            used[j0] = true;
+            const int i0 = p[j0];
+            int delta = INT_MAX, j1 = -1;
+
+            for (int j = 1; j <= n; j++) {
+                if (used[j]) continue;
+                const int cur = cout[(i0 - 1) * n + (j - 1)] - u[i0] - v[j];
+                if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+                if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+            }
+
+            for (int j = 0; j <= n; j++) {
+                if (used[j]) { u[p[j]] += delta; v[j] -= delta; }
+                else         { minv[j] -= delta; }
+            }
+            j0 = j1;
+        } while (p[j0] != 0);
+
+        do {
+            const int j1 = way[j0];
+            p[j0] = p[j1];
+            j0 = j1;
+        } while (j0);
     }
-    return h;
+
+    int total = 0;
+    for (int j = 1; j <= n; j++)
+        total += cout[(p[j] - 1) * n + (j - 1)];   // caisse p[j] affectée au but j
+    return total;
+}
+
+int Game::getHeuristique() const {
+    const int j = playerPoint.x() + playerPoint.y() * largeur;
+
+    // Recense les caisses (colonnes = buts, lignes = caisses de la matrice).
+    QVarLengthArray<int, 32> caisses;
+    for (int i = 0; i < size; i++) {
+        if (cases[i] == Level::tcCaisse || cases[i] == Level::tcGoalCaisse)
+            caisses.append(i);
+    }
+    const int n = caisses.size();
+    if (n == 0) return 0;
+
+    // Garde-fou (§7.2) : les 43 niveaux ont nb caisses == nb buts, la matrice est
+    // carrée. Si un .xsb futur amenait un déséquilibre, on retombe proprement sur
+    // l'ancienne borne « chaque caisse vise son but le plus proche ».
+    if (n != nbButs) {
+        int h = 0;
+        for (int c = 0; c < n; c++) {
+            const int cell = caisses[c];
+            h += distancePoussee[cell * maxRegions + regions[j * size + cell]];
+        }
+        return h;
+    }
+
+    // cout[caisse][but] = distance de cette caisse (depuis sa case, joueur du côté
+    // regions[j][cell]) vers CE but. Inatteignable -> INF_COUPLAGE.
+    QVarLengthArray<int, 256> cout(n * n);
+    for (int c = 0; c < n; c++) {
+        const int cell = caisses[c];
+        const int r    = regions[j * size + cell];
+        for (int b = 0; b < nbButs; b++) {
+            const int d = distanceParBut[((qsizetype)b * size + cell) * maxRegions + r];
+            cout[c * n + b] = (d < 0) ? INF_COUPLAGE : d;
+        }
+    }
+
+    return hongrois(cout.constData(), n);
 }
 
 void Game::appliqueEtat(const QByteArray& cle) {
@@ -542,48 +632,66 @@ void Game::calculDistancePoussee() {
         maxRegions = qMax(maxRegions, (int)nb);
     }
 
+    // Une table de distances PAR BUT (§7.2). Un BFS à rebours par but j, seul à
+    // servir de source, remplit sa tranche distanceParBut[(j*size + b)*maxRegions + r].
+    // distancePoussee (utilisée par casesMortes et checkDefaite) en devient le MIN
+    // sur les buts — même valeur qu'un unique BFS multi-but simultané, mais on garde
+    // en plus la distance vers CHAQUE but, dont getHeuristique() a besoin.
+    nbButs = goals.size();
+    distanceParBut = QVector<int>((qsizetype)nbButs * size * maxRegions, -1);
     distancePoussee = QVector<int>(size * maxRegions, -1);
 
-    QList<QPair<int,int>> file;                       // (case de la caisse, région du joueur)
-    for (int g : goals) {
-        for (int r = 0; r < nbRegions[g]; r++) {      // un but, quel que soit le côté du joueur
-            distancePoussee[g * maxRegions + r] = 0;
+    for (int j = 0; j < nbButs; j++) {
+        const int g = goals[j];
+        int* dpb = distanceParBut.data() + (qsizetype)j * size * maxRegions;   // tranche du but j
+
+        QList<QPair<int,int>> file;                   // (case de la caisse, région du joueur)
+        for (int r = 0; r < nbRegions[g]; r++) {      // le but, quel que soit le côté du joueur
+            dpb[g * maxRegions + r] = 0;
             file.append({g, r});
         }
-    }
 
-    while (!file.isEmpty()) {
-        const auto [c, rc] = file.takeFirst();
-        const int cx = c % largeur, cy = c / largeur;
+        while (!file.isEmpty()) {
+            const auto [c, rc] = file.takeFirst();
+            const int cx = c % largeur, cy = c / largeur;
 
-        for (int d = 0; d < NB_DIRECTION; d++) {
-            // On remonte une poussée : la caisse venait de b, poussée vers c dans la
-            // direction d. Le joueur se tenait donc en p, deux cases en arrière.
-            const int bx = cx -     directions[d].dx, by = cy -     directions[d].dy;
-            const int px = cx - 2 * directions[d].dx, py = cy - 2 * directions[d].dy;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                // On remonte une poussée : la caisse venait de b, poussée vers c dans
+                // la direction d. Le joueur se tenait donc en p, deux cases en arrière.
+                const int bx = cx -     directions[d].dx, by = cy -     directions[d].dy;
+                const int px = cx - 2 * directions[d].dx, py = cy - 2 * directions[d].dy;
 
-            // Bornes : cf. le flood-fill ci-dessus, la bordure n'est pas garantie
-            // en murs (cases de remplissage hors contour).
-            if (bx < 0 || bx >= largeur || by < 0 || by >= hauteur) continue;
-            if (px < 0 || px >= largeur || py < 0 || py >= hauteur) continue;
+                // Bornes : cf. le flood-fill ci-dessus, la bordure n'est pas garantie
+                // en murs (cases de remplissage hors contour).
+                if (bx < 0 || bx >= largeur || by < 0 || by >= hauteur) continue;
+                if (px < 0 || px >= largeur || py < 0 || py >= hauteur) continue;
 
-            const int b = bx + by * largeur;
-            const int p = px + py * largeur;
+                const int b = bx + by * largeur;
+                const int p = px + py * largeur;
 
-            if (cases[b] == Level::tcMur || cases[p] == Level::tcMur) continue;
+                if (cases[b] == Level::tcMur || cases[p] == Level::tcMur) continue;
 
-            // APRÈS la poussée, le joueur se retrouve en b. Il doit donc appartenir à
-            // la région rc — celle mesurée avec la caisse en c.
-            if (regions[b * size + c] != rc) continue;
+                // APRÈS la poussée, le joueur se retrouve en b. Il doit donc appartenir
+                // à la région rc — celle mesurée avec la caisse en c.
+                if (regions[b * size + c] != rc) continue;
 
-            // AVANT la poussée : caisse en b, joueur en p.
-            const qint16 r = regions[p * size + b];
-            if (r < 0) continue;
+                // AVANT la poussée : caisse en b, joueur en p.
+                const qint16 r = regions[p * size + b];
+                if (r < 0) continue;
 
-            if (distancePoussee[b * maxRegions + r] == -1) {
-                distancePoussee[b * maxRegions + r] = distancePoussee[c * maxRegions + rc] + 1;
-                file.append({b, r});
+                if (dpb[b * maxRegions + r] == -1) {
+                    dpb[b * maxRegions + r] = dpb[c * maxRegions + rc] + 1;
+                    file.append({b, r});
+                }
             }
+        }
+
+        // distancePoussee = min sur les buts (en ignorant les -1 = inatteignable).
+        for (int k = 0; k < size * maxRegions; k++) {
+            const int v = dpb[k];
+            if (v == -1) continue;
+            if (distancePoussee[k] == -1 || v < distancePoussee[k])
+                distancePoussee[k] = v;
         }
     }
 }

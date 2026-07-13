@@ -72,15 +72,21 @@ public:
     QVector<quint8> getCaissesDeplacable() const { return getCaissesDeplacable(getZoneJoueur()); }
     QVector<quint8> getCaissesDeplacable(const QVector<bool>& zone) const;
     bool isLibre(const QPoint& p) const;
-    // Somme, pour chaque caisse du plateau, de sa distance EXACTE au but le plus
-    // proche — celle d'une caisse SEULE, mais en tenant compte de l'accessibilité
-    // du joueur : une caisse coupe le plateau, et selon le côté où il se trouve
-    // elle n'est pas poussable dans les mêmes sens (cf. distancePoussee).
+    // Borne inférieure du nombre de poussées restantes, par COUPLAGE de coût
+    // minimal (algorithme hongrois) entre les caisses et les buts.
     //
-    // Admissible : retirer les autres caisses ne fait que LIBÉRER le joueur (elles
-    // ne sont que des obstacles), donc la distance calculée seule est toujours <=
-    // au coût réel. Et chaque poussée ne déplaçant qu'une caisse, la somme reste
-    // une borne inférieure.
+    // Chaque coût cout[caisse][but] est la distance EXACTE d'une caisse SEULE vers
+    // CE but précis, tenant compte de l'accessibilité du joueur (distanceParBut,
+    // sous-produit joueur-aware : une caisse coupe le plateau, et selon le côté où
+    // il se trouve elle n'est pas poussable dans les mêmes sens). On prend ensuite
+    // l'affectation bijective caisses<->buts de somme minimale.
+    //
+    // Admissible (§7.2) : toute solution réelle réalise une bijection caisses<->buts
+    // dont le coût est >= la somme de cette affectation ; retirer les autres caisses
+    // ne fait que LIBÉRER le joueur. Domine strictement l'ancienne « chaque caisse
+    // vise son but le plus proche » (qui relâchait la contrainte de distinction) :
+    // elle corrige les COLLISIONS de buts (N caisses réclamant le même but), erreur
+    // dominante des niveaux à beaucoup de caisses.
     int getHeuristique() const;
     // Applique une poussée sans faire marcher le joueur : le TÉLÉPORTE sur la
     // case d'appui, puis pousse via move() (qui fait checkVictoire/checkDefaite).
@@ -125,6 +131,17 @@ private:
     // doublait le temps par état.
     QVector<qint16> regions, nbRegions;
     QVector<int> distancePoussee;
+
+    // distanceParBut[(BUT * size + CASE) * maxRegions + REGION] = nombre minimal de
+    // poussées pour amener une caisse SEULE de CASE vers CE but précis, le joueur
+    // étant dans REGION (composante de plateau-moins-cette-caisse). Une table par
+    // but, calculée par un BFS à rebours par but (cf. calculDistancePoussee).
+    //
+    // distancePoussee en est le min sur les buts — même valeur qu'un BFS multi-but
+    // simultané, donc casesMortes/checkDefaite sont inchangés. distanceParBut sert
+    // au couplage hongrois de getHeuristique() : cout[caisse][but] direct.
+    QVector<int> distanceParBut;
+    int nbButs = 0;
     int maxRegions = 0;
 
     bool move(EDirection dir);
