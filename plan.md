@@ -504,9 +504,41 @@ Les deux relaxations sont **orthogonales** : la table joueur-aware corrige les *
 - [~] **Le pari est un échange temps ↔ états** : mesuré en **pondéré** — niveau 1 ×1,9 d'états (23 072 → 12 184), niveau 17 ~0 % (1,636 M → 1,634 M). Le coût O(n³) par état n'a pas fait exploser le temps (à confirmer au chrono). Reste à mesurer en **optimal**.
 - [ ] Puis le niveau 2, en surveillant `footprint -p PID` (**jamais `ps rss`**, cf. §6.B).
 
-### 7.4 Si la mémoire redevient le mur
-- [ ] **Clés compactes.** Les 11 Go de `MALLOC_SMALL` du niveau 2 sont 81,7 M de `QByteArray` : 22 octets utiles, mais un en-tête `QArrayData` de 24 o plus un bloc `malloc` arrondi, plus le nœud de hachage. Un **hachage 128 bits** (valeur plate, zéro allocation) ferait tomber ces 11 Go à ~3 → **~3× de piste**. Risque de collision négligeable en 128 bits (en 64 bits : ~1,8·10⁻⁴ pour 82 M de clés — une collision élaguerait silencieusement une branche).
-- [ ] ~~Fusionner `ferme` dans `meilleurG`~~ → **ne rapporte que ~2 Go** : les `QByteArray` sont déjà partagés par COW entre les deux tables, seuls les *nœuds* sont dupliqués. Bien moins rentable que les clés compactes.
+### 7.4 Clés compactes — LE MUR MÉMOIRE EST REVENU (niveau 3) → PROCHAIN CHANTIER
+
+**Contexte (à reprendre cet après-midi, sur le Mac).** Niveaux 0/1/2/17 résolus en optimal grâce
+au couplage. **Niveau 3 (11 caisses) : tué franchement avant swap** sur la machine Linux — mur
+mémoire franc, exactement le cas prévu ici. Une caisse de plus que le 2 (résolu en 591 k états) ;
+reste à voir si sa géométrie est un « cas 2 » (collisions → s'effondre) ou un « cas 17 »
+(manœuvre → beaucoup d'états). Dans les deux cas, le poste qui sature est le **stockage des
+états**, pas le solveur ni la `h`.
+
+**DÉCISION : clé inline exacte, PAS hachage.** (Choisi le 2026-07-13, à implémenter.)
+
+Le §7.4 d'origine proposait un **hachage 128 bits**. Écarté après avoir vu le piège : un hachage
+n'est **PAS réversible**, or `appliqueEtat(cle)` **reconstruit le plateau depuis la clé** au
+dépilement (mécanisme du §4.4 étape 7). Un hachage forcerait à re-stocker l'état complet ailleurs
+dans la file ouverte → gain annulé en partie + risque de collision (élagage silencieux d'une
+branche).
+
+- [ ] **Clé = valeur POD inline** (positions des N caisses + joueur en `quint16`, ~24-34 o), au
+  lieu de `QByteArray`. Supprime l'**allocation tas par clé**, l'en-tête `QArrayData` (24 o) et
+  l'arrondi `malloc` — c'est ça les 11 Go, pas les 22 o utiles. Vise le **~3×** annoncé (11 → ~4 Go),
+  en restant **exacte** (zéro collision) et **réversible** (`appliqueEtat` marche encore).
+  - Où : type `Cle` (struct avec `quint16 v[MAX]` ou taille fixée au chargement), remplace
+    `QByteArray` partout où `getEtat()` sert de clé — `SElement.cle`, `meilleurG`
+    (`QHash<Cle,int>`), `ferme` (`QSet<Cle>`), `getEtat()`/`appliqueEtat()`.
+  - À écrire : `qHash(Cle, seed)` et `operator==(Cle,Cle)` pour QHash/QSet. Longueur fixe par
+    niveau (N+1 shorts) → comparaison et hachage triviaux, pas de délimiteur (cf. §1.1).
+  - Vérif : canari **4 / 97 / 213 inchangé** + niveau 2 toujours **591 138 / 131** (la clé encode
+    exactement le même état, aucune raison que ça bouge — un écart = bug d'encodage/hachage).
+- [ ] **Si ça ne suffit toujours pas** pour le 3 : hachage 128 bits **par-dessus** l'inline, dans
+  les seules tables de dédup (`meilleurG`/`ferme`), en gardant la clé inline exacte dans la file
+  ouverte pour la reconstruction. Collision négligeable en 128 bits ; à ne faire que si mesuré
+  nécessaire.
+- [ ] ~~Fusionner `ferme` dans `meilleurG`~~ → **ne rapporte que ~2 Go** : les clés sont déjà
+  partagées entre les deux tables, seuls les *nœuds* sont dupliqués. Bien moins rentable que les
+  clés compactes.
 
 ---
 
