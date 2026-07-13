@@ -1,6 +1,7 @@
 #ifndef SOLVEURASTAR_H
 #define SOLVEURASTAR_H
 
+#include "cle.h"
 #include "solveur.h"
 
 // A* sur les poussées : f = g + poids * h.
@@ -25,13 +26,18 @@ public:
     // NE PORTE PAS de Game. Un Game complet pèse ~700 o (72 o d'objet + le
     // tableau 'cases'), et la file ouverte d'A* compte des millions d'entrées :
     // c'était LE poste mémoire (3,4 Go sur 4,8 Go pour le niveau 2). La clé
-    // (~22 o) détermine entièrement l'état — on reconstruit le Game au
-    // dépilement avec Game::appliqueEtat(). ~700 o → ~50 o.
+    // détermine entièrement l'état — on reconstruit le Game au dépilement avec
+    // Game::appliqueEtat().
+    //
+    // Et la clé elle-même n'est plus un QByteArray mais une simple référence
+    // dans l'arène (4 o, cf. cle.h) : le QByteArray coûtait un malloc et un
+    // en-tête QArrayData par clé, pour 22 o utiles. SElement tient maintenant en
+    // 16 octets, entièrement POD — donc memcpy-able quand le tas se réalloue.
     typedef struct _SElement {
         int f;
         int g;
         int idxNoeud;
-        QByteArray cle;
+        Cle cle;
     } SElement;
 
     explicit SolveurAStar(const Game& etatDepart, int poids = 1, QObject* parent = nullptr);

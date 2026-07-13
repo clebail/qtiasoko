@@ -1,7 +1,8 @@
 #include <QQueue>
-#include <QSet>
 #include <QtDebug>
+#include <unordered_set>
 #include <utility>
+#include "cle.h"
 #include "solveurbfs.h"
 
 SolveurBFS::SolveurBFS(const Game& etatDepart, QObject* parent) : Solveur(etatDepart, parent) {
@@ -9,14 +10,20 @@ SolveurBFS::SolveurBFS(const Game& etatDepart, QObject* parent) : Solveur(etatDe
 
 void SolveurBFS::run() {
     QQueue<QPair<Game, int>> file;
-    QSet<QByteArray> vus;
     qint64 compteur = 0;
+
+    // Clés rangées bout à bout dans l'arène, l'ensemble des vus n'en portant que
+    // des références de 4 octets (cf. cle.h). C'était son poste mémoire : un
+    // malloc et un en-tête QArrayData par QByteArray, pour 22 o utiles.
+    Arene arene(depart.tailleCle());
+    std::unordered_set<Cle,CleHash,CleEq> vus(1024, CleHash{&arene}, CleEq{&arene});
 
     noeuds.clear();
     noeuds.append(Noeud{-1, -1, Game::dHaut});   // racine : aucune poussée ne la précède
 
     file.enqueue({depart, 0});
-    vus.insert(depart.getEtat());
+    depart.getEtat(arene.reserve());
+    vus.insert(Cle{arene.dernier()});
 
     while (file.size()) {
         auto [g, idx] = file.dequeue();
@@ -47,12 +54,16 @@ void SolveurBFS::run() {
                     e.pousse(i, (Game::EDirection)d);
 
                     if (!e.isPerdu()) {
-                        auto key = e.getEtat();
+                        // Clé écrite directement en fin d'arène. insert() dit s'il
+                        // s'agit d'un nouvel état ; si non, on reprend la clé —
+                        // elle est déjà dans l'arène, sous son offset d'origine.
+                        e.getEtat(arene.reserve());
 
-                        if (!vus.contains(key)) {
-                            vus.insert(key);
+                        if (vus.insert(Cle{arene.dernier()}).second) {
                             noeuds.append(Noeud{idx, i, (Game::EDirection)d});
                             file.enqueue({std::move(e), noeuds.size() - 1});
+                        } else {
+                            arene.annule();
                         }
                     }
                 }

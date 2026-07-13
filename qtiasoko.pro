@@ -37,6 +37,7 @@ SOURCES += \
 HEADERS += \
     astar.h \
     caisse.h \
+    cle.h \
     game.h \
     goal.h \
     goalcaisse.h \

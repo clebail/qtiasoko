@@ -67,6 +67,19 @@ public:
     // solveur appelle typiquement getEtat() ET getCaissesDeplacable() par
     // état exploré).
     QVector<bool> getZoneJoueur() const;
+    // Longueur de la clé d'état, en shorts : les N caisses + la case canonique du
+    // joueur. CONSTANTE sur toute une résolution — aucune caisse n'apparaît ni ne
+    // disparaît —, ce qui permet au solveur de ranger toutes ses clés bout à bout
+    // dans une arène (cf. cle.h).
+    int tailleCle() const { return nbCaisses + 1; }
+    // Écrit la clé dans 'cle', qui doit pouvoir accueillir tailleCle() shorts.
+    // C'est la forme qu'utilise le solveur : elle écrit directement dans l'arène,
+    // sans allouer.
+    void getEtat(quint16* cle) const { getEtat(cle, getZoneJoueur()); }
+    void getEtat(quint16* cle, const QVector<bool>& zone) const;
+    // Même clé, en QByteArray (short big-endian par case). Ne sert plus au
+    // solveur — un malloc par clé était son principal poste mémoire —, mais reste
+    // commode pour comparer deux états à l'unité, dans les tests.
     QByteArray getEtat() const { return getEtat(getZoneJoueur()); }
     QByteArray getEtat(const QVector<bool>& zone) const;
     QVector<quint8> getCaissesDeplacable() const { return getCaissesDeplacable(getZoneJoueur()); }
@@ -105,7 +118,9 @@ public:
     // atteignables, cf. getMinIdx), pas forcément là où il était. Sans effet :
     // getEtat() normalise déjà à cette case, pousse() téléporte, et
     // checkVictoire()/checkDefaite() ne dépendent que des caisses.
-    void appliqueEtat(const QByteArray& cle);
+    //
+    // 'cle' pointe sur tailleCle() shorts, au format de getEtat().
+    void appliqueEtat(const quint16* cle);
 private:
     int largeur = 0;
     int hauteur = 0;
@@ -116,6 +131,7 @@ private:
     int nbDep = 0;
     int nbDepCaisse = 0;
     int numNiveau = 1;
+    int nbCaisses = 0;
     bool gagne = false;
     bool perdu = false;
     QList<int> goals;

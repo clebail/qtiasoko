@@ -36,6 +36,10 @@ Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
             } else if(c.typeCase == Level::tcGoal || c.typeCase == Level::tcGoalCaisse) {
                 goals.append(idx);
             }
+
+            if (c.typeCase == Level::tcCaisse || c.typeCase == Level::tcGoalCaisse) {
+                nbCaisses++;
+            }
         }
     }
 
@@ -47,6 +51,7 @@ Game::Game(const Game& other)
     : largeur(other.largeur), hauteur(other.hauteur), size(other.size),
       playerPoint(other.playerPoint), playerDirection(other.playerDirection),
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
+      nbCaisses(other.nbCaisses),
     gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes),
     regions(other.regions), nbRegions(other.nbRegions), distancePoussee(other.distancePoussee),
     distanceParBut(other.distanceParBut), nbButs(other.nbButs),
@@ -70,6 +75,7 @@ Game& Game::operator=(const Game& other) {
     nbDep = other.nbDep;
     nbDepCaisse = other.nbDepCaisse;
     numNiveau = other.numNiveau;
+    nbCaisses = other.nbCaisses;
     gagne = other.gagne;
     perdu = other.perdu;
     goals = other.goals;
@@ -97,6 +103,7 @@ Game::Game(Game&& other) noexcept
       playerPoint(other.playerPoint), playerDirection(other.playerDirection),
       cases(other.cases),
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
+      nbCaisses(other.nbCaisses),
       gagne(other.gagne), perdu(other.perdu),
       goals(std::move(other.goals)), casesMortes(std::move(other.casesMortes)),
       regions(std::move(other.regions)), nbRegions(std::move(other.nbRegions)),
@@ -118,6 +125,7 @@ Game& Game::operator=(Game&& other) noexcept {
     nbDep = other.nbDep;
     nbDepCaisse = other.nbDepCaisse;
     numNiveau = other.numNiveau;
+    nbCaisses = other.nbCaisses;
     gagne = other.gagne;
     perdu = other.perdu;
     goals = std::move(other.goals);
@@ -263,22 +271,35 @@ bool Game::moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caisse
     return true;
 }
 
-QByteArray Game::getEtat(const QVector<bool>& zone) const {
-    QByteArray etat;
-    const short idxPalyer= getMinIdx(zone);
+void Game::getEtat(quint16* cle, const QVector<bool>& zone) const {
+    int n = 0;
 
+    // Balayage y/x croissant : les caisses sortent triées par id de case, ce qui
+    // canonicalise le fait qu'elles sont indistinguables.
     for (int y = 0; y < hauteur; y++) {
         for (int x = 0; x < largeur; x++) {
             int idx = x + y * largeur;
             if(cases[idx] == Level::tcCaisse || cases[idx] == Level::tcGoalCaisse) {
-                etat += (unsigned char)(((short)idx) >> 8);
-                etat += (unsigned char)(((short)idx) & 0x00FF);
+                cle[n++] = (quint16)idx;
             }
         }
     }
 
-    etat += (unsigned char)(((short)idxPalyer) >> 8);
-    etat += (unsigned char)(((short)idxPalyer) & 0x00FF);
+    // Le joueur en dernier, sur la case CANONIQUE de sa zone. La longueur est
+    // donc toujours nbCaisses + 1 = tailleCle() : pas de délimiteur, et l'arène
+    // peut ranger les clés bout à bout (cf. cle.h).
+    cle[n] = (quint16)getMinIdx(zone);
+}
+
+QByteArray Game::getEtat(const QVector<bool>& zone) const {
+    QVarLengthArray<quint16, 32> cle(tailleCle());
+    getEtat(cle.data(), zone);
+
+    QByteArray etat;
+    for (int i = 0; i < cle.size(); ++i) {
+        etat += (unsigned char)(cle[i] >> 8);
+        etat += (unsigned char)(cle[i] & 0x00FF);
+    }
 
     return etat;
 }
@@ -483,7 +504,7 @@ int Game::getHeuristique() const {
     return hongrois(cout.constData(), n);
 }
 
-void Game::appliqueEtat(const QByteArray& cle) {
+void Game::appliqueEtat(const quint16* cle) {
     // 1. Plateau à nu. Mapping LOCAL, case par case : surtout pas de
     //    goals.contains(i), qui serait une recherche linéaire dans une QList —
     //    donc O(n²) sur l'ensemble du plateau.
@@ -497,19 +518,16 @@ void Game::appliqueEtat(const QByteArray& cle) {
         }
     }
 
-    // 2. La clé = [id des N caisses triés] + [id canonique de la zone du joueur],
-    //    un short big-endian par case (cf. getEtat()). Le dernier est le joueur.
-    const int nb = cle.size() / 2;
-    for (int k = 0; k < nb; ++k) {
-        const int idx = (static_cast<quint8>(cle[2 * k]) << 8) | static_cast<quint8>(cle[2 * k + 1]);
-
-        if (k < nb - 1) {
-            cases[idx] = (cases[idx] == Level::tcGoal) ? Level::tcGoalCaisse : Level::tcCaisse;
-        } else {
-            cases[idx] = (cases[idx] == Level::tcGoal) ? Level::tcGoalPlayer : Level::tcPlayer;
-            playerPoint = QPoint(idx % largeur, idx / largeur);
-        }
+    // 2. La clé = [id des N caisses triés] + [id canonique de la zone du joueur]
+    //    (cf. getEtat()). Sa longueur est tailleCle(), le dernier est le joueur.
+    for (int k = 0; k < nbCaisses; ++k) {
+        const int idx = cle[k];
+        cases[idx] = (cases[idx] == Level::tcGoal) ? Level::tcGoalCaisse : Level::tcCaisse;
     }
+
+    const int idxJoueur = cle[nbCaisses];
+    cases[idxJoueur] = (cases[idxJoueur] == Level::tcGoal) ? Level::tcGoalPlayer : Level::tcPlayer;
+    playerPoint = QPoint(idxJoueur % largeur, idxJoueur / largeur);
 
     nbDep = 0;
     nbDepCaisse = 0;

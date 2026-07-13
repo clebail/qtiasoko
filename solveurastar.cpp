@@ -1,8 +1,8 @@
 #include <QtDebug>
-#include <QHash>
-#include <QSet>
 #include <algorithm>
 #include <climits>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include "solveurastar.h"
 
@@ -26,8 +26,17 @@ SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, QObject *parent)
 
 void SolveurAStar::run() {
     std::vector<SElement> file;
-    QHash<QByteArray,int> meilleurG;
     qint64 compteur = 0;
+
+    // Toutes les clés du solve vivent ici, bout à bout (cf. cle.h). Les
+    // conteneurs ci-dessous n'en portent que des références de 4 octets.
+    //
+    // std::unordered_map et non QHash : hacher ou comparer une clé exige de LIRE
+    // l'arène, or QHash passe par un qHash(T)/operator== globaux, à qui on n'a
+    // aucun moyen de la transmettre. Les foncteurs de la STL, eux, sont des
+    // objets — ils la portent.
+    Arene arene(depart.tailleCle());
+    std::unordered_map<Cle,int,CleHash,CleEq> meilleurG(1024, CleHash{&arene}, CleEq{&arene});
 
     // Ensemble des états DÉJÀ DÉVELOPPÉS. Uniquement en mode pondéré.
     //
@@ -49,7 +58,7 @@ void SolveurAStar::run() {
     // re-développement : la solution reste bornée par w * C*, et on récupère le
     // facteur 2,6.
     const bool interditRedeveloppement = (poids > 1);
-    QSet<QByteArray> ferme;
+    std::unordered_set<Cle,CleHash,CleEq> ferme(1024, CleHash{&arene}, CleEq{&arene});
 
     // 'noeuds' appartient à la classe de base et survit d'une résolution à
     // l'autre : sans ce reset, la racine ne serait pas à l'indice 0 et le premier
@@ -57,8 +66,9 @@ void SolveurAStar::run() {
     noeuds.clear();
     noeuds.append(Noeud{-1, -1, Game::dHaut});   // racine : aucune poussée ne la précède
 
-    const QByteArray cleDepart = depart.getEtat();
-    meilleurG.insert(cleDepart, 0);
+    depart.getEtat(arene.reserve());
+    const Cle cleDepart{arene.dernier()};
+    meilleurG.emplace(cleDepart, 0);
 
     file.push_back({poids * depart.getHeuristique(), 0, 0, cleDepart});
     std::push_heap(file.begin(), file.end(), compare);
@@ -80,10 +90,11 @@ void SolveurAStar::run() {
 
         // Entrée périmée : un meilleur chemin vers ce même état a été trouvé
         // APRÈS qu'on ait enfilé celle-ci. On la jette sans la compter.
-        if(cur.g > meilleurG.value(cur.cle, INT_MAX)) continue;
+        auto itCur = meilleurG.find(cur.cle);
+        if(itCur != meilleurG.end() && cur.g > itCur->second) continue;
 
         if (interditRedeveloppement) {
-            if (ferme.contains(cur.cle)) continue;
+            if (ferme.count(cur.cle)) continue;
             ferme.insert(cur.cle);
         }
 
@@ -94,11 +105,14 @@ void SolveurAStar::run() {
         }
 
         // Le Game n'était pas dans la file : on le reconstruit depuis la clé.
-        etat.appliqueEtat(cur.cle);
+        etat.appliqueEtat(arene.lit(cur.cle.offset));
 
         if(etat.isGagne()) {
             qDebug() << "SolveurAStar: solution trouvee apres" << compteur << "etats explores,"
                      << cur.g << "poussees.";
+            qDebug() << "  arene =" << arene.nbCles() << "cles,  meilleurG =" << meilleurG.size()
+                     << ",  noeuds =" << noeuds.size() << ",  file =" << file.size()
+                     << ",  capacite file =" << file.capacity();
             emit solutionTrouvee(reconstruire(cur.idxNoeud), compteur);
             return;
         }
@@ -115,21 +129,42 @@ void SolveurAStar::run() {
                     e.pousse(i, (Game::EDirection)d);
 
                     if(!e.isPerdu()) {
-                        auto cle = e.getEtat();
+                        // La clé s'écrit directement en fin d'arène — aucune
+                        // allocation. Si l'enfant se révèle être un doublon, on
+                        // la reprend par annule() : elle y figure déjà.
+                        e.getEtat(arene.reserve());
+                        Cle cle{arene.dernier()};
+
                         int gE = cur.g + 1;   // une poussée = un pas, toujours
 
                         // Déjà développé : inutile de le ré-enfiler, on le
                         // jetterait au dépilement — et la file gonflerait pour rien.
-                        if (interditRedeveloppement && ferme.contains(cle)) continue;
+                        if (interditRedeveloppement && ferme.count(cle)) {
+                            arene.annule();
+                            continue;
+                        }
 
                         // Ce test commande l'ENFILAGE, pas seulement l'insertion
                         // dans meilleurG : on n'enfile que si l'état est inconnu,
                         // ou atteint par un chemin strictement meilleur. Le BFS
-                        // pouvait se contenter d'un QSet parce qu'une FIFO
-                        // découvre les états dans l'ordre du coût ; A* dépile par
-                        // f, pas par g, et n'a pas cette garantie.
-                        if(gE >= meilleurG.value(cle, INT_MAX)) continue;
-                        meilleurG.insert(cle, gE);
+                        // pouvait se contenter d'un ensemble de vus parce qu'une
+                        // FIFO découvre les états dans l'ordre du coût ; A* dépile
+                        // par f, pas par g, et n'a pas cette garantie.
+                        auto it = meilleurG.find(cle);
+                        if (it != meilleurG.end()) {
+                            if (gE >= it->second) {
+                                arene.annule();
+                                continue;
+                            }
+                            it->second = gE;
+                            // L'état est déjà dans l'arène : on réutilise SA clé et
+                            // on rend celle qu'on vient d'écrire, sinon chaque
+                            // réenfilage d'un état connu la stockerait à nouveau.
+                            cle = it->first;
+                            arene.annule();
+                        } else {
+                            meilleurG.emplace(cle, gE);
+                        }
 
                         noeuds.append(Noeud{cur.idxNoeud, i, (Game::EDirection)d});
 
