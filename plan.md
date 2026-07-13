@@ -215,6 +215,11 @@ Gain mémoire réel : **÷2 à ÷3** (niveau 1 A* : 518 → 160 Mo ; niveau 17 p
 **⚠️ Piège de mesure sur macOS.** `ps rss` est **faux** : le compresseur mémoire sort les pages compressées de la RSS. Observé : RSS qui *baisse* (7,1 → 5,3 Go) pendant que les structures grossissent, alors que le `phys_footprint` réel était à **13 Go**. Utiliser `footprint -p PID`, jamais `ps rss`. Toutes les mesures mémoire antérieures de ce document sont donc **sous-estimées**.
 
 #### 🔴 Niveau 2 : VERDICT — hors d'atteinte de cette approche
+> **⚠️ PÉRIMÉ (voir §7.-1) : le niveau 2 A ÉTÉ RÉSOLU** en 591 138 états / 131 poussées, une fois
+> la `h` rendue quasi exacte par le couplage hongrois (§7). Le diagnostic ci-dessous — « la cause
+> est en amont, `h` ne discrimine pas » — était le **bon**, et sa conclusion (« seule une meilleure
+> `h` sauvera le 2 ») s'est vérifiée. Ce n'était pas un mur de combinatoire, c'était un mur
+> d'heuristique.
 A* pondéré (w=2) + `SElement` allégé + gel + `casesMortes`, build `-O2` :
 ```
 25 min | 119 606 000 états dépilés | 74 352 881 distincts | file ouverte 37 453 122
@@ -398,17 +403,45 @@ matrice `n×n` puis résout l'affectation de coût minimal (hongrois par potenti
 
 | niveau | mode | états AVANT | états APRÈS | poussées |
 |---|---|---|---|---|
-| 1  | A* pondéré (+fermeture)  | 23 072    | **12 184**    | 103 (inchangé) |
-| 17 | A* pondéré (+fermeture)  | 1 636 218 | **1 634 102** | **227 → 225** |
+| 1  | A* **optimal**           | 783 474    | **13 208**    | **97 ✅** (canari) |
+| 1  | A* pondéré (+fermeture)  | 23 072     | **12 184**    | 103 (inchangé) |
+| 17 | A* **optimal**           | 14 826 798 | **1 088 789** | **213 ✅** (canari) |
+| 17 | A* pondéré (+fermeture)  | 1 636 218  | **1 634 102** | 227 → 225 |
+| **2** | A* **optimal**        | ∞ (jamais résolu) | **591 138** | **131 🏆** |
 
-**Le gain suit exactement la nature de l'erreur résiduelle**, comme prévu §7.1 :
-- **niveau 1** (erreur = collisions de buts) : **×1,9 d'états**, tension `h(départ)` 91 % → 98 %.
-- **niveau 17** (erreur = coût de manœuvre, déjà pris par la joueur-aware) : **~0 % d'états**
-  (+7 seulement sur `h`, 91 % → 94 %), mais solution un cran meilleure (227 → 225).
+### 🏆 LE NIVEAU 2 EST RÉSOLU
+Le niveau 2 (10 caisses), « hors d'atteinte de cette approche » (§4.4, tué à 20,7 Go / 119 M
+d'états sans converger), tombe en **591 138 états, 131 poussées, en A* OPTIMAL**. Détail qui
+résume tout : **591 k < 1,09 M** — le niveau 2 est devenu **plus facile que le 17**.
+
+Pourquoi (validation totale du §7.1) : l'erreur du 17 est du **coût de manœuvre** (dur à capturer,
+`h` plafonne à 94 %) ; celle du 2 est de la **collision de buts** — dix caisses se disputant les
+mêmes buts —, **exactement** ce que le couplage corrige. Tension `h(départ)` = **129 / 131 =
+98,5 %** : heuristique quasi exacte → espace effondré. Le §6.0 poussé à son terme.
+
+Optimalité : aucune référence externe n'existait pour le 2, mais `h` est **admissible par
+construction** et confirmée sur le 1 (97) et le 17 (213) → **131 est l'optimum**.
+
+**Le gros gain du couplage est en mode OPTIMAL, et il est ÉNORME** — c'est la
+**confirmation de la thèse §6.0** : la relation tension→élagage est **très non-linéaire près de
+100 %**. À 91 % de tension A* optimal ne coupait que −20 % (§4.3) ; resserrer de quelques points
+au sommet fait s'effondrer le nombre d'états (presque plus aucun n'a `f ≤ C*` à tort).
+- **niveau 1, optimal** : **×59** (783 474 → 13 208), tension 91 % → 98 %, optimalité préservée.
+- **niveau 17, optimal** : **×13,6** (14,8 M → 1,09 M), tension 91 % → **94 %** seulement, et 213.
+
+**⚠️ Correction d'une conclusion trop rapide.** En voyant d'abord le résultat *pondéré* du 17
+(~0 % de gain), j'avais écrit « le couplage ne sert à rien sur le 17 ». **Faux — vrai seulement
+en pondéré.** Le pondéré (w=2 + fermeture) était déjà écrasé à ~1,6 M par le *plongeon* ; le
+petit gain de tension n'y était pas visible. En **optimal**, ce même +3 points de tension vaut
+×13,6. Leçon : **le bénéfice d'une `h` plus tendue se lit en mode OPTIMAL**, le pondéré le masque.
+
+**Conséquence : sur le 17, le mode pondéré est devenu inutile** — l'optimal avec couplage
+(1,09 M / 213) explore **moins** d'états que le pondéré avec couplage (1,63 M / 225), *et* il est
+optimal.
 
 **⚠️ Non encore vérifié :**
-- [ ] **Canari optimal** : le mode optimal doit toujours rendre **4 / 97 / 213**. Pas relancé
-  depuis le couplage — à confirmer avant de déclarer `h` admissible.
+- [~] **Canari optimal** : doit rendre **4 / 97 / 213**. **Niveau 1 = 97 ✅, niveau 17 = 213 ✅**
+  (admissible confirmé sur les deux gros). Reste le **0 (=4)**, trivial.
 - [ ] **Niveau 2** : le vrai juge (10 caisses → collisions dominantes). Pas encore lancé.
 - [ ] **Bonus deadlock du couplage** (§7.2, affectation à coût infini) : **pas implémenté**. Les
   paires inatteignables valent `INF_COUPLAGE = 1 000 000` (grand mais fini) → un état sans
@@ -421,7 +454,10 @@ joueur conservé). Isolent chaque distance caisse↔but individuelle pour valide
 de faire confiance à l'affectation globale. Certains couples sont volontairement insolubles
 (caisse coincée / but derrière un mur) → testent au passage la détection de deadlock.
 
-### 7.0 Où en est le niveau 2 (état des lieux après §6)
+### 7.0 Où en est le niveau 2 (état des lieux après §6) — PÉRIMÉ, résolu depuis (§7.-1)
+> Ce qui suit décrit la meilleure tentative *avant* le couplage (pondéré, ne terminait pas). Depuis
+> §7.-1, le niveau 2 est **résolu en 591 138 états en optimal**. Conservé pour le raisonnement.
+
 
 Meilleure tentative à ce jour, A* pondéré w=2 + `h` joueur-aware + fermeture :
 ```
