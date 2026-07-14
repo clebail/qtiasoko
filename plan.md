@@ -2,8 +2,9 @@
 
 > ## 📏 Les mesures ont leurs outils : `mesures/` — voir [mesures/mesure.md](mesures/mesure.md)
 >
-> Six harnais en ligne de commande (`bench`, `mou`, `diverge`, `paires`, `trace`,
-> `tunnels`) qui compilent le solveur tel quel et l'interrogent de l'extérieur.
+> Sept harnais en ligne de commande (`bench`, `mou`, `diverge`, `paires`, `trace`,
+> `passages`, `congestion`) qui compilent le solveur tel quel et l'interrogent de
+> l'extérieur.
 > **Avant de croire une affirmation de ce document, re-mesure-la** : les chiffres
 > écrits ici vieillissent en silence pendant que le code bouge (l'étape 11 a failli
 > « corriger » une régression mémoire qui n'existait pas, faute d'avoir comparé
@@ -725,7 +726,7 @@ Résultat : trois des quatre chantiers envisagés sont **sans objet**, et le vra
 gisement n'était nulle part dans le plan.
 
 Outils : `mesures/mou`, `mesures/diverge`, `mesures/bench` (`INSTRUM_F`), `mesures/paires`,
-`mesures/trace`, `mesures/tunnels`.
+`mesures/trace`.
 
 ### 9.1 A\* ne gaspille RIEN — le résultat qui renverse tout
 
@@ -822,40 +823,6 @@ attrape pas, justement parce qu'ils sont réellement différents.
 **Ce n'est pas le mou de `h` qui fait exploser l'exploration. C'est la combinatoire des
 ordres de rangement.**
 
-### 9.5 Prochain chantier : les MACRO-POUSSÉES (tunnels)
-
-`tunnels` mesure la part des poussées atterrissant dans un couloir sans alternative
-(perpendiculaires = murs, hors but) — là où s'arrêter ne sert **à rien**, sauf à créer
-un point de branchement pour aller tripoter une autre caisse :
-
-| niveau | couloirs de la grille | poussées fusionnables | états développés |
-|---|---|---|---|
-| 0  | 0 %  | 0 %  | 5 |
-| 1  | 19 % | **40 %** (39/97) | 15 596 |
-| 2  | 10 % | 23 % (30/131) | 590 871 |
-| 3  | 15 % | 17 % (23/134) | 7 280 104 |
-| 17 | 12 % | 15 % (33/213) | 1 091 295 |
-
-Le gain n'est pas de 15-40 % : il est **combinatoire**. On ne retire pas 33 états au
-niveau 17, on retire les *branches* qui partaient de ces 33 points de branchement,
-répétées à chaque combinaison des autres caisses.
-
-**Implémentation prévue**
-- [ ] Table statique `tunnel[case][axe]`, calculée une fois (comme `casesMortes`).
-- [ ] `Game::pousse()` **continue** tant que la caisse est en couloir selon la
-  direction de poussée, hors but, et poussable ; **retourne le nombre de poussées**.
-- [ ] Solveur : `gE = cur.g + k` au lieu de `+1`. Le coût reste le nombre de poussées.
-  `Noeud{idxCaisse, dir}` suffit toujours — la macro est déterministe, `reconstruire()`
-  la rejoue à l'identique.
-
-**⚠️ Le piège, à surveiller** : forcer la macro **interdit de s'arrêter au milieu du
-tunnel**. Ça se défend presque toujours (une caisse plantée dans un couloir bloque le
-joueur ; la pousser jusqu'à la sortie ne peut que libérer le passage). **Sauf** si la
-solution optimale demande de la pousser dans le couloir puis de lui faire faire
-**demi-tour**, le joueur la reprenant de l'autre côté par un autre chemin. On perdrait
-l'optimalité **en silence** — la faute maison (§3bis, §6.B, §8.5).
-→ **Juge : le canari 4 / 97 / 131 / 134 / 213.** Un seul chiffre qui bouge = macro fautive.
-
 ### 9.7 🎯 DÉCOMPOSITION EXACTE DU COÛT — `C* = trajets + congestion` (2026-07-14)
 
 **Le résultat le plus structurant du projet.** Trouvé en regardant les solutions, pas
@@ -905,8 +872,6 @@ dévient jamais.
   l'écrire avant de s'en apercevoir).
 - **Les 6 poussées non productives** du 17 (§9.3), dont 5 dans les 9 premières :
   c'est le démêlage. Chacune creuse l'écart de 2 → **6 × 2 = 12 = le mou**. Tout colle.
-- **Pourquoi les macro-poussées étaient condamnées** (§9.5) : elles interdisaient de
-  GARER une caisse dans une artère — précisément la manœuvre que la congestion exige.
 
 #### Ce que ça ouvre
 
@@ -1010,14 +975,13 @@ Deux approches, à trancher :
   une zone étroite) et borner son coût d'extraction. Capture potentiellement les 12, mais
   l'admissibilité devient délicate — et c'est **exactement le terrain où ce projet s'est
   fait avoir trois fois** (§3bis faux positif de deadlock, §6.B `h` qui soustrait, §8.5
-  caisses = murs, §9.5 macro-poussées).
+  caisses = murs).
 
 **Juge dans les deux cas : le canari 4 / 97 / 131 / 134 / 213.** Une `h` qui surestime ne
 rend pas une solution un peu moins bonne — elle fait **manquer l'optimum sans aucun signal**.
 
 ### 9.6 Ce qui restera dehors
-Le **coût de manœuvre** (§9.3) est hors de portée de toute heuristique caisse↔but, et
-les macro-poussées ne l'attaquent pas non plus (elles réduisent les états, pas le mou).
+Le **coût de manœuvre** (§9.3) est hors de portée de toute heuristique caisse↔but.
 Le niveau 17 gardera son mou de 12. Piste éventuelle, non explorée : une **PDB à 2 ou 3
 caisses** (BFS rétrograde sur `(case₁, case₂, région)`, ~313 Ko) — mais elle ne verrait
 pas le mou du 17 non plus (interaction de paire nulle), et son admissibilité demande un
@@ -1034,10 +998,6 @@ deux paires disjointes en caisses peuvent viser les mêmes buts).
 > puis 204 poussées de rangement pur). Mais elle ne sauve pas le découpage, dont les
 > deux coutures (§8.2 incomplet, §8.3 « trouver l'ordre EST le problème ») tiennent
 > toujours.
->
-> Ce que cette observation désigne vraiment, c'est **les macro-poussées (§9.5)** :
-> elles exploitent le même corridor, mais **sans renoncer à l'optimalité** — on ne fige
-> aucune caisse, on refuse seulement de s'arrêter au milieu d'un couloir.
 
 Idée : découper le gros problème en petits (maxime classique « diviser pour régner »).
 1. Trouver l'**ordre** de rangement des caisses (se concentrer sur une caisse à la fois).

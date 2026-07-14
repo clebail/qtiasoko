@@ -195,16 +195,14 @@ void SolveurAStar::run() {
                 if (dirPoussePossible & mask) {
                     Game e(etat);
 
-                    const int k = appliquer(e, i, (Game::EDirection)d);
-
-                    if(k > 0 && !e.isPerdu()) {
+                    if(e.pousse(i, (Game::EDirection)d) && !e.isPerdu()) {
                         // La clé s'écrit directement en fin d'arène — aucune
                         // allocation. Si l'enfant se révèle être un doublon, on
                         // la reprend par annule() : elle y figure déjà.
                         e.getEtat(arene.reserve());
                         Cle cle{arene.dernier()};
 
-                        int gE = cur.g + k;   // k poussées : l'arête est pondérée
+                        int gE = cur.g + 1;   // une poussée = une arête de coût 1
 
                         // Déjà développé : inutile de le ré-enfiler, on le
                         // jetterait au dépilement — et la file gonflerait pour rien.

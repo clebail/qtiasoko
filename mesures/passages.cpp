@@ -30,9 +30,8 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    // BFS pour les sous-niveaux a 1 caisse : optimal en poussees, et sans aucune
-    // macro-poussee (les macros ne vivent que dans A* pondere, mais autant ne
-    // laisser aucun doute sur le trajet mesure).
+    // BFS pour les sous-niveaux a 1 caisse : optimal en poussees, aucun doute sur
+    // le trajet mesure.
     // A* optimal pour le niveau complet : le BFS n'y terminerait pas.
     const bool bfs = (QString(argv[1]) == "bfs");
     const Solveur::EType type = bfs ? Solveur::Bfs : Solveur::Astar;

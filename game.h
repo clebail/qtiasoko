@@ -109,25 +109,6 @@ public:
     // sur les enfants réellement retenus, et non sur tous les doublons.
     // 'nbDep' ne comptera qu'un coup au lieu de la marche complète.
     bool pousse(int idxCaisse, EDirection dir);
-    // MACRO-POUSSÉE : pousse, puis CONTINUE tant que la caisse est dans un couloir
-    // selon la direction de poussée (les deux côtés perpendiculaires sont des murs),
-    // qu'elle n'est pas sur un but, et qu'elle peut encore avancer. Rend le nombre
-    // de poussées effectuées (0 si la première a échoué).
-    //
-    // Pourquoi : dans un tel couloir, la caisse n'a plus AUCUNE alternative — le
-    // joueur ne peut pas la prendre de côté, il n'y a pas la place. S'y arrêter
-    // n'apporte donc rien... sauf à créer un point de branchement où le solveur peut
-    // lâcher cette caisse pour aller en pousser une autre. Ces états intermédiaires
-    // sont tous distincts et tous optimaux (§9.1) : la déduplication ne les attrape
-    // pas, et ils font exploser l'exploration en entrelacements (§9.4).
-    //
-    // On s'ARRÊTE sur un but : c'est une destination légitime.
-    //
-    // ⚠️ Réservé à A*, qui pondère ses arêtes par le nombre de poussées. Le BFS
-    // explore par couches en supposant des arêtes de coût 1 : lui donner des macros
-    // de coût k lui ferait rendre des solutions NON optimales — et c'est justement
-    // notre étalon d'optimalité.
-    int pousseMacro(int idxCaisse, EDirection dir);
     // Réécrit le plateau à partir d'une clé getEtat() : les caisses et le joueur
     // sont replacés, les murs et les buts ne bougent pas. Permet au solveur de ne
     // PAS transporter un Game complet (~700 o) dans sa file ouverte, mais juste la
@@ -155,12 +136,6 @@ private:
     bool perdu = false;
     QList<int> goals;
     QVector<bool> casesMortes;
-
-    // couloirs[case] : bits COULOIR_H / COULOIR_V. Une caisse posée là ne peut
-    // bouger QUE sur l'axe correspondant — les deux côtés perpendiculaires sont des
-    // murs, le joueur ne peut pas la prendre de flanc. Statique (ne dépend que des
-    // murs), calculée une fois, partagée par COW entre tous les clones.
-    QVector<quint8> couloirs;
 
     // regions[CASE * size + CAISSE] = id de la composante connexe de CASE, sur un
     // plateau où le seul obstacle (hors murs) est une caisse posée en CAISSE.
@@ -198,14 +173,7 @@ private:
     bool bloqueeSurAxe(int idxCaisse, EDirection dirA, EDirection dirB, QVector<bool>& enCours) const;
     bool estCaisse(int idx) const;
     void calculDistancePoussee();
-    void calculCouloirs();
 };
-
-// Bits de Game::couloirs. COULOIR_H : les cases du DESSUS et du DESSOUS sont des
-// murs -> une caisse ici ne glisse qu'horizontalement. COULOIR_V : idem gauche et
-// droite -> elle ne glisse que verticalement.
-static const quint8 COULOIR_H = 1;
-static const quint8 COULOIR_V = 2;
 
 Q_DECLARE_METATYPE(Game::EDirection)
 

@@ -45,15 +45,6 @@ public:
 protected:
     void run() override;
 
-    // ⚠️ MACRO-POUSSÉES : ESSAYÉES, ABANDONNÉES (cf. plan §9.5).
-    //
-    // Game::pousseMacro() existe encore, mais N'EST PLUS APPELÉE. Ne pas la
-    // rebrancher sans lire le §9.5 : elle casse l'optimalité (niveau 2 : 133
-    // poussées au lieu de 131) ET la capacité à résoudre (le niveau 2 ne passe plus
-    // du tout en pondéré). Le critère « couloir » ne suffit pas — il faut pouvoir
-    // GARER une caisse au milieu d'une artère, c'est précisément ce que la macro
-    // interdit.
-
 private:
     const int poids;
 };
