@@ -921,6 +921,100 @@ petit et confiné à quelques cases.
 - [ ] ⚠️ Toute estimation ajoutée à `h` doit rester **admissible** : sous-estimer la
   congestion, jamais la surestimer. Le canari 4 / 97 / 131 / 134 / 213 est le juge.
 
+### 9.8 🔬 ANATOMIE DE LA CONGESTION — le motif, et pourquoi les paires étaient vouées à l'échec
+
+Le §9.7 dit que le mou EST le coût de congestion, et **où** il est payé. Le §9.8 dit
+**de quoi il est fait**. Outil : `mesures/congestion`.
+
+#### La congestion, c'est du DÉBLOCAGE
+
+Les 6 poussées non productives du niveau 17, disséquées (quelle caisse bouge, quitte-t-elle
+son trajet solo, quelle case libère-t-elle, et qui attendait cette case) :
+
+| poussée | caisse écartée | libère | la case libérée est sur le trajet de |
+|---|---|---|---|
+| 2  | 1 | (4,9)  | **2, 4, 5** |
+| 5  | 1 | (5,9)  | 2 |
+| 7  | 5 | (4,10) | 4 |
+| 9  | 0 | (4,8)  | **1, 2, 4, 5** |
+| 69 | 4 | (4,10) | 5 |
+| 4  | 2 | (7,9)  | *(personne)* |
+
+**5 sur 6 libèrent une case qui est sur le trajet d'une ou plusieurs autres caisses.**
+Les caisses du tas de départ sont assises sur les routes les unes des autres ; il faut
+les écarter avant que les suivantes puissent passer. Chaque écartement coûte **2**
+(elle s'éloigne de son but → `h` monte de 1 ; elle devra revenir → 1 poussée de plus).
+
+**L'exception (poussée 4) est un SECOND motif** : la caisse 2 est écartée alors qu'elle
+ne bloque le trajet d'aucune caisse. Elle bloquait le **JOUEUR**, qui doit pouvoir se
+placer derrière les caisses pour les pousser. Ce motif-là ne se lit PAS sur les trajets
+des caisses.
+
+#### ❌ Ce qui est DÉFINITIVEMENT écarté : toute décomposition par PAIRES
+
+L'énigme du §9.3 est résolue : l'interaction à 2 caisses est **nulle** sur le 17 (0/15
+paires) alors que son mou vaut 12. Raison : **dans un sous-problème à 2 caisses, les
+4 autres sont retirées — il y a donc la place de manœuvrer.** Le surcoût n'existe que
+quand les 6 sont là.
+
+> **Ce n'est pas une interaction, c'est une DENSITÉ.**
+
+Aucune PDB par paires ne la verra jamais, quel que soit le soin qu'on y met (on aurait
+pu l'écrire pendant deux jours pour découvrir qu'elle rend zéro). Le §9.6 le disait déjà
+sans savoir pourquoi ; maintenant on sait.
+
+#### ❌ Ce qui est aussi RÉFUTÉ : « hors couloir = non productif »
+
+Tentation naturelle (`mesures/horsreseau.py`) : définir le RÉSEAU comme l'union des
+trajets solos, et déclarer non productive toute poussée qui en sort. **Faux, mesuré :**
+
+| niveau | mou | passages hors réseau | 2 × hors réseau | |
+|---|---|---|---|---|
+| 1  | 2  | 3 | 6  | ✗ |
+| 2  | 2  | 1 | 2  | ✓ |
+| 3  | 6  | 7 | 14 | ✗ |
+| 17 | **12** | **2** | 4 | ✗ |
+
+Le 17 est décisif : 12 de mou pour seulement **2** passages hors réseau. Une caisse
+écartée atterrit presque toujours **sur le trajet d'une voisine** — donc dans le réseau.
+Vue d'une carte de trafic agrégée, elle n'est jamais « sortie ».
+
+> **Le critère est PAR CAISSE, jamais par case.** Une carte de trafic a perdu l'identité
+> des caisses ; elle ne peut structurellement pas voir la congestion.
+
+La seule formulation correcte reste : **une poussée est non productive quand elle ne fait
+pas descendre `h`** (elle éloigne CETTE caisse de SON but), et `mou = 2 × (non productives)` —
+vérifié : 6 × 2 = 12 sur le 17.
+
+#### ⏭️ PROCHAIN CHANTIER : borner le coût de déblocage
+
+L'idée qui vient : *« si la caisse i est posée sur le trajet solo de j, elle devra être
+écartée → +2 »*. O(n²) sur les trajets solos, qu'on sait maintenant EXACTS (§9.7).
+
+**⚠️ Mais ce n'est PAS admissible tel quel** — à voir AVANT de coder :
+- si `i` **part d'elle-même** avant que `j` n'arrive (en avançant sur son propre trajet),
+  elle libère la case **gratuitement** → compter +2 **SURESTIME** → optimum perdu en silence ;
+- à l'inverse, la caisse 1 du 17 est écartée **deux fois** (poussées 2 et 5) : elle coûte
+  +4 à elle seule → compter +2 par bloqueur **sous-estime** parfois ;
+- et le **second motif** (bloquer le joueur, poussée 4) échappe entièrement à ce raisonnement.
+
+Deux approches, à trancher :
+
+- [ ] **PRUDENTE (recommandée pour commencer)** — ne compter que les écartements
+  **démontrables** : `i` est sur le trajet de `j`, ET son propre trajet ne lui permet pas
+  de quitter cette case sans reculer. Sous-estime beaucoup (peut-être 4 des 12 sur le 17),
+  mais **admissible par construction**. Rappel du §9.2 : combler le mou est un effet de
+  **SEUIL**, pas un gain graduel — même un tiers récupéré peut faire basculer des masses
+  d'états de `f < C*` (obligatoires) à `f = C*` (optionnels).
+- [ ] **AMBITIEUSE** — modéliser l'amas (un groupe de caisses mutuellement bloquantes dans
+  une zone étroite) et borner son coût d'extraction. Capture potentiellement les 12, mais
+  l'admissibilité devient délicate — et c'est **exactement le terrain où ce projet s'est
+  fait avoir trois fois** (§3bis faux positif de deadlock, §6.B `h` qui soustrait, §8.5
+  caisses = murs, §9.5 macro-poussées).
+
+**Juge dans les deux cas : le canari 4 / 97 / 131 / 134 / 213.** Une `h` qui surestime ne
+rend pas une solution un peu moins bonne — elle fait **manquer l'optimum sans aucun signal**.
+
 ### 9.6 Ce qui restera dehors
 Le **coût de manœuvre** (§9.3) est hors de portée de toute heuristique caisse↔but, et
 les macro-poussées ne l'attaquent pas non plus (elles réduisent les états, pas le mou).

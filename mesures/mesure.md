@@ -26,7 +26,16 @@ mkdir -p build/bench && cd build/bench && qmake ../../bench.pro && make
 | `diverge <niv>` | `h` désigne-t-elle le bon coup ? | Rang du bon enfant parmi les enfants classés par `h`, et mou de `h` le long du chemin optimal. |
 | `paires <niv>` | Le mou vient-il d'une interaction entre 2 caisses ? | Matrice des suppléments d'interaction, par paire de caisses. |
 | `trace <niv> [pas]` | À quoi ressemble la solution ? | La grille poussée par poussée, avec les poussées **non productives** (les manœuvres). |
-| `tunnels <niv>` | Quel est le potentiel des macro-poussées ? | Part des poussées atterrissant dans un couloir sans alternative. |
+| `tunnels <niv>` | Quel est le potentiel des macro-poussées ? | Part des poussées atterrissant dans un couloir sans alternative. (Piste abandonnée, §9.5.) |
+| `passages <bfs\|astar> <niv...>` | **Les couloirs sont-ils prédictibles ?** | Carte des passages de caisse. Sur PLUSIEURS niveaux, en somme : superpose les caisses résolues seules. **C'est l'outil du §9.7** : l'écart avec la vraie solution vaut EXACTEMENT le mou de `h`. |
+| `congestion <niv> <solo...>` | **De quoi le mou est-il fait ?** | Dissèque chaque poussée non productive : quelle caisse est écartée, quelle case elle libère, et qui attendait cette case. **C'est l'outil du §9.8.** |
+| `derive.py <src> <base>` | — | Génère les sous-niveaux à 1 caisse + 1 but (`012x` ← 17, `013x` ← 1, `014x` ← 2, `015x` ← 3). |
+| `goulots.py` | Où sont les passages obligés ? | Une carte PNG par niveau. ⚠️ Mesure la propagation par POUSSÉE, pas le flood-fill du joueur (voir les pièges). |
+| `cumul.py`, `horsreseau.py` | — | Additionnent / comparent les cartes exportées par l'app (bouton « Export passages »). |
+
+**L'app compte aussi les passages** : chaque case affiche le nombre de fois qu'une caisse
+l'a occupée (1 sous chaque caisse au départ — elle y est déjà), et le bouton
+**« Export passages »** écrit le tout en `.txt`.
 
 ## Pièges de mesure déjà rencontrés (ne pas les refaire)
 
@@ -46,3 +55,12 @@ mkdir -p build/bench && cd build/bench && qmake ../../bench.pro && make
   (2 caisses, 2 buts).
 - **`ps rss` ment sur macOS** (le compresseur mémoire sort les pages de la RSS).
   Utiliser `/usr/bin/time -l` (« peak memory footprint ») ou `footprint -p PID`.
+- **Une carte de trafic a perdu l'identité des caisses.** Elle agrège tout le monde, donc
+  elle ne peut PAS servir à juger la congestion : une caisse écartée atterrit presque
+  toujours sur le trajet d'une voisine, sans jamais « sortir du réseau ». Mesuré (§9.8) :
+  niveau 17, **12 de mou pour 2 passages hors réseau**. Le critère est PAR CAISSE, jamais
+  par case.
+- **`timeout` n'existe pas sur macOS** (ni `gtimeout` sans Homebrew). Un script de balayage
+  qui l'utilise fait échouer TOUS les niveaux instantanément et les compte comme des
+  timeouts — y compris le niveau 0, qui se résout en 1 ms. Lancer en fond + `kill` après
+  délai.
