@@ -56,10 +56,19 @@ protected:
     // le sont. Ce trajet ne sert qu'à l'affichage, jamais à l'identité d'un
     // état : reconstruire() le recalcule donc une seule fois, le long de la
     // solution, en rejouant les poussées depuis 'depart'.
+    // 8 octets, pas 12 : il y a un Noeud par état DÉCOUVERT, et le niveau 3 en
+    // découvre 21,5 M — chaque octet s'y paie en centaines de mégaoctets.
+    //
+    // ⚠️ 'idxCaisse' est un index de CASE sur la grille (reconstruire() en tire
+    // x = idx % largeur, y = idx / largeur), PAS le rang de la caisse parmi les
+    // N. Les grilles vont jusqu'à 20x16 = 320 cases : un quint8 y déborderait en
+    // silence (la case 300 deviendrait la 44) et corromprait le rejeu sans que
+    // le nombre d'états ni le nombre de poussées ne bougent d'un chiffre. D'où
+    // le quint16 — qui, avec le padding, tient dans les mêmes 8 octets.
     struct Noeud {
-        int parent;
-        int idxCaisse;
-        Game::EDirection dir;
+        qint32 parent;
+        quint16 idxCaisse;
+        quint8 dir;
     };
 
     // Offset de la case d'APPUI relative à la caisse — l'opposé du vecteur de

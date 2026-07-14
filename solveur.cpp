@@ -47,13 +47,15 @@ QList<Game::EDirection> Solveur::reconstruire(int idx) {
         const Noeud& n = noeuds[i];
         if (n.parent == -1) continue;   // la racine n'est précédée d'aucune poussée
 
-        const QPoint appui(n.idxCaisse % g.getLargeur() + appuis[n.dir].dx,
-                           n.idxCaisse / g.getLargeur() + appuis[n.dir].dy);
+        const Game::EDirection dir = (Game::EDirection)n.dir;
+
+        const QPoint appui(n.idxCaisse % g.getLargeur() + appuis[dir].dx,
+                           n.idxCaisse / g.getLargeur() + appuis[dir].dy);
 
         chemin += AStar(&g).getChemin(g.getPlayerPoint(), appui);
-        chemin.append(n.dir);
+        chemin.append(dir);
 
-        g.pousse(n.idxCaisse, n.dir);
+        g.pousse(n.idxCaisse, dir);
     }
 
     return chemin;

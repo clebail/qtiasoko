@@ -19,7 +19,7 @@ void SolveurBFS::run() {
     std::unordered_set<Cle,CleHash,CleEq> vus(1024, CleHash{&arene}, CleEq{&arene});
 
     noeuds.clear();
-    noeuds.append(Noeud{-1, -1, Game::dHaut});   // racine : aucune poussée ne la précède
+    noeuds.append(Noeud{-1, 0, 0});   // racine : aucune poussée ne la précède (idxCaisse/dir jamais lus)
 
     file.enqueue({depart, 0});
     depart.getEtat(arene.reserve());
@@ -60,7 +60,7 @@ void SolveurBFS::run() {
                         e.getEtat(arene.reserve());
 
                         if (vus.insert(Cle{arene.dernier()}).second) {
-                            noeuds.append(Noeud{idx, i, (Game::EDirection)d});
+                            noeuds.append(Noeud{idx, (quint16)i, (quint8)d});
                             file.enqueue({std::move(e), noeuds.size() - 1});
                         } else {
                             arene.annule();

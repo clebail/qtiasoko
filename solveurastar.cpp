@@ -31,12 +31,12 @@ void SolveurAStar::run() {
     // Toutes les clés du solve vivent ici, bout à bout (cf. cle.h). Les
     // conteneurs ci-dessous n'en portent que des références de 4 octets.
     //
-    // std::unordered_map et non QHash : hacher ou comparer une clé exige de LIRE
-    // l'arène, or QHash passe par un qHash(T)/operator== globaux, à qui on n'a
-    // aucun moyen de la transmettre. Les foncteurs de la STL, eux, sont des
-    // objets — ils la portent.
+    // meilleurG est à ADRESSAGE OUVERT (TableG, cf. cle.h) et non un
+    // std::unordered_map : la map chaînée payait ~40 o d'infrastructure par
+    // entrée (noeud alloué un par un + seau) pour 8 o utiles, ce qui en faisait
+    // le premier poste mémoire du solveur — ~800 Mo sur le niveau 3.
     Arene arene(depart.tailleCle());
-    std::unordered_map<Cle,int,CleHash,CleEq> meilleurG(1024, CleHash{&arene}, CleEq{&arene});
+    TableG meilleurG(&arene);
 
     // Ensemble des états DÉJÀ DÉVELOPPÉS. Uniquement en mode pondéré.
     //
@@ -64,11 +64,11 @@ void SolveurAStar::run() {
     // l'autre : sans ce reset, la racine ne serait pas à l'indice 0 et le premier
     // enfant deviendrait son propre parent — reconstruire() boucherait à l'infini.
     noeuds.clear();
-    noeuds.append(Noeud{-1, -1, Game::dHaut});   // racine : aucune poussée ne la précède
+    noeuds.append(Noeud{-1, 0, 0});   // racine : aucune poussée ne la précède (idxCaisse/dir jamais lus)
 
     depart.getEtat(arene.reserve());
     const Cle cleDepart{arene.dernier()};
-    meilleurG.emplace(cleDepart, 0);
+    meilleurG.insere(cleDepart, 0);
 
     file.push_back({poids * depart.getHeuristique(), 0, 0, cleDepart});
     std::push_heap(file.begin(), file.end(), compare);
@@ -90,8 +90,8 @@ void SolveurAStar::run() {
 
         // Entrée périmée : un meilleur chemin vers ce même état a été trouvé
         // APRÈS qu'on ait enfilé celle-ci. On la jette sans la compter.
-        auto itCur = meilleurG.find(cur.cle);
-        if(itCur != meilleurG.end() && cur.g > itCur->second) continue;
+        const TableG::Slot* slotCur = meilleurG.cherche(cur.cle);
+        if(slotCur && cur.g > slotCur->g) continue;
 
         if (interditRedeveloppement) {
             if (ferme.count(cur.cle)) continue;
@@ -150,23 +150,23 @@ void SolveurAStar::run() {
                         // pouvait se contenter d'un ensemble de vus parce qu'une
                         // FIFO découvre les états dans l'ordre du coût ; A* dépile
                         // par f, pas par g, et n'a pas cette garantie.
-                        auto it = meilleurG.find(cle);
-                        if (it != meilleurG.end()) {
-                            if (gE >= it->second) {
+                        TableG::Slot* slot = meilleurG.cherche(cle);
+                        if (slot) {
+                            if (gE >= slot->g) {
                                 arene.annule();
                                 continue;
                             }
-                            it->second = gE;
+                            slot->g = gE;
                             // L'état est déjà dans l'arène : on réutilise SA clé et
                             // on rend celle qu'on vient d'écrire, sinon chaque
                             // réenfilage d'un état connu la stockerait à nouveau.
-                            cle = it->first;
+                            cle = slot->cle;
                             arene.annule();
                         } else {
-                            meilleurG.emplace(cle, gE);
+                            meilleurG.insere(cle, gE);
                         }
 
-                        noeuds.append(Noeud{cur.idxNoeud, i, (Game::EDirection)d});
+                        noeuds.append(Noeud{cur.idxNoeud, (quint16)i, (quint8)d});
 
                         file.push_back({gE + poids * e.getHeuristique(), gE, noeuds.size()-1, cle});
                         std::push_heap(file.begin(), file.end(), compare);

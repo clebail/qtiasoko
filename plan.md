@@ -410,11 +410,12 @@ matrice `n×n` puis résout l'affectation de coût minimal (hongrois par potenti
 | **2** | A* **optimal**        | ∞ (jamais résolu) | **591 138** | **131 🏆** |
 
 > ⚠️ **Les « états APRÈS » de ce tableau sont PÉRIMÉS** (constaté le 2026-07-13 en §7.4). Le code
-> actuel rend **15 596** sur le niveau 1 optimal (et non 13 208) et **1 091 295** sur le 17 (et non
-> 1 088 789). Vérifié : ce n'est **pas** une régression de la clé arène — l'ancien binaire,
-> reconstruit depuis `HEAD` via `git worktree`, rend exactement les mêmes chiffres. Ce sont les
-> valeurs du tableau qui datent d'un état antérieur du code. **Les POUSSÉES, elles, sont
-> inchangées** (97 / 213) : le canari n'a jamais menti. Références à jour en §7.4.
+> actuel rend **15 596** sur le niveau 1 optimal (et non 13 208), **1 091 295** sur le 17 (et non
+> 1 088 789), et **590 871** sur le 2 (et non 591 138 — constaté le 2026-07-14 en §étape 11).
+> Vérifié : ce n'est **pas** une régression de la clé arène — l'ancien binaire, reconstruit depuis
+> `HEAD` via `git worktree`, rend exactement les mêmes chiffres. Ce sont les valeurs du tableau qui
+> datent d'un état antérieur du code. **Les POUSSÉES, elles, sont inchangées** (97 / 213 / 131) :
+> le canari n'a jamais menti. Références à jour en §7.4 / étape 11.
 
 ### 🏆 LE NIVEAU 2 EST RÉSOLU
 Le niveau 2 (10 caisses), « hors d'atteinte de cette approche » (§4.4, tué à 20,7 Go / 119 M
@@ -606,17 +607,94 @@ brièvement l'ancien **et** le nouveau) → les 2,49 Go mesurés. Le modèle se 
 **Le poste dominant n'est plus la clé, c'est la TABLE qui la range** : `unordered_map` paie
 40 o d'infrastructure (nœud + seau) pour 8 o de contenu utile.
 
-#### Étape 11 — Adressage ouvert → PROCHAIN CHANTIER
+#### Étape 11 — Adressage ouvert — FAIT (gain : 1,4× à 2,0×)
 
-- [ ] **`meilleurG` en table à adressage ouvert** : un `std::vector` de slots `{Cle, g}` de **8 o**,
-  sans nœud alloué, sans liste chaînée, sans tableau de seaux. À 70 % de charge : **~210 Mo au lieu
-  de ~800**. C'est le plus gros gisement restant, et de loin.
-- [ ] **`Noeud` resserré** : `idxCaisse` (< 32) et `dir` (< 4) tiennent chacun dans un `quint8` →
-  `{qint32 parent; quint8 idxCaisse; quint8 dir;}` = **8 o au lieu de 12**.
-- [ ] `reserve()` sur l'arène et la file : supprime les pics transitoires de doublement.
-- Cible : **~1,6 Go**, soit **2,1× cumulé** sur les 3,37 Go d'origine.
-- Vérif : mêmes canaris (**4 / 97 / 213 / 134**) et **mêmes nombres d'états au chiffre près**
-  (7 280 104 pour le 3, 1 091 295 pour le 17) — comparés à l'ancien binaire via `git worktree`.
+**Mesuré binaire contre binaire** (ancien reconstruit depuis `HEAD` via `git worktree`, même
+machine, même session — cf. le piège de méthode ci-dessous) :
+
+| niveau | états | poussées | AVANT | APRÈS | gain |
+|---|---|---|---|---|---|
+| 1  | 15 596    | **97** ✅  | 8,32 Mo  | 6,05 Mo    | 1,38× |
+| 2  | 590 871   | **131** ✅ | 256,6 Mo | 189,0 Mo   | 1,36× |
+| 17 | 1 091 295 | **213** ✅ | 162,3 Mo | 79,5 Mo    | **2,04×** |
+| 3  | 7 280 104 | **134** ✅ | 2,87 Go  | **1,72 Go** | **1,66×** |
+
+**Canari intact partout** (4 / 97 / 213 / 134 / 131) et **nombres d'états identiques au chiffre
+près**, avant comme après. 131 tests unitaires passent. Le gain **croît avec la taille du niveau**
+— cohérent : c'est `meilleurG` qui domine sur les gros, et c'est lui qu'on a attaqué.
+
+**Ce qui a été fait :**
+- [x] **`meilleurG` en table à adressage ouvert** (`TableG`, `cle.h`) : un `std::vector` de cellules
+  `{Cle, g}` de **8 o**, sondage linéaire, charge max 70 %, aucune allocation par entrée. Remplace
+  un `unordered_map` qui payait ~40 o d'infrastructure (nœud alloué un par un + seau) pour 8 o
+  utiles. Pas de suppression → pas de pierre tombale.
+- [x] **`Noeud` resserré à 8 o** : `{qint32 parent; quint16 idxCaisse; quint8 dir;}`.
+- [x] **Arène par BLOCS** (à la place du `reserve()` prévu, qui était inapplicable — voir plus bas).
+
+##### ⚠️ Piège n°1 — `idxCaisse` en `quint8` : le plan avait TORT, et le bug aurait été silencieux
+Le plan annonçait « `idxCaisse` (< 32) tient dans un `quint8` ». **Faux.** `idxCaisse` n'est pas le
+rang de la caisse parmi les N : c'est un **index de CASE sur la grille** — `reconstruire()` en tire
+`x = idx % largeur, y = idx / largeur`. Or les niveaux 10 et 19 font 20×16 = **320 cases**. Un
+`quint8` y aurait fait déborder la case 300 en case 44, corrompant le rejeu **sans que le nombre
+d'états ni le nombre de poussées ne bougent d'un chiffre** — le canari n'aurait rien vu.
+→ `quint16`, qui tient dans les mêmes 8 octets grâce au padding. Aucun coût.
+
+##### ⚠️ Piège n°2 — `slots` est un mot-clé Qt
+Nommer le tableau de la table `slots` le fait **disparaître** : Qt fait `#define slots` dans
+`qobjectdefs.h` (pour écrire `public slots:`). `std::vector<Slot> slots;` devient
+`std::vector<Slot> ;` (« declaration does not declare anything ») et chaque `slots[i]` se réduit à
+`[i]`, que le compilateur lit comme l'ouverture d'une **lambda**. Le déluge d'erreurs qui suit ne
+pointe jamais la cause. → membre renommé `cellules`.
+
+##### ⚠️ Piège n°3 (le plus instructif) — comparer un binaire à un CHIFFRE ÉCRIT, et non à un binaire
+Première mesure après l'adressage ouvert : niveau 3 à **2,72 Go**, contre les **2,49 Go** annoncés
+par ce document. Conclusion apparente : *régression mémoire*, l'inverse du but. Et niveau 2 à
+590 871 états contre les **591 138** du §7.-1 : *267 états de perdus*, donc un bug d'encodage.
+
+**Les deux étaient faux.** L'ancien binaire, reconstruit depuis `HEAD`, rend sur cette machine
+**2,87 Go** et **590 871 états** :
+- les 2,49 Go dataient d'autres conditions de mesure → le vrai gain est **2,87 → 1,72 Go** ;
+- les 591 138 états étaient **périmés**, exactement comme les 13 208 du niveau 1 que le §7.-1
+  signalait déjà lui-même.
+
+J'ai failli « corriger » une régression qui n'existait pas. **Un chiffre écrit dans un document
+n'est pas une référence** : il vieillit en silence pendant que le code bouge. La seule référence
+est un binaire qu'on relance. Le §7.4 prescrivait déjà le `git worktree` pour cette raison — il
+faut l'appliquer AVANT de diagnostiquer, pas après.
+
+##### `reserve()` était inapplicable → arène par blocs
+Le plan prévoyait un `reserve()` sur l'arène et la file. **Impossible** : il faut connaître le
+nombre d'états d'avance, or c'est précisément ce qu'on cherche.
+
+Diagnostic à la place (niveau 3, après l'adressage ouvert) — régime **permanent** vs **pic** :
+
+| poste | taille | coût |
+|---|---|---|
+| arène | 18,5 M × 24 o | 444 Mo |
+| `meilleurG` | 33,5 M cellules × 8 o | 268 Mo |
+| `noeuds` | 21,5 M × 8 o | ~268 Mo |
+| file ouverte | 16,8 M × 16 o | 268 Mo |
+| **permanent** | | **~1,25 Go** |
+| **pic mesuré** | | **1,83 Go** |
+
+Les ~580 Mo d'écart sont du **pur transitoire de doublement** : un `std::vector` qui double détient
+l'ancien tableau ET le nouveau le temps de la copie. L'arène, premier poste, en était le principal
+responsable.
+
+→ **`Arene` rangée en blocs de 65536 clés, jamais réalloués** (index de clé, `bloc = idx >> 16`,
+`pos = idx & 0xFFFF` — décalage et masque, pas de division). Un bloc alloué ne bouge plus jamais :
+**aucun pic**, et les pointeurs vers les clés deviennent **valides à vie** — le piège « le pointeur
+rendu est invalidé par la réservation suivante », documenté en tête de `cle.h`, disparaît.
+Effet mesuré : niveau 3 **1,83 → 1,72 Go**, niveau 17 **116,8 → 79,5 Mo**.
+
+##### Ce qui reste
+Cible du plan : ~1,6 Go sur le niveau 3. **Atteint à 1,72 Go.** Les postes restants sont tous du
+régime permanent (plus de transitoire à gratter) :
+- [ ] `noeuds` et la file ouverte doublent encore (QVector / std::vector) — même remède par blocs
+  possible, gain attendu ~200 Mo au pic.
+- [ ] `meilleurG` à 268 Mo pour 18,5 M entrées est déjà au plancher de ce que coûte une clé + un g.
+  Seul un hachage 128 bits (sans stocker la clé) descendrait plus bas — mais `appliqueEtat()` a
+  besoin de la clé exacte, donc l'arène resterait de toute façon.
 
 - [ ] **Si ça ne suffit toujours pas** : hachage 128 bits **par-dessus** l'arène, dans les seules
   tables de dédup, en gardant la clé exacte dans l'arène pour la reconstruction (`appliqueEtat` en
