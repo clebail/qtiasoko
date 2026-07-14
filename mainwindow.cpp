@@ -1,6 +1,9 @@
 #include <QDir>
+#include <QFile>
+#include <QFileDialog>
 #include <QKeyEvent>
 #include <QMessageBox>
+#include <QTextStream>
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
@@ -14,6 +17,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     cbSolveur->setFocusPolicy(Qt::NoFocus);
     pbResoudre->setFocusPolicy(Qt::NoFocus);
     pbRevoir->setFocusPolicy(Qt::NoFocus);
+    pbExport->setFocusPolicy(Qt::NoFocus);
 
     for (const Solveur::SType& t : Solveur::types()) {
         cbSolveur->addItem(t.libelle, static_cast<int>(t.type));
@@ -41,6 +45,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(cbNiveau, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onNiveauChange);
     connect(pbResoudre, &QPushButton::clicked, this, &MainWindow::onIALance);
     connect(pbRevoir, &QPushButton::clicked, this, &MainWindow::onRevoir);
+    connect(pbExport, &QPushButton::clicked, this, &MainWindow::onExportPassages);
     connect(&timerRejeu, &QTimer::timeout, this, &MainWindow::rejouerCoup);
     timerRejeu.setInterval(150);
 
@@ -62,9 +67,46 @@ void MainWindow::onNiveauChange(int index) {
     derniereSolutionCoups.clear();
     pbRevoir->setEnabled(false);
 
+    initPassages();
+
     wGame->setGame(&game);
     wGame->setEtatsExplores(0);
+    wGame->setPassages(passages);
     wGame->update();
+}
+
+void MainWindow::initPassages() {
+    const int size = game.getLargeur() * game.getHauteur();
+    passages = QVector<int>(size, 0);
+
+    // Une caisse occupe déjà sa case de départ : le compte y démarre à 1.
+    for (int i = 0; i < size; i++) {
+        const Level::ETypeCase c = game.getCase(i);
+        if (c == Level::tcCaisse || c == Level::tcGoalCaisse) passages[i] = 1;
+    }
+}
+
+// Un coup, et le comptage du passage de caisse s'il y en a un.
+bool MainWindow::joue(Game::EDirection dir) {
+    const QPoint avant  = game.getPlayerPoint();
+    const int    caisses = game.getNbDepCaisse();
+
+    if (!game.deplace(dir)) return false;
+
+    if (game.getNbDepCaisse() > caisses) {
+        // Le joueur a avancé d'une case ; la caisse qu'il vient de pousser est
+        // juste devant lui, dans le même sens.
+        const QPoint apres = game.getPlayerPoint();
+        const QPoint delta = apres - avant;
+        const QPoint caisse = apres + delta;
+
+        const int idx = caisse.x() + caisse.y() * game.getLargeur();
+        if (idx >= 0 && idx < passages.size()) passages[idx]++;
+
+        wGame->setPassages(passages);
+    }
+
+    return true;
 }
 
 // Contrôles verrouillés pendant qu'un solveur tourne ou qu'une solution se
@@ -127,8 +169,14 @@ void MainWindow::onRevoir() {
 
     game = derniereSolutionDepart;
     coupsRestants = derniereSolutionCoups;
+
+    // On repart du départ : le compteur aussi (1 sous chaque caisse), sinon deux
+    // visionnages cumulent leurs passages.
+    initPassages();
+
     wGame->setGame(&game);
     wGame->setEtatsExplores(derniereSolutionEtats);
+    wGame->setPassages(passages);
 
     setControlesActifs(false);
     pbRevoir->setEnabled(false);
@@ -145,8 +193,75 @@ void MainWindow::rejouerCoup() {
     }
 
     Game::EDirection dir = coupsRestants.takeFirst();
-    game.deplace(dir);
+    joue(dir);
     wGame->update();
+}
+
+// Export texte de la carte des passages, à côté de la grille du niveau, pour
+// pouvoir la lire et l'annoter hors de l'app.
+void MainWindow::onExportPassages() {
+    const QString chemin = QFileDialog::getSaveFileName(
+        this, "Exporter les passages",
+        QString("passages_niveau%1.txt").arg(game.getNumNiveau(), 2, 10, QChar('0')),
+        "Texte (*.txt)");
+    if (chemin.isEmpty()) return;
+
+    QFile f(chemin);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Export", "Écriture impossible.");
+        return;
+    }
+
+    const int L = game.getLargeur(), H = game.getHauteur();
+    QTextStream out(&f);
+
+    out << "Niveau " << game.getNumNiveau() << "\n";
+    out << "Passages de caisse par case (cumulé : une caisse qui repasse compte à nouveau).\n";
+    out << "Poussées jouées : " << game.getNbDepCaisse()
+        << "   Déplacements : " << game.getNbDep() << "\n\n";
+
+    // La grille, pour situer.
+    out << "-- grille --\n";
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < L; x++) {
+            switch (game.getCase(x + y * L)) {
+                case Level::tcMur:        out << '#'; break;
+                case Level::tcCaisse:     out << '$'; break;
+                case Level::tcGoalCaisse: out << '*'; break;
+                case Level::tcGoal:       out << '.'; break;
+                case Level::tcPlayer:     out << '@'; break;
+                case Level::tcGoalPlayer: out << '+'; break;
+                default:                  out << ' '; break;
+            }
+        }
+        out << "\n";
+    }
+
+    // Les passages, alignés sur la même grille (3 colonnes par case pour que les
+    // nombres à 2 chiffres restent lisibles).
+    out << "\n-- passages (3 caracteres par case) --\n";
+    int total = 0, pic = 0;
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < L; x++) {
+            const int idx = x + y * L;
+            if (game.getCase(idx) == Level::tcMur) { out << "###"; continue; }
+
+            const int n = (idx < passages.size()) ? passages[idx] : 0;
+            total += n;
+            if (n > pic) pic = n;
+
+            if (n == 0) out << "  .";
+            else        out << QString("%1").arg(n, 3);
+        }
+        out << "\n";
+    }
+
+    out << "\ntotal des passages : " << total << "   maximum sur une case : " << pic << "\n";
+    f.close();
+
+    QMessageBox::information(this, "Export",
+        QString("Écrit : %1\n%2 passages, pic à %3 sur une case.")
+            .arg(chemin).arg(total).arg(pic));
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
@@ -159,10 +274,10 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
         bool moved = false;
 
         switch (keyEvent->key()) {
-            case Qt::Key_Up:    moved = game.haut();   break;
-            case Qt::Key_Right: moved = game.droite(); break;
-            case Qt::Key_Down:  moved = game.bas();    break;
-            case Qt::Key_Left:  moved = game.gauche(); break;
+            case Qt::Key_Up:    moved = joue(Game::dHaut);   break;
+            case Qt::Key_Right: moved = joue(Game::dDroite); break;
+            case Qt::Key_Down:  moved = joue(Game::dBas);    break;
+            case Qt::Key_Left:  moved = joue(Game::dGauche); break;
             default: break;
         }
 

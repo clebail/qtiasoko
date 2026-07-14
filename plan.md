@@ -856,6 +856,71 @@ solution optimale demande de la pousser dans le couloir puis de lui faire faire
 l'optimalité **en silence** — la faute maison (§3bis, §6.B, §8.5).
 → **Juge : le canari 4 / 97 / 131 / 134 / 213.** Un seul chiffre qui bouge = macro fautive.
 
+### 9.7 🎯 DÉCOMPOSITION EXACTE DU COÛT — `C* = trajets + congestion` (2026-07-14)
+
+**Le résultat le plus structurant du projet.** Trouvé en regardant les solutions, pas
+les statistiques.
+
+**Protocole** (`mesures/passages`, `mesures/derive.py`) : on dérive un sous-niveau par
+caisse (1 caisse + 1 but apparié, les autres caisses et buts RETIRÉS — les `012x`,
+`013x`, `014x`, `015x`), on résout chacun **en BFS** (optimal en poussées, aucun biais),
+et on **superpose** les cases occupées. On compare à la carte de la vraie solution
+(niveau complet, **A\* optimal**).
+
+| niveau | caisses seules | complet | écart | mou (`C* - h`) |
+|---|---|---|---|---|
+| 1  | 95  | 97  | **2**  | 2 ✓ |
+| 2  | 129 | 131 | **2**  | 2 ✓ |
+| 3  | 128 | 134 | **6**  | 6 ✓ |
+| 17 | 201 | 213 | **12** | 12 ✓ |
+
+**L'écart vaut EXACTEMENT le mou de `h`, sur les 4 niveaux.** Ce n'est pas une
+approximation, c'est une égalité — et elle est logique : `h` EST la somme des trajets
+solos (couplage hongrois sur les distances joueur-aware). Le mou est donc, par
+définition, ce que la réalité coûte **en plus** de la somme des solos : le **prix de la
+congestion**.
+
+```
+C*  =  Σ (trajets des caisses seules)  +  coût de congestion
+       └──── h, EXACT ────────────────┘    └── le mou, 2 à 12 ──┘
+```
+
+#### Ce qui est neuf : on sait OÙ le prix est payé
+
+Les **couloirs sont prédits SANS ERREUR**. Sur le niveau 17, l'écart case par case est
+**nul** sur les trois couloirs (trafic 11, 6 et 5 — des dizaines de cases), et
+**tout** l'écart (12) est concentré dans la **zone de départ**, là où les 6 caisses sont
+massées et doivent se démêler. Sur le niveau 1, l'écart est dans la zone d'**arrivée**
+(le rangement final). Toujours : **là où les caisses se marchent dessus**.
+
+Une caisse lancée dans un corridor suit exactement son trajet solo. Les autres ne la
+dévient jamais.
+
+#### Ce que ça explique enfin
+
+- **L'anomalie du §9.3** : l'interaction à 2 caisses est NULLE sur le 17 (0/15 paires)
+  alors que son mou vaut 12. Normal — la congestion du 17 n'est pas un conflit de
+  paire, c'est un **embouteillage collectif** dans le tas de départ. Il faut 3+ caisses
+  pour le voir. Une PDB par paires ne l'aurait **jamais** capturé (et on aurait pu
+  l'écrire avant de s'en apercevoir).
+- **Les 6 poussées non productives** du 17 (§9.3), dont 5 dans les 9 premières :
+  c'est le démêlage. Chacune creuse l'écart de 2 → **6 × 2 = 12 = le mou**. Tout colle.
+- **Pourquoi les macro-poussées étaient condamnées** (§9.5) : elles interdisaient de
+  GARER une caisse dans une artère — précisément la manœuvre que la congestion exige.
+
+#### Ce que ça ouvre
+
+Le solveur brûle un million d'états pour redécouvrir péniblement les **trajets** — qu'on
+peut lire d'avance, exactement. Le seul vrai inconnu est un problème de **démêlage local**,
+petit et confiné à quelques cases.
+
+- [ ] Estimer le coût de congestion (ne serait-ce qu'à ±1) comblerait le mou. Rappel du
+  §9.2 : combler le mou est un effet de **SEUIL** — il fait passer les états de
+  « obligatoires » (`f < C*`) à « optionnels » (`f = C*`). Sur le niveau 2, 99,7 % des
+  états basculeraient.
+- [ ] ⚠️ Toute estimation ajoutée à `h` doit rester **admissible** : sous-estimer la
+  congestion, jamais la surestimer. Le canari 4 / 97 / 131 / 134 / 213 est le juge.
+
 ### 9.6 Ce qui restera dehors
 Le **coût de manœuvre** (§9.3) est hors de portée de toute heuristique caisse↔but, et
 les macro-poussées ne l'attaquent pas non plus (elles réduisent les états, pas le mou).

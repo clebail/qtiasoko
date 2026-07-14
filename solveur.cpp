@@ -53,9 +53,12 @@ QList<Game::EDirection> Solveur::reconstruire(int idx) {
                            n.idxCaisse / g.getLargeur() + appuis[dir].dy);
 
         chemin += AStar(&g).getChemin(g.getPlayerPoint(), appui);
-        chemin.append(dir);
 
-        g.pousse(n.idxCaisse, dir);
+        // Une MACRO-poussée vaut k poussées consécutives dans la même direction :
+        // le joueur pousse simplement k fois de suite. appliquer() rend k (1 pour
+        // le BFS, qui ne fait pas de macros).
+        const int k = appliquer(g, n.idxCaisse, dir);
+        for (int i = 0; i < k; i++) chemin.append(dir);
     }
 
     return chemin;

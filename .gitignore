@@ -13,3 +13,4 @@ tests/tst_getetat
 qtiasoko.app/
 .DS_Store
 mesures/build/
+mesures/__pycache__/

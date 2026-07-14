@@ -45,6 +45,7 @@ Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
 
     calculDistancePoussee();
     calculCaseMorte();
+    calculCouloirs();
 }
 
 Game::Game(const Game& other)
@@ -53,6 +54,7 @@ Game::Game(const Game& other)
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
       nbCaisses(other.nbCaisses),
     gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes),
+    couloirs(other.couloirs),
     regions(other.regions), nbRegions(other.nbRegions), distancePoussee(other.distancePoussee),
     distanceParBut(other.distanceParBut), nbButs(other.nbButs),
     maxRegions(other.maxRegions)
@@ -80,6 +82,7 @@ Game& Game::operator=(const Game& other) {
     perdu = other.perdu;
     goals = other.goals;
     casesMortes = other.casesMortes;
+    couloirs = other.couloirs;
     maxRegions = other.maxRegions;
     regions = other.regions;
     nbRegions = other.nbRegions;
@@ -106,6 +109,7 @@ Game::Game(Game&& other) noexcept
       nbCaisses(other.nbCaisses),
       gagne(other.gagne), perdu(other.perdu),
       goals(std::move(other.goals)), casesMortes(std::move(other.casesMortes)),
+      couloirs(std::move(other.couloirs)),
       regions(std::move(other.regions)), nbRegions(std::move(other.nbRegions)),
       distancePoussee(std::move(other.distancePoussee)),
       distanceParBut(std::move(other.distanceParBut)), nbButs(other.nbButs),
@@ -130,6 +134,7 @@ Game& Game::operator=(Game&& other) noexcept {
     perdu = other.perdu;
     goals = std::move(other.goals);
     casesMortes = std::move(other.casesMortes);
+    couloirs = std::move(other.couloirs);
     maxRegions = other.maxRegions;
     regions = std::move(other.regions);
     nbRegions = std::move(other.nbRegions);
@@ -552,6 +557,71 @@ bool Game::pousse(int idxCaisse, EDirection dir) {
     cases[idxPlayer] = cases[idxPlayer] == Level::tcGoal ? Level::tcGoalPlayer : Level::tcPlayer;
 
     return move(dir);
+}
+
+// Les cases perpendiculaires à la poussée sont des murs : la caisse ne peut plus
+// aller que tout droit (ou revenir sur ses pas, ce qui annulerait la poussée et
+// n'est jamais optimal). Voir game.h pour le pourquoi.
+int Game::pousseMacro(int idxCaisse, EDirection dir) {
+    if (!pousse(idxCaisse, dir)) return 0;
+
+    const int pas = directions[(int)dir].dx + directions[(int)dir].dy * largeur;
+    const quint8 masque = (directions[(int)dir].dx != 0) ? COULOIR_H : COULOIR_V;
+
+    int k = 1;
+    while (!gagne && !perdu) {
+        // Après move(), le joueur occupe l'ancienne case de la caisse : celle-ci
+        // est donc juste devant lui, dans le sens de la poussée.
+        const int idxCourant = playerPoint.x() + playerPoint.y() * largeur + pas;
+
+        // Sur un but : destination légitime, on ne force pas la caisse à le
+        // dépasser.
+        if (cases[idxCourant] == Level::tcGoalCaisse) break;
+
+        if (!(couloirs.at(idxCourant) & masque)) break;   // plus dans un couloir
+        if (!isLibre(idxCourant + pas))          break;   // ne peut plus avancer
+
+        // ⚠️ NE PAS pousser la caisse sur une case morte. Sinon la macro ne se
+        // contente pas de coûter plus cher : elle DÉTRUIT une branche valide.
+        // L'état résultant est perdu, isPerdu() l'élague — alors que s'arrêter une
+        // case avant donnait un état parfaitement jouable. C'est ce qui faisait
+        // rendre 133 poussées au lieu de 131 sur le niveau 2, le solveur cherchant
+        // une solution qu'il s'était lui-même interdite.
+        if (casesMortes.at(idxCourant + pas)) break;
+
+        if (!move(dir)) break;
+        k++;
+    }
+
+    return k;
+}
+
+// Statique : ne dépend que des murs, jamais des caisses. Calculée une fois à la
+// construction, partagée par COW entre tous les clones du solveur.
+void Game::calculCouloirs() {
+    couloirs = QVector<quint8>(size, 0);
+
+    // ⚠️ Tests de bornes indispensables : la bordure n'est PAS toujours en murs.
+    // Level::load() complète les lignes courtes par des espaces (tcNone), et
+    // certains .xsb commencent leurs lignes par des espaces (cf. §6.B, où l'oubli
+    // de ce test faisait crasher calculDistancePoussee()). Hors grille compte comme
+    // un mur : une caisse ne peut de toute façon pas y aller.
+    auto mur = [this](int x, int y) {
+        if (x < 0 || y < 0 || x >= largeur || y >= hauteur) return true;
+        return cases[x + y * largeur] == Level::tcMur;
+    };
+
+    for (int y = 0; y < hauteur; y++) {
+        for (int x = 0; x < largeur; x++) {
+            const int idx = x + y * largeur;
+            if (cases[idx] == Level::tcMur) continue;
+
+            quint8 c = 0;
+            if (mur(x, y - 1) && mur(x, y + 1)) c |= COULOIR_H;
+            if (mur(x - 1, y) && mur(x + 1, y)) c |= COULOIR_V;
+            couloirs[idx] = c;
+        }
+    }
 }
 
 // Test de gel (« freeze deadlock »). Distingue « bloquée maintenant » de

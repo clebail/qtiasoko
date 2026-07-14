@@ -23,7 +23,26 @@ private slots:
     void onAucuneSolution();
     void onRevoir();
     void rejouerCoup();
+    void onExportPassages();
 private:
+    // Joue un coup et compte le passage de caisse s'il y en a un. Unique point
+    // d'entrée : le clavier (humain) et le rejeu (solution) passent tous deux par
+    // ici, sinon le compteur ne verrait que la moitié des poussées.
+    bool joue(Game::EDirection dir);
+
+    // Remet le compteur à l'état de DÉPART : 1 sous chaque caisse, 0 ailleurs.
+    // Une caisse OCCUPE déjà sa case initiale — partir de 0 ferait afficher 0 sous
+    // une caisse qui ne bouge jamais, comme si elle n'existait pas.
+    void initPassages();
+
+    // passages[case] = nombre de fois qu'une caisse a été poussée SUR cette case
+    // depuis le chargement du niveau. CUMULÉ : une caisse qui repasse au même
+    // endroit incrémente à nouveau.
+    //
+    // Vit ici et non dans Game : le solveur clone Game des millions de fois, un
+    // QVector par état ferait exploser la mémoire (cf. étape 11).
+    QVector<int> passages;
+
     // Rôle du numéro de niveau dans cbNiveau (Qt::UserRole sert déjà au nom de fichier).
     static constexpr int RoleNumero = Qt::UserRole + 1;
 

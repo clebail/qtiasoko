@@ -42,6 +42,11 @@ void WGame::setEtatsExplores(qint64 n) {
     update();
 }
 
+void WGame::setPassages(const QVector<int>& p) {
+    passages = p;
+    update();
+}
+
 QString WGame::formaterMillier(qint64 n) {
     QString s = QString::number(n);
     for (int i = s.length() - 3; i > 0; i -= 3) {
@@ -87,6 +92,30 @@ void WGame::paintEvent(QPaintEvent *) {
 
                 if (s) {
                     painter.drawImage(QPoint(margX + x * SPRITE_WIDTH, margY + y * SPRITE_HEIGHT), s->getImage(idxS));
+                }
+
+                // Compteur de passages, par-dessus la case. Les murs n'en ont
+                // jamais.
+                if (idx < passages.size() && passages[idx] > 0 && c != Level::tcMur) {
+                    const QRect r(margX + x * SPRITE_WIDTH, margY + y * SPRITE_HEIGHT,
+                                  SPRITE_WIDTH, SPRITE_HEIGHT);
+
+                    QFont f = painter.font();
+                    f.setPointSize(13);
+                    f.setBold(true);
+                    painter.setFont(f);
+
+                    // Halo sombre puis chiffre clair : lisible sur n'importe quel
+                    // sprite, sans avoir à connaître sa couleur.
+                    const QString t = QString::number(passages[idx]);
+                    painter.setPen(QColor(0, 0, 0, 200));
+                    for (int dx = -1; dx <= 1; dx++)
+                        for (int dy = -1; dy <= 1; dy++)
+                            if (dx || dy)
+                                painter.drawText(r.translated(dx, dy), Qt::AlignCenter, t);
+
+                    painter.setPen(QColor(255, 255, 255));
+                    painter.drawText(r, Qt::AlignCenter, t);
                 }
             }
         }

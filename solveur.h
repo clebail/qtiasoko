@@ -76,6 +76,20 @@ protected:
     // tient derrière la caisse.
     static const Game::SDirection appuis[NB_DIRECTION];
 
+    // Rejoue la poussée d'un Noeud et rend le nombre de POUSSÉES effectuées.
+    //
+    // Existe pour que reconstruire() soit fidèle au générateur : A* enfile des
+    // MACRO-poussées (une caisse traverse un couloir d'une traite, coût k), le BFS
+    // des poussées simples (coût 1). Rejouer une macro là où le générateur avait
+    // fait un pas simple — ou l'inverse — donnerait un chemin faux.
+    //
+    // Le BFS ne peut PAS prendre les macros : il explore par couches en supposant
+    // des arêtes de coût 1, et rendrait des solutions non optimales. Or c'est notre
+    // étalon d'optimalité.
+    virtual int appliquer(Game& g, int idxCaisse, Game::EDirection dir) {
+        return g.pousse(idxCaisse, dir) ? 1 : 0;
+    }
+
     Game depart;
     QVector<Noeud> noeuds;
 
