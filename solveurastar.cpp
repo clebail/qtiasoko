@@ -1,4 +1,5 @@
 #include <QtDebug>
+#include <cstdio>
 #include <algorithm>
 #include <climits>
 #include <unordered_map>
@@ -23,10 +24,52 @@ SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, QObject *parent)
     : Solveur(etatDepart, parent), poids(poids) {
 }
 
+#ifdef DUMP_DEV
+// Uniquement pour l'instrumentation hors-ligne (harnais de mesure). Un seul
+// thread solveur tourne à la fois, pas de verrou.
+std::vector<std::pair<QByteArray,int>>& etatsDeveloppes() {
+    static std::vector<std::pair<QByteArray,int>> v;
+    return v;
+}
+#endif
+
+#ifdef INSTRUM_F
+// cStar = g de l'état gagnant = le coût optimal.
+static void imprimeHistoF(const std::vector<qint64>& histoF, int cStar, qint64 total) {
+    qint64 sousCStar = 0, aCStar = 0;
+    qint64 mouProuve = 0;   // somme des (C* - f), le mou minimal garanti
+
+    for (size_t f = 0; f < histoF.size(); ++f) {
+        if (!histoF[f]) continue;
+        if ((int)f < cStar) { sousCStar += histoF[f]; mouProuve += histoF[f] * (cStar - (int)f); }
+        else if ((int)f == cStar) aCStar += histoF[f];
+    }
+
+    printf("\n-- HISTOGRAMME DES f AU DEPILEMENT (C* = %d) --\n", cStar);
+    for (size_t f = 0; f < histoF.size(); ++f)
+        if (histoF[f])
+            printf("   f = %3zu %s : %10lld  (%.1f %%)\n", f,
+                   (int)f == cStar ? "=C*" : "<C*",
+                   (long long)histoF[f], 100.0 * histoF[f] / total);
+
+    printf("   ----\n");
+    printf("   f <  C* : %10lld  (%.1f %%)  <- mou PROUVE, elaguables par une h plus serree\n",
+           (long long)sousCStar, 100.0 * sousCStar / total);
+    printf("   f == C* : %10lld  (%.1f %%)  <- a la limite : f seul ne peut PAS les distinguer\n",
+           (long long)aCStar, 100.0 * aCStar / total);
+    printf("   mou moyen prouve sur les f < C* : %.2f poussees\n",
+           sousCStar ? (double)mouProuve / sousCStar : 0.0);
+    fflush(stdout);
+}
+#endif
+
 
 void SolveurAStar::run() {
     std::vector<SElement> file;
     qint64 compteur = 0;
+#ifdef INSTRUM_F
+    std::vector<qint64> histoF;
+#endif
 
     // Toutes les clés du solve vivent ici, bout à bout (cf. cle.h). Les
     // conteneurs ci-dessous n'en portent que des références de 4 octets.
@@ -104,8 +147,30 @@ void SolveurAStar::run() {
                      << ", vus =" << meilleurG.size() << ", f =" << cur.f;
         }
 
+#ifdef INSTRUM_F
+        // Combien de mou reste-t-il à gratter dans h ? Pour TOUT état développé,
+        // le meilleur chemin qui le traverse coûte au moins l'optimum :
+        //     g(s) + h*(s) >= C*   =>   h*(s) >= C* - g(s)
+        // donc le mou de h sur cet état vaut au minimum
+        //     mou(s) = h*(s) - h(s) >= C* - f(s).
+        // Autrement dit : tout état développé avec f < C* a un mou PROUVÉ, connu
+        // gratuitement, sans jamais résoudre depuis lui. L'histogramme des f au
+        // dépilement borne donc par le bas ce qu'une h plus serrée pourrait
+        // élaguer. (C* n'est connu qu'à la fin : on garde les f et on conclut là.)
+        if ((size_t)cur.f >= histoF.size()) histoF.resize(cur.f + 1, 0);
+        histoF[cur.f]++;
+#endif
+
         // Le Game n'était pas dans la file : on le reconstruit depuis la clé.
         etat.appliqueEtat(arene.lit(cur.cle.offset));
+
+#ifdef DUMP_DEV
+        // Les états RÉELLEMENT dépilés — et non l'ensemble {f <= C*}, qui est
+        // ~25x plus gros : A* s'arrête dès qu'il atteint le but et n'en visite
+        // qu'une fraction. Échantillonner {f <= C*} au lieu de ceci fausse toute
+        // mesure portant sur « ce que le solveur explore vraiment ».
+        etatsDeveloppes().push_back({etat.getEtat(), cur.g});
+#endif
 
         if(etat.isGagne()) {
             qDebug() << "SolveurAStar: solution trouvee apres" << compteur << "etats explores,"
@@ -113,6 +178,9 @@ void SolveurAStar::run() {
             qDebug() << "  arene =" << arene.nbCles() << "cles,  meilleurG =" << meilleurG.size()
                      << ",  noeuds =" << noeuds.size() << ",  file =" << file.size()
                      << ",  capacite file =" << file.capacity();
+#ifdef INSTRUM_F
+            imprimeHistoF(histoF, cur.g, compteur);
+#endif
             emit solutionTrouvee(reconstruire(cur.idxNoeud), compteur);
             return;
         }
