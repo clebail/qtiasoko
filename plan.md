@@ -393,7 +393,7 @@ Cette version est **plus informative que l'actuelle ET moins chère** : `getHeur
 **⚠️ Pièges**
 - [ ] **`h` doit rester une fonction de l'ÉTAT NORMALISÉ** (§1), sinon deux positions du joueur dans la même zone donneraient des `h` différentes et A* deviendrait incohérent. C'est vrai, mais il faut le savoir : la zone réelle du joueur (toutes caisses en obstacles) est connexe, donc **entièrement contenue dans UNE seule composante** de `plateau-moins-cette-caisse` (qui a moins d'obstacles). `comp[caisse][playerCell]` est donc invariant sur toute la zone. ✅
 - [ ] **Mémoire** : `comp` fait `size × size` entiers — 410 Ko pour un niveau 20×16. À **aplatir en un seul `QVector<qint16>`** de `size*size` plutôt qu'un `QVector<QVector<int>>` (allocations imbriquées). Copié par COW entre tous les clones de `Game`, comme `casesMortes` — **surtout ne pas le recalculer par état**.
-- [ ] **Bonus deadlock** : `distJoueur[caisse][region] == -1` signifie que cette caisse ne peut plus JAMAIS atteindre un but avec le joueur de ce côté. C'est un deadlock **dynamique**, plus fort que `casesMortes` (qui est statique). Sain pour la même raison que l'admissibilité : retirer les autres caisses ne fait qu'aider. À tester dans `checkDefaite()` — mais **pas** à fusionner dans `casesMortes`, qui ne dépend pas du joueur.
+- [x] ~~**Bonus deadlock** : `distJoueur[caisse][region] == -1` signifie que cette caisse ne peut plus JAMAIS atteindre un but avec le joueur de ce côté.~~ **FAIT** (c'est le correctif de `h += -1`, §6.B — sans lui `h` se met à soustraire). ⚠️ Tout durcissement SUPPLÉMENTAIRE de la détection de deadlock est **sans objet** : cf. **§9.1**, 0 deadlock non détecté sur 530 états dépilés échantillonnés.
 
 ### 6.4 Vérification
 - [ ] **Poussées inchangées : 4 / 97 / 213.** Le canari. `h` reste admissible (vérifié : 3 ≤ 4, 88 ≤ 97, 194 ≤ 213), donc l'optimalité doit être préservée. Un écart = bug (table fausse, ou `h` qui surestime).
@@ -401,7 +401,7 @@ Cette version est **plus informative que l'actuelle ET moins chère** : `getHeur
 - [ ] ⚠️ **La tension au départ est un proxy IMPARFAIT.** Le niveau 1 avait déjà 91 % de tension… et A* n'y élaguait que 20 %. La tension initiale ne dit rien de la tension *en profondeur dans l'arbre*. **Ne rien conclure avant d'avoir compté les états.**
 
 ### 6.5 Ensuite, si besoin
-- [ ] Ajouter le **couplage hongrois** par-dessus (distance joueur-aware *vers chaque but* → matrice `n×n` → affectation de coût minimal). Orthogonal, se cumule : 91 % → 94 % sur le 17, +29 % sur le 2. Coût : O(n³) par état au lieu de O(n).
+- [x] Ajouter le **couplage hongrois** par-dessus (distance joueur-aware *vers chaque but* → matrice `n×n` → affectation de coût minimal). **FAIT — c'est le §7**, et c'est lui qui a fait tomber le niveau 2.
 
 ---
 
@@ -464,10 +464,10 @@ optimal.
 - [~] **Canari optimal** : doit rendre **4 / 97 / 213**. **Niveau 1 = 97 ✅, niveau 17 = 213 ✅**
   (admissible confirmé sur les deux gros). Reste le **0 (=4)**, trivial.
 - [ ] **Niveau 2** : le vrai juge (10 caisses → collisions dominantes). Pas encore lancé.
-- [ ] **Bonus deadlock du couplage** (§7.2, affectation à coût infini) : **pas implémenté**. Les
-  paires inatteignables valent `INF_COUPLAGE = 1 000 000` (grand mais fini) → un état sans
-  affectation finie reçoit un `h` énorme et n'est jamais développé (correct mais il encombre la
-  file au lieu d'être élagué dans `checkDefaite()`).
+- [x] ~~**Bonus deadlock du couplage** (§7.2, affectation à coût infini) : pas implémenté.~~
+  **ABANDONNÉ — sans objet, cf. §9.1** : 0 deadlock non détecté sur 530 états dépilés
+  échantillonnés (niveaux 1/2/3/17). L'état sans affectation finie reçoit un `h` énorme et n'est
+  jamais développé ; l'élaguer en plus dans `checkDefaite()` ne changerait rien au nombre d'états.
 
 **Niveaux de test 0100-0109** : dérivés de `level0002` (grille 10 caisses/10 buts), chacun ne
 gardant **qu'une caisse + un but** (caisse *k* appariée au but *k* dans l'ordre de balayage,
@@ -516,7 +516,7 @@ Les deux relaxations sont **orthogonales** : la table joueur-aware corrige les *
 
 **⚠️ Pièges**
 - [x] **Paires inatteignables** (`distanceParBut == -1`) : coût `INF_COUPLAGE = 1 000 000`, **grand mais FINI** (n ≤ ~30, la somme ne déborde jamais un `int`) — jamais `INT_MAX` qui déborderait dans l'addition du hongrois.
-- [ ] **Bonus deadlock, plus fort que celui de §6** : si le couplage optimal contient au moins une paire à coût infini, **aucune affectation bijective n'est possible** → deadlock. Exemple que rien ne détecte aujourd'hui : deux caisses qui ne peuvent atteindre qu'un seul et même but. À tester dans `checkDefaite()`. **PAS ENCORE FAIT** : pour l'instant l'état reçoit juste un `h` énorme (jamais développé, mais pas élagué).
+- [x] ~~**Bonus deadlock, plus fort que celui de §6** : si le couplage optimal contient au moins une paire à coût infini, aucune affectation bijective n'est possible → deadlock.~~ **ABANDONNÉ — sans objet, cf. §9.1.** Le raisonnement est juste, mais la mesure dit que le cas ne se présente pas : 0 deadlock non détecté sur 530 états dépilés. On élaguerait quelque chose qu'A\* ne développe déjà jamais.
 - [x] **`h` reste incohérente** (elle l'était déjà depuis §6) → fermeture en pondéré et re-développement en optimal **conservés à l'identique**. Rien touché dans `solveurastar.cpp`.
 - [ ] **Admissible** : toute solution réelle réalise une bijection caisses↔buts ; son coût est ≥ la somme de cette affectation ; on prend le **minimum sur toutes** les affectations. Donc `h_couplage ≤ C*`. Et comme la version « but le plus proche » relâche la contrainte de distinction, `h_joueur ≤ h_couplage` : le couplage **domine**, il ne peut pas être pire.
 
@@ -869,6 +869,17 @@ deux paires disjointes en caisses peuvent viser les mêmes buts).
 
 ## 8. Découpage « une caisse à la fois » (goal ordering) — ANALYSÉ, EN RÉSERVE
 
+> **Note 2026-07-14.** L'observation qui pousse naturellement vers ce §8 — « toutes les
+> caisses empruntent le même corridor, et une fois lancées c'est mécanique » — est
+> **juste et mesurée** (§9.3 : sur le 17, 5 manœuvres dans les 9 premières poussées,
+> puis 204 poussées de rangement pur). Mais elle ne sauve pas le découpage, dont les
+> deux coutures (§8.2 incomplet, §8.3 « trouver l'ordre EST le problème ») tiennent
+> toujours.
+>
+> Ce que cette observation désigne vraiment, c'est **les macro-poussées (§9.5)** :
+> elles exploitent le même corridor, mais **sans renoncer à l'optimalité** — on ne fige
+> aucune caisse, on refuse seulement de s'arrêter au milieu d'un couloir.
+
 Idée : découper le gros problème en petits (maxime classique « diviser pour régner »).
 1. Trouver l'**ordre** de rangement des caisses (se concentrer sur une caisse à la fois).
 2. Une fois l'ordre fixé, positionner le joueur pour ranger cette caisse **sans créer de
@@ -933,6 +944,25 @@ sur des niveaux solubles. Limite d'expressivité, pas bug réparable. **⇒ inco
 
 ## 5. Recherche en faisceau (beam search) — EN RÉSERVE
 *(Déclassé : §6 attaque la cause — une `h` trop lâche — là où le faisceau renonce à l'optimalité. À reprendre seulement si §6 ne suffit pas.)*
+
+> ## ⚠️ §5.1 est PÉRIMÉ (2026-07-14) — la question a été tranchée, cf. §9.2
+>
+> Le §5.1 dit « on n'a jamais testé si `h` est un bon **classeur** ». **C'est fait**
+> (`mesures/diverge`), et la réponse est **oui, excellent** : le long du chemin optimal,
+> `h` désigne le bon enfant en **rang 1 dans ~100 % des cas** (97/97 sur le 1,
+> 131/131 sur le 2, 208/213 sur le 17).
+>
+> Ça ne relance PAS le faisceau pour autant, et il faut comprendre pourquoi :
+> `h` place le bon enfant en tête **mais à égalité avec 1 à 2 autres** (mesuré :
+> 2,1 ex aequo en moyenne sur le niveau 1, pour 5,3 enfants). Elle refuse de le classer
+> derrière, elle ne le **distingue** pas. Un faisceau devrait donc trancher au hasard
+> entre plusieurs candidats à chaque coup — et le §5.3 le pressentait déjà
+> (« départage à `h` égal », piège annoncé).
+>
+> Surtout : le §5.2 promet que le faisceau « borne la mémoire *a priori* ». Ce n'est
+> plus l'urgence — l'étape 11 a ramené le niveau 3 à 1,72 Go, et **le vrai gisement
+> n'est ni la mémoire ni la qualité de `h`, c'est la multiplicité des entrelacements
+> (§9.4)**, que le faisceau n'attaque pas non plus.
 
 ### 5.1 L'erreur de cadrage qu'on vient de comprendre
 
