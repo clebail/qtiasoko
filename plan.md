@@ -1,5 +1,18 @@
 # Plan solveur Sokoban
 
+> ## 📏 Les mesures ont leurs outils : `mesures/` — voir [mesures/mesure.md](mesures/mesure.md)
+>
+> Six harnais en ligne de commande (`bench`, `mou`, `diverge`, `paires`, `trace`,
+> `tunnels`) qui compilent le solveur tel quel et l'interrogent de l'extérieur.
+> **Avant de croire une affirmation de ce document, re-mesure-la** : les chiffres
+> écrits ici vieillissent en silence pendant que le code bouge (l'étape 11 a failli
+> « corriger » une régression mémoire qui n'existait pas, faute d'avoir comparé
+> binaire à binaire).
+>
+> Le **canari** — le nombre de poussées optimal, qui ne doit JAMAIS bouger :
+> **4 / 97 / 131 / 134 / 213** (niveaux 0 / 1 / 2 / 3 / 17).
+> `mesure.md` liste aussi les pièges de mesure déjà rencontrés, pour ne pas les refaire.
+
 ## 1. Normalisation de la région joueur
 Un état = positions des caisses + zone atteignable par le joueur sans pousser de caisse.
 Deux configurations avec les mêmes caisses mais le joueur dans la même zone = même état.
@@ -702,6 +715,155 @@ régime permanent (plus de transitoire à gratter) :
   choix). Collision négligeable en 128 bits ; à ne faire que si mesuré nécessaire.
 - [ ] ~~Fusionner `ferme` dans `meilleurG`~~ → sans objet en mode optimal : `ferme` n'y est même
   pas peuplée (le re-développement est ce qui rétablit l'optimalité, cf. §6.B).
+
+---
+
+## 9. Où va vraiment le temps — TROIS CHANTIERS ÉLIMINÉS PAR LA MESURE (2026-07-14)
+
+Avant d'écrire la moindre optimisation, on a **mesuré ce que le solveur explore**.
+Résultat : trois des quatre chantiers envisagés sont **sans objet**, et le vrai
+gisement n'était nulle part dans le plan.
+
+Outils : `mesures/mou`, `mesures/diverge`, `mesures/bench` (`INSTRUM_F`), `mesures/paires`,
+`mesures/trace`, `mesures/tunnels`.
+
+### 9.1 A\* ne gaspille RIEN — le résultat qui renverse tout
+
+`mou` échantillonne les états **réellement dépilés** et résout depuis chacun pour
+obtenir le vrai coût restant `h*`, puis classe : sur un chemin optimal / hors chemin /
+deadlock non détecté.
+
+| niveau | échantillons | sur un chemin optimal | hors chemin | deadlocks |
+|---|---|---|---|---|
+| 1  | 100 | **100 %** | 0 | 0 |
+| 2  | 200 | **100 %** | 0 | 0 |
+| 17 | 200 | **100 %** | 0 | 0 |
+| 3  | 30  | **100 %** | 0 | 0 |
+
+**Tout état qu'A\* développe est réellement sur un chemin optimal.** Conséquences,
+et elles sont dures :
+
+- ❌ **Renforcer `checkDefaite()` ne rapporterait RIEN.** 0 deadlock sur 530 échantillons
+  (taux réel < 1,5 %). `casesMortes` + le gel attrapent déjà tout ce qui compte. Le
+  §7.2 « bonus deadlock du couplage » et tout durcissement de la détection sont
+  **sans objet**.
+- ❌ **Une `h` plus discriminante ne rapporterait RIEN non plus.** Il n'y a pas de
+  « mauvais états » à séparer des bons : ils sont tous bons. Le §6.0 espérait que
+  « si `h` était parfaite, A\* n'explorerait QUE les chemins optimaux » — **c'est déjà
+  le cas.**
+- ❌ **Pas de re-développement à supprimer** : dépilements ≈ états distincts
+  (niveau 2 : 590 871 dépilés, 1 689 322 découverts, 1 482 595 encore en file — la
+  somme se referme). Le §6.B est réglé.
+
+### 9.2 Le mou de `h` : petit, uniforme, et FATAL
+
+`diverge` : le long du chemin optimal, `h` désigne le bon enfant en **rang 1 à ~100 %**
+(97/97 sur le 1, 131/131 sur le 2, 208/213 sur le 17) et son mou moyen est ≤ 0,9.
+**`h` est quasi parfaite là où on la regardait.** Toute idée d'« améliorer le premier
+choix » est morte : il n'y a pas de divergence à corriger.
+
+Mais l'histogramme des `f` au dépilement (`bench` + `INSTRUM_F`) montre où ça coince :
+
+| niveau | `f < C*` (OBLIGATOIRES) | `f == C*` |
+|---|---|---|
+| 1  | 0,0 % | 100 % |
+| 2  | **99,7 %** (mou de 2) | 0,3 % |
+| 17 | **93,3 %** (mou de 2 à 10) | 6,7 % |
+
+A\* **doit** développer tout état de `f < C*` — sinon l'optimalité n'est pas prouvée.
+Or sur le niveau 2, `h` sous-estime de **exactement 2**, uniformément : ça met 99,7 %
+des états sous `C*` et les rend **obligatoires**. Combler ce 2 les ferait passer à
+`f = C*` : ils cesseraient d'être obligatoires.
+
+**C'est un effet de SEUIL, pas un gain graduel** — et ça explique enfin le ×59 du
+couplage hongrois (§7) : il n'avait rien « mieux séparé », il avait juste remonté `h`
+de quelques unités, faisant basculer des masses d'états d'obligatoire à optionnel.
+La non-linéarité que le §7 constatait sans l'expliquer, c'est ça.
+
+⚠️ Mais le niveau 1 interdit de crier victoire : son mou est **déjà nul** (100 % à
+`f = C*`) et A\* y développe quand même 15 594 états. **Combler le mou est nécessaire,
+pas suffisant.**
+
+### 9.3 D'où vient le mou : des MANŒUVRES, pas des paires
+
+`paires` (sous-problèmes **carrés** : 2 caisses, 2 buts — sinon `getHeuristique()`
+bascule sur son repli et on mesure autre chose) :
+
+| niveau | mou | interaction de paire max | paires concernées |
+|---|---|---|---|
+| 1  | 2  | **0** | 0 / 15 |
+| 2  | 2  | **2** | 1 / 45 — la paire (6,7) |
+| 3  | 6  | 2 | 4 / 55 |
+| 17 | **12** | **0** | 0 / 15 |
+
+Le niveau 2 s'explique **entièrement** par une seule paire de caisses. Le 17, **pas du
+tout** : son mou de 12 n'est pas une affaire de caisses qui se gênent deux à deux.
+
+`trace` le montre : sur les 213 poussées du 17, **6 sont NON PRODUCTIVES** (elles font
+*monter* `h` — on éloigne une caisse pour dégager le passage). Chacune creuse l'écart
+de 2 (une poussée dépensée + `h` qui remonte de 1) → **6 × 2 = 12 = le mou exact**.
+Et 5 des 6 tombent dans les **9 premières poussées** : une phase d'ouverture, puis 204
+poussées de rangement pur où `h` prédit chaque coup.
+
+C'est le **coût de manœuvre** du §4.6, enfin chiffré. Aucune relaxation caisse↔but ne
+peut le voir — c'est précisément ce qu'elle relaxe pour rester admissible.
+
+### 9.4 Le vrai gisement : la MULTIPLICITÉ des chemins optimaux
+
+Si tous les états développés sont optimaux et qu'il y en a 1,09 M pour 213 poussées,
+c'est qu'il existe **1,09 M d'états appartenant à de vraies solutions à 213 poussées**.
+
+D'où viennent-ils ? Les caisses empruntent le même corridor, et A\* explore **tous les
+entrelacements** : avancer la caisse 1 de trois cases puis la 4 de deux, ou l'inverse,
+ou alterner. Chaque entrelacement produit des états **distincts** (les caisses ne sont
+pas aux mêmes endroits) et **tous également optimaux** — la déduplication ne les
+attrape pas, justement parce qu'ils sont réellement différents.
+
+**Ce n'est pas le mou de `h` qui fait exploser l'exploration. C'est la combinatoire des
+ordres de rangement.**
+
+### 9.5 Prochain chantier : les MACRO-POUSSÉES (tunnels)
+
+`tunnels` mesure la part des poussées atterrissant dans un couloir sans alternative
+(perpendiculaires = murs, hors but) — là où s'arrêter ne sert **à rien**, sauf à créer
+un point de branchement pour aller tripoter une autre caisse :
+
+| niveau | couloirs de la grille | poussées fusionnables | états développés |
+|---|---|---|---|
+| 0  | 0 %  | 0 %  | 5 |
+| 1  | 19 % | **40 %** (39/97) | 15 596 |
+| 2  | 10 % | 23 % (30/131) | 590 871 |
+| 3  | 15 % | 17 % (23/134) | 7 280 104 |
+| 17 | 12 % | 15 % (33/213) | 1 091 295 |
+
+Le gain n'est pas de 15-40 % : il est **combinatoire**. On ne retire pas 33 états au
+niveau 17, on retire les *branches* qui partaient de ces 33 points de branchement,
+répétées à chaque combinaison des autres caisses.
+
+**Implémentation prévue**
+- [ ] Table statique `tunnel[case][axe]`, calculée une fois (comme `casesMortes`).
+- [ ] `Game::pousse()` **continue** tant que la caisse est en couloir selon la
+  direction de poussée, hors but, et poussable ; **retourne le nombre de poussées**.
+- [ ] Solveur : `gE = cur.g + k` au lieu de `+1`. Le coût reste le nombre de poussées.
+  `Noeud{idxCaisse, dir}` suffit toujours — la macro est déterministe, `reconstruire()`
+  la rejoue à l'identique.
+
+**⚠️ Le piège, à surveiller** : forcer la macro **interdit de s'arrêter au milieu du
+tunnel**. Ça se défend presque toujours (une caisse plantée dans un couloir bloque le
+joueur ; la pousser jusqu'à la sortie ne peut que libérer le passage). **Sauf** si la
+solution optimale demande de la pousser dans le couloir puis de lui faire faire
+**demi-tour**, le joueur la reprenant de l'autre côté par un autre chemin. On perdrait
+l'optimalité **en silence** — la faute maison (§3bis, §6.B, §8.5).
+→ **Juge : le canari 4 / 97 / 131 / 134 / 213.** Un seul chiffre qui bouge = macro fautive.
+
+### 9.6 Ce qui restera dehors
+Le **coût de manœuvre** (§9.3) est hors de portée de toute heuristique caisse↔but, et
+les macro-poussées ne l'attaquent pas non plus (elles réduisent les états, pas le mou).
+Le niveau 17 gardera son mou de 12. Piste éventuelle, non explorée : une **PDB à 2 ou 3
+caisses** (BFS rétrograde sur `(case₁, case₂, région)`, ~313 Ko) — mais elle ne verrait
+pas le mou du 17 non plus (interaction de paire nulle), et son admissibilité demande un
+couplage **paires-de-caisses ↔ paires-de-buts**, pas une simple somme (qui surestimerait :
+deux paires disjointes en caisses peuvent viser les mêmes buts).
 
 ---
 

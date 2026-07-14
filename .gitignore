@@ -12,3 +12,4 @@ tests/tst_getetat
 .qtc_clangd/
 qtiasoko.app/
 .DS_Store
+mesures/build/
