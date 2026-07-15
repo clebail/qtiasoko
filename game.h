@@ -100,7 +100,13 @@ public:
     // vise son but le plus proche » (qui relâchait la contrainte de distinction) :
     // elle corrige les COLLISIONS de buts (N caisses réclamant le même but), erreur
     // dominante des niveaux à beaucoup de caisses.
-    int getHeuristique() const;
+    int getHeuristique() const { return getHeuristique(nullptr); }
+    // Surcharge : calcule aussi le SCORE DE GUIDAGE (§10.2) via l'appariement du
+    // couplage. Ordre lexicographique des distances-restantes par but (priorité =
+    // index du but) : à f et g égaux, A* préfère le score le plus PETIT, ce qui
+    // impose un ordre canonique de rangement et casse la multiplicité (§9.4).
+    // Pur tie-break : sans effet sur l'optimalité. scoreGuidage peut être nul.
+    int getHeuristique(qint64* scoreGuidage) const;
     // Applique une poussée sans faire marcher le joueur : le TÉLÉPORTE sur la
     // case d'appui, puis pousse via move() (qui fait checkVictoire/checkDefaite).
     // Précondition, NON vérifiée : la case d'appui doit être dans la zone du

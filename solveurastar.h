@@ -38,6 +38,7 @@ public:
         int g;
         int idxNoeud;
         Cle cle;
+        qint64 guidage;   // départage lexicographique (§10.2) : plus PETIT = préféré
     } SElement;
 
     explicit SolveurAStar(const Game& etatDepart, int poids = 1, QObject* parent = nullptr);

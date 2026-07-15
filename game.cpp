@@ -419,7 +419,10 @@ static const int INF_COUPLAGE = 1000000;
 // Affectation de coût minimal (hongrois, méthode des potentiels, O(n^3)) sur une
 // matrice n x n donnée à plat en ligne-major. Renvoie la somme minimale.
 // Implémentation classique 1-indexée (u/v potentiels, p affectation, way chemin).
-static int hongrois(const int* cout, int n) {
+//
+// Si 'affectation' n'est pas nul, il reçoit affectation[but] = caisse (0-indexés) :
+// l'identité « quelle caisse va à quel but », dont le guidage (§10.2) a besoin.
+static int hongrois(const int* cout, int n, int* affectation = nullptr) {
     // Qt 5.15 : QVarLengthArray n'a pas de constructeur de remplissage, on initialise
     // à la main. Prealloc = 32 -> pas d'allocation tas tant que n < 32.
     QVarLengthArray<int, 32> u(n + 1), v(n + 1), p(n + 1), way(n + 1);
@@ -460,12 +463,15 @@ static int hongrois(const int* cout, int n) {
     }
 
     int total = 0;
-    for (int j = 1; j <= n; j++)
+    for (int j = 1; j <= n; j++) {
         total += cout[(p[j] - 1) * n + (j - 1)];   // caisse p[j] affectée au but j
+        if (affectation) affectation[j - 1] = p[j] - 1;   // but j-1 (0-indexé) -> caisse p[j]-1
+    }
     return total;
 }
 
-int Game::getHeuristique() const {
+int Game::getHeuristique(qint64* scoreGuidage) const {
+    if (scoreGuidage) *scoreGuidage = 0;
     const int j = playerPoint.x() + playerPoint.y() * largeur;
 
     // Recense les caisses (colonnes = buts, lignes = caisses de la matrice).
@@ -501,7 +507,35 @@ int Game::getHeuristique() const {
         }
     }
 
-    return hongrois(cout.constData(), n);
+    // Le guidage a besoin de l'appariement caisse<->but (l'identité) : on le
+    // récupère dans 'affectation', qu'on jetait jusqu'ici.
+    QVarLengthArray<int, 32> affectation(n);
+    const int h = hongrois(cout.constData(), n, scoreGuidage ? affectation.data() : nullptr);
+
+    // Score de DÉPARTAGE (§10.2) : ordre lexicographique des distances par but.
+    // Les buts sont pris dans leur ordre d'index (priorité fixe) ; minimiser ce
+    // score revient à finir le but 0 d'abord, puis le 1, etc. → un ordre canonique
+    // de rangement qui casse la multiplicité des entrelacements (§9.4). L'état tout
+    // rangé (toutes distances nulles) a le score minimal, donc A* plonge vers lui.
+    if (scoreGuidage) {
+        // Base ADAPTATIVE : autant de bits par but que 63 en autorise, pour que
+        // l'encodage lexicographique tienne dans un qint64 QUEL QUE SOIT nbButs
+        // (base^n <= 2^63). Jusqu'à ~11 buts la base dépasse toute distance réelle
+        // (aucun clamp) ; au-delà les distances sont clampées, sans conséquence —
+        // ces niveaux à beaucoup de buts sont dominés par le mou, le guidage n'y
+        // change rien. Plus de désactivation, le guidage vaut sur tous les niveaux.
+        const int    bits = qMax(1, 63 / n);
+        const qint64 base = 1LL << bits;
+        qint64 s = 0;
+        for (int b = 0; b < n; b++) {
+            qint64 d = cout[affectation[b] * n + b];
+            if (d >= base) d = base - 1;
+            s = s * base + d;
+        }
+        *scoreGuidage = s;
+    }
+
+    return h;
 }
 
 void Game::appliqueEtat(const quint16* cle) {

@@ -1003,17 +1003,17 @@ deux paires disjointes en caisses peuvent viser les mêmes buts).
 
 ---
 
-## 10. 🧭 PROCHAINES OPÉRATIONS — dans CET ordre (2026-07-14)
+## 10. 🧭 LE DÉPARTAGE PAR GUIDAGE — FAIT, et les impasses écartées (2026-07-15)
 
-> **À lire avant de toucher au §9.8.** Le §9.8 dit « prochain chantier : borner le coût
-> de déblocage ». C'est vrai, mais **il ne doit pas être le premier**. Deux opérations
-> d'une heure chacune viennent avant : l'une décide si le chantier existe, l'autre
-> attaque un problème que le chantier ne résoudra jamais.
+**Résultat net : le guidage (§10.2) divise le niveau 1 par 2,8, canari intact partout.
+Les trois autres pistes de cette section ont été mesurées puis ÉCARTÉES.** L'ordre
+d'exécution prévu (oracle d'abord) était le bon : il a réfuté le gros chantier avant qu'on
+l'écrive.
 
-### 10.0 Il y a DEUX problèmes, pas un
+### 10.0 Il y a DEUX problèmes, pas un — CONFIRMÉ
 
-L'histogramme des `f` au dépilement (§9.2) le dit, mais la conclusion n'en avait pas été
-tirée :
+L'histogramme des `f` au dépilement (§9.2) partage les états en deux régimes, et toute la
+suite en découle :
 
 | niveau | `f < C*` (OBLIGATOIRES) | `f == C*` | états développés |
 |---|---|---|---|
@@ -1021,57 +1021,95 @@ tirée :
 | 2  | 99,7 %         | 0,3 %          | 590 871 |
 | 17 | 93,3 %         | 6,7 %          | 1 091 295 |
 
-- **Niveaux 2 et 17** : la masse est **sous** `C*` — ces états sont *obligatoires*, A\*
-  n'a pas le choix, c'est le mou de `h`. → soignés par la **borne de déblocage** (§10.3).
-- **Niveau 1** : tout est **à** `C*`. `f` ne peut **structurellement pas** les départager.
-  Combler le mou du niveau 1 économiserait… **2 états**. C'est la multiplicité des chemins
-  optimaux (§9.4), et **aucune amélioration de `h` n'y touchera jamais**. → seul le
-  **départage** (§10.2) l'attaque.
+- **Niveau 1** : tout est **à** `C*` = multiplicité pure des chemins optimaux (§9.4). Un
+  **départage** (§10.2) peut trancher ces états équivalents. **C'est là, et seulement là,
+  que tous les leviers de cette section mordent.**
+- **Niveaux 2 et 17** : la masse est **sous** `C*` = mou de `h`. A\* les développe TOUS
+  d'office (règle d'optimalité), quel que soit l'ordre. Aucun départage n'y a prise, et
+  §9.1 a montré qu'ils sont tous sur des chemins optimaux → même une `h` parfaite ne les
+  élaguerait pas. **Ces niveaux sont incompressibles par ces méthodes.**
 
-### 10.1 Opération 1 — L'ORACLE DU MOU (1 h, à faire EN PREMIER)
+### 10.1 L'ORACLE DU MOU — ❌ RÉFUTÉ (la constante est invisible pour A\*)
 
-**Mesurer le plafond du chantier de congestion AVANT de l'écrire.** On connaît `C*` et on
-connaît le mou exact (2 / 2 / 6 / 12, §9.7). Donc on triche : on ajoute une **constante**
-à `getHeuristique()` et on compte les états.
+Idée testée : simuler une `h` parfaite en ajoutant le mou connu comme **constante**
+(`h + 2` sur le 2, etc.), pour mesurer le plafond du chantier de congestion avant de
+l'écrire. **Mesuré : AUCUN effet, à `k = 2` comme à `k = 1000`, ni sur le 1 ni sur le 2.**
 
-- [ ] `h + 2` sur le niveau 2, `h + 12` sur le 17. Compter les états développés.
-- Si l'espace s'effondre → le §10.3 vaut tout ce qu'on y mettra.
-- S'il ne rend presque rien → **on abandonne le §10.3 sans l'avoir écrit**, et on a
-  économisé les deux jours que ce projet a déjà perdus trois fois de cette façon
-  (§3bis, §6.B, §8.5, macro-poussées).
+Raison, et elle est définitive : A\* ne regarde que les **écarts relatifs** de `f`. Ajouter
+`k` partout donne `f' = f + k` pour tous les états — l'ordre de dépilement est identique.
+Le seul état non décalé est le but (garde `h = 0`), mais le tie-break `g`-max le priorisait
+déjà. Et le mou n'étant **pas** constant (il se résorbe près du but), la constante pousse
+les états proches du but *au-dessus* de `C*`, retardant l'enfilage du but d'exactement
+autant → bilan nul par construction. **Le §10.1 tel que conçu ne pouvait rien mesurer.**
 
-⚠️ **Ce n'est PAS admissible** et ce n'est pas censé l'être : le mou se résorbe à mesure
-que le démêlage se fait, donc `h + k` **surestime** près du but. C'est un **diagnostic
-jetable**, à ne jamais livrer. Le canari dira au passage de combien ça déborde.
+Retombée : ceci **confirme le §9.1**. Il n'y a pas d'états « mauvais » à séparer des bons —
+ils sont tous optimaux —, donc **aucune `h`, même parfaite, ne réduit les gros niveaux.**
+Le levier heuristique est épuisé.
 
-### 10.2 Opération 2 — LE DÉPARTAGE À `f` ÉGAL (1 h, AUCUN risque d'optimalité)
+### 10.2 LE GUIDAGE PAR COUPLAGE — ✅ FAIT (niveau 1 : ÷2,8)
 
-Le comparateur d'A\* départage sur le `g` le plus grand (ce qui fait plonger). Mais à `f`
-**et** `g` égaux, l'ordre est **arbitraire** — et sur le niveau 1, c'est 100 % des états.
+Départage lexicographique à `f` et `g` égaux, implémenté et livré :
 
-- [ ] Ajouter un critère secondaire. Piste tirée des **artères de trafic** (§9.7) :
-  préférer l'enfant qui **dégage une case de forte affluence**, ou qui fait avancer une
-  caisse **le long de son artère** plutôt que d'en dévier.
-- **C'est le seul levier de cette liste qui ne peut PAS nous faire manquer l'optimum** :
-  un départage ne change que l'ordre de visite, jamais l'admissibilité. À ce titre il est
-  gratuit, et il attaque le seul problème (§9.4) que la borne de déblocage ne verra pas.
+| niveau | avant | après guidage | poussées |
+|---|---|---|---|
+| 0  | 5          | 5          | 4 ✅ |
+| 1  | 15 596     | **5 638** (**÷2,8**) | 97 ✅ |
+| 2  | 590 871    | 590 066    | 131 ✅ |
+| 3  | 7 280 104  | 7 280 054  | 134 ✅ |
+| 17 | 1 091 295  | 1 090 145  | 213 ✅ |
 
-### 10.3 Opération 3 — LA BORNE DE DÉBLOCAGE (le vrai chantier — SEULEMENT si 10.1 conclut)
+**Implémentation** (`getHeuristique(qint64* scoreGuidage)`, `SElement::guidage`,
+comparateur) : le **couplage hongrois** (déjà calculé pour `h`) fournit l'identité
+caisse↔but — on récupère l'appariement qu'on jetait. Le score est l'ordre **lexicographique**
+des distances-restantes par but (priorité = index du but) : à `f`/`g` égaux, A\* préfère le
+score le plus petit, ce qui impose un ordre canonique de rangement et fait plonger vers
+l'état tout-rangé. **Pur tie-break → l'optimalité est intacte** (canari 4/97/131/134/213),
+c'est ce qui le rend sûr.
 
-C'est le §9.8, dont tout le détail (variante prudente vs ambitieuse, et les trois raisons
-pour lesquelles le `+2` naïf n'est pas admissible) est déjà écrit là-bas. **Commencer par
-la variante PRUDENTE.**
+**Le gain est confiné au niveau 1, et on sait exactement pourquoi** (cf. §10.0) : un
+départage ne joue **qu'entre états de même `f`**. Le niveau 1 est 100 % à `f = C*` → le
+guidage tranche ; les niveaux 2/17 ont du mou → leurs états sont *sous* `C*`, développés
+d'office, hors de portée du départage.
 
-Elle **repose entièrement sur les artères de trafic** (§9.7) : « la caisse `i` est posée
-sur l'artère de `j`, elle devra être écartée → +2 » n'a de sens que parce qu'on sait **où
-passe `j`**, exactement — ce que `mesures/passages` a mesuré et validé (écart nul sur les
-artères du 17).
+**Encodage** : le score lexicographique tient dans un `qint64` via une **base adaptative**
+(`bits = 63 / nbButs`, `base = 2^bits`) — jusqu'à ~11 buts la base dépasse toute distance
+réelle (aucune perte), au-delà les distances sont clampées, sans conséquence (ces niveaux
+sont dominés par le mou). Le guidage vaut sur **tous** les niveaux, sans désactivation.
 
-⚠️ Rappel du §9.8 : le critère est **PAR CAISSE, jamais par case**. Une carte de trafic
-agrégée a perdu l'identité des caisses et ne peut structurellement pas voir la congestion.
+### 10.3 COUPER LES RÉPÉTITIONS — ❌ IMPASSE (le désordre valide n'est pas de la redondance)
 
-**Juge : le canari 4 / 97 / 131 / 134 / 213.** Une `h` qui surestime ne rend pas une
-solution un peu moins bonne — elle fait **manquer l'optimum sans aucun signal**.
+Idée testée : transformer le départage souple en **coupe dure** — interdire de remplir les
+buts dans le désordre (`remplissageOrdonne()`). **Résultat : niveau 1 rendu INSOLUBLE.**
+
+Raison, et elle rejoint le §8 : remplir dans le désordre n'est un problème que si ça
+**bloque** l'accès aux buts restants — et ce cas est **déjà** élagué par la détection de
+deadlocks (`distancePoussee == -1`). Couper *tout* désordre coupe donc aussi les désordres
+**valides**, qui ne sont pas de la redondance mais une vraie liberté de la solution. Il n'y
+a rien à couper de plus que ce que les deadlocks coupent déjà. Le chantier « borne de
+déblocage » du §9.8 tombe avec : combler le mou par une `h` plus fine ne réduit pas les
+gros niveaux (§10.1), et couper l'espace non plus.
+
+### 10.4 LE SOUS-OPTIMAL EST CONTRE-PRODUCTIF SUR LES GROS NIVEAUX
+
+Renoncer à l'optimalité pour la vitesse (l'utilisateur préfère « rapide mais approché ») a
+été essayé — greedy (`h` seul), pondéré (`w = 2`), beam (front borné à `W`) :
+
+| niveau | A\* optimal + guidage | greedy | beam (W=20k) |
+|---|---|---|---|
+| 1  | 5 638 / 97   | **413 / 111** | 413 / 111 |
+| 2  | **590 066 / 131** | explose (12 M+) | aucune solution |
+| 17 | **1 090 145 / 213** | 1 701 623 / 223 | 1 701 623 / 223 |
+
+**Contre-intuitif mais net : sur les gros niveaux, le sous-optimal est PIRE que l'optimal.**
+Le greedy plonge tête baissée, tombe dans les deadlocks/manœuvres, doit backtracker — il
+navigue *moins bien* que la recherche optimale, qui garde `g` et reste cohérente. Le
+sous-optimal ne paie **que sur le niveau 1** (multiplicité pure, aucun piège). Leur coût
+n'est pas de la redondance sacrifiable, c'est du travail incompressible.
+
+**État des lieux :** niveau 1 accéléré (guidage ÷2,8 en optimal, ou greedy 413/111 si on
+accepte l'approché). Niveaux 2/17/3 : l'A\* optimal + guidage reste le meilleur connu, et
+on a la preuve qu'aucune des pistes de ce §10 ne les réduira. Le mur est compris, pas
+seulement constaté.
 
 ---
 

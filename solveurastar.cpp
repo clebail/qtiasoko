@@ -17,7 +17,11 @@
 // un palier.
 static bool compare(const SolveurAStar::SElement& a, const SolveurAStar::SElement& b) {
     if (a.f != b.f) return a.f > b.f;
-    return a.g < b.g;
+    if (a.g != b.g) return a.g < b.g;
+    // Départage (§10.2) : à f et g égaux, l'état au score de guidage le plus PETIT
+    // passe devant (rangement dans l'ordre canonique des buts). Pur ordre de visite,
+    // sans effet sur l'optimalité — attaque la multiplicité des entrelacements (§9.4).
+    return a.guidage > b.guidage;
 }
 
 SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, QObject *parent)
@@ -113,7 +117,9 @@ void SolveurAStar::run() {
     const Cle cleDepart{arene.dernier()};
     meilleurG.insere(cleDepart, 0);
 
-    file.push_back({poids * depart.getHeuristique(), 0, 0, cleDepart});
+    qint64 scoreDepart;
+    const int hDepart = depart.getHeuristique(&scoreDepart);
+    file.push_back({poids * hDepart, 0, 0, cleDepart, scoreDepart});
     std::push_heap(file.begin(), file.end(), compare);
 
     // État de travail RÉUTILISÉ d'un dépilement à l'autre : appliqueEtat()
@@ -235,7 +241,9 @@ void SolveurAStar::run() {
 
                         noeuds.append(Noeud{cur.idxNoeud, (quint16)i, (quint8)d});
 
-                        file.push_back({gE + poids * e.getHeuristique(), gE, noeuds.size()-1, cle});
+                        qint64 score;
+                        const int hE = e.getHeuristique(&score);
+                        file.push_back({gE + poids * hE, gE, noeuds.size()-1, cle, score});
                         std::push_heap(file.begin(), file.end(), compare);
                     }
                 }
