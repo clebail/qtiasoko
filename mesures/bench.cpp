@@ -1,6 +1,6 @@
-// Harnais headless : résout un niveau en A* optimal et imprime le canari.
+// Harnais headless : résout un niveau et imprime le canari.
 //
-//   bench <numNiveau> [poids]
+//   bench <numNiveau> [astar|macro|pondere|bfs]   (défaut : astar optimal)
 //
 // Sortie : "OK <niveau> etats=<n> poussees=<p>" — les deux chiffres qui doivent
 // rester identiques à l'octet près après l'étape 11 (adressage ouvert).
@@ -15,9 +15,13 @@
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
 
-    if (argc < 2) { fprintf(stderr, "usage: bench <niveau> [poids]\n"); return 2; }
-    const int num   = QString(argv[1]).toInt();
-    const int poids = (argc > 2) ? QString(argv[2]).toInt() : 1;
+    if (argc < 2) { fprintf(stderr, "usage: bench <niveau> [astar|macro|pondere|bfs]\n"); return 2; }
+    const int num    = QString(argv[1]).toInt();
+    const QString md = (argc > 2) ? argv[2] : "astar";
+    const Solveur::EType type =
+        (md == "macro")   ? Solveur::AstarMacro   :
+        (md == "pondere" || md == "2") ? Solveur::AstarPondere :
+        (md == "bfs")     ? Solveur::Bfs          : Solveur::Astar;
 
     Level level;
     level.load(QString("%1/level%2.xsb")
@@ -26,8 +30,7 @@ int main(int argc, char** argv) {
 
     Game game(level, num);
 
-    Solveur* s = Solveur::creer(poids == 1 ? Solveur::Astar : Solveur::AstarPondere,
-                                game);
+    Solveur* s = Solveur::creer(type, game);
 
     QObject::connect(s, &Solveur::solutionTrouvee,
                      [num, game](QList<Game::EDirection> chemin, qint64 etats) {

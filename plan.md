@@ -1107,9 +1107,133 @@ sous-optimal ne paie **que sur le niveau 1** (multiplicité pure, aucun piège).
 n'est pas de la redondance sacrifiable, c'est du travail incompressible.
 
 **État des lieux :** niveau 1 accéléré (guidage ÷2,8 en optimal, ou greedy 413/111 si on
-accepte l'approché). Niveaux 2/17/3 : l'A\* optimal + guidage reste le meilleur connu, et
-on a la preuve qu'aucune des pistes de ce §10 ne les réduira. Le mur est compris, pas
-seulement constaté.
+accepte l'approché). Niveaux 2/17/3 : l'A\* optimal + guidage reste le meilleur connu.
+
+> ⚠️ **PÉRIMÉ par le §10.5.** Ce §10.4 concluait « aucune piste ne réduira les gros
+> niveaux ». **Faux depuis la goal macro** : le §10.5 les divise par 1000 à 14 000. La
+> conclusion valait pour les leviers qui restent *optimaux* et *complets* ; la macro, elle,
+> s'engage (approché) et contourne le mou au lieu de le combler. C'était le point aveugle.
+
+### 10.5 🏆 LA GOAL MACRO — le levier qui perce les gros niveaux (2026-07-15)
+
+**Idée de l'utilisateur, et c'est LE résultat du projet.** Au lieu d'explorer poussée par
+poussée l'acheminement d'une caisse (ce que la recherche redécouvre péniblement, §9.4), on
+**pousse la caisse jusqu'au but d'un seul coup** — une transition composite — et on ne
+laisse à la recherche que l'ordre et le démêlage.
+
+**Chiffres à jour au 2026-07-16 (macro + goal-ordering à rebours, cf. plus bas) :**
+
+| niveau | A\* + guidage (sans macro) | **macro + rebours** | poussées | optimum ? |
+|---|---|---|---|---|
+| 0  | 5          | **4**         | 4   | ✅ 4 |
+| 1  | 5 638      | **14**        | 97  | ✅ 97 |
+| 2  | 590 066    | **435**       | 131 | ✅ 131 |
+| 3  | 7 280 054  | **509**       | 134 | ✅ 134 |
+| 4  | *ne passe pas* | **3 687 580** | 355 | 🔓 macro (BFS ne passe pas → optimum inconnu ; **référence pour la suite**) |
+| 5  | *ne passe pas* | **71 339**  | 143 | ? macro seule |
+| 6  | 542 032    | **784**       | 110 | ✅ 110 (confirmé) |
+| 7  | *ne passe pas* | **806 476** | 90  | ? macro seule |
+| 8  | *ne passe pas* | *lent — passe* | —   | ralenti par un deadlock non détecté (§ ci-dessous) |
+| 9  | *ne passe pas* | **1 340 763** | 237 | même deadlock que le 8 ; passe |
+| 17 | 1 090 145  | **202 086**   | 213 | ✅ 213 |
+
+**Canari élargi** : optima confirmés **0/1/2/3/6/17 = 4/97/131/134/110/213** (macro = optimal,
+mesuré contre l'A\* complet là où il aboutit). **Niveau 4 : 3 687 580 états / 355 poussées** —
+première résolution du 20-caisses, gardée comme **référence macro** (le BFS n'y passe pas, on
+ne connaît pas l'optimum ; à comparer quand on durcira la détection de deadlocks). Niveaux
+**5 → 143** et **7 → 90** : références macro seule aussi.
+
+#### Pourquoi ça marche — et où, exactement
+
+- **Ça contourne le mou** (§10) au lieu de le combler. Les états intermédiaires du transport
+  d'une caisse, y compris à `f < C*` (le mou), disparaissent de l'arbre. Interdit en A\*
+  optimal (il doit développer tout `f < C*`), permis en approché.
+- **Ça s'auto-régule et reste souvent optimal** : la macro ne s'engage QUE si la caisse peut
+  réellement atteindre le but (trajet libre). Une caisse coincée par la congestion ne peut
+  pas → la recherche la démêle normalement. On ne compresse que le trajet libre, qui est
+  optimal (§9.7) → l'optimalité tient sur 0/1/2/3/6/17.
+- **L'ordre de remplissage `ordreButs`** décide quel but la macro vise en premier. Il est
+  passé de « profondeur » à un vrai **goal-ordering à rebours** (cf. sous-section dédiée) —
+  c'est lui qui a résolu le 4 et fait chuter le 1 de 944 à 14.
+
+#### Implémentation
+`Game::butActif()` (but profond disponible), `Game::macroVersBut()` (joue le trajet solo pas
+à pas en vérifiant la faisabilité réelle à chaque étape, empile les poussées pour
+`reconstruire()`), et dans `SolveurAStar` le **régime d'engagement** : si le but actif est
+atteignable, on ne génère QUE les macros qui l'y envoient (une branche par caisse capable),
+sinon on retombe sur les poussées simples. **Formalisé** (2026-07-16) en mode propre
+`Solveur::AstarMacro` (« A\* macro (rapide) » dans le combo ; `bench <niveau> macro`) — fini
+la variable d'environnement.
+
+#### La limite, MESURÉE : congestion forte = trajet solo ≠ trajet réel
+
+**Les niveaux 4 et 8 bloquent**, et l'utilisateur en a donné la cause, vérifiée sur ses
+cartes de passages (bouton « Export passages » + `mesures/comparaison`) : sur le niveau 4
+(20 caisses), le trajet **solo** d'une caisse (l'artère du haut, la plus courte seule) n'est
+**pas** celui qu'elle emprunte réellement. Saturée par 20 caisses, l'artère est contournée
+par le bas. Écart mesuré solo↔réel : **+126 passages de détour** (contre 2 sur le niveau 2).
+La macro suit le solo, l'envoie dans l'autoroute bloquée → impasse. **Elle marche là où la
+congestion est faible, échoue là où elle est forte.** La correction « macro si chemin forcé »
+ne suffit pas : ce n'est pas une ambiguïté locale, c'est le trajet solo *entier* qui est le
+mauvais. (Le niveau 4 a depuis été **résolu** par un meilleur ordre de remplissage, ci-dessous ;
+le 8 résiste encore, à cause d'un deadlock non détecté.)
+
+#### 🏆 Le goal-ordering À REBOURS — a résolu le niveau 4 (2026-07-16)
+
+**Le vrai enjeu du 4 n'était pas la macro, c'était l'ORDRE de remplissage de la salle de
+buts.** Deux fausses pistes d'abord, toutes deux mesurées :
+- **Profondeur** (distance de poussée décroissante) : remplit en **couches concentriques**
+  (les coins d'abord). Ça **enclave** le pourtour → salle auto-murée, le 4 plafonnait à 13/20.
+- **Enclavement = nb de voisins-buts** (remplir le cœur de la poche d'abord) : **DÉSASTRE**
+  (4 à 1/20, 5 cassé). Une caisse au centre d'une salle vide coupe le joueur en deux.
+
+**La bonne réponse : le goal-ordering à rebours.** On part de la salle PLEINE et on retire
+les caisses dans l'ordre où on peut les **tirer** vers une case libre (les autres caisses-buts
+comptant comme obstacles) ; l'ordre de retrait **inversé** est l'ordre de remplissage. La
+dernière caisse sortable (la plus enclavée) se pose en premier. Version **géométrique** (on
+vérifie que la case d'arrivée du tirage ET la case d'appui sont libres, sans prouver que le
+joueur les atteint) — suffit pour l'ordre de salle. Départage clé : à caisses également
+sortables, préférer celle qui sort **directement hors des buts** (le bord) avant celle qui
+sort via un but déjà libéré (l'intérieur) → la salle se vide **colonne par colonne**, de
+l'entrée vers le fond ; le remplissage inverse va **fond → entrée**, exactement l'ordre que
+l'utilisateur trace à la main.
+
+**Résultat** : niveau 4 **résolu** (bloquait → 3 687 580 états / 355 poussées ; 355 < 405 de
+la solution à la main). Bonus général : niveau 1 **944 → 14** états, canari intact partout.
+Implémenté dans `calculDistancePoussee()` (calcul de `ordreButs`). Vérifié : 0/1/2/3/6 canari
+OK, 131 tests passent.
+
+#### Outils de diagnostic ajoutés (2026-07-16)
+- **Jauges dans `qDebug`** (A\* et BFS) : tendance de la file (`MONTE`/`stagne`/`DESCEND`),
+  reste estimé `h = f - g` (→ 0 = fin proche), et **caisses rangées : courant (max atteint)/N**.
+  Le « max » a révélé les plateaux (4 à 13→14→18/20 selon l'ordre).
+- **UI** : case à cocher **« Voir le max de caisses posées »** (le solveur émet
+  `nouveauMaxCaisses(Game, int)` à chaque record ; l'UI affiche l'état figé) et bouton
+  **« Export .xsb »** (exporte le plateau affiché — courant ou état-max — pour l'inspecter).
+
+#### Ce qui ralentit : les DEADLOCKS multi-caisses dynamiques (8 ET 9, et le résidu du 4)
+**Les niveaux 8 et 9 ne bloquent PAS — ils sont LENTS**, sur le MÊME motif (constaté par
+l'utilisateur). Le 9 finit par passer en **1 340 763 états / 237 poussées** ; le deadlock non
+détecté *gonfle* l'exploration sans la tuer. Le détecter serait donc un **accélérateur** (gros
+gain attendu sur 8/9), pas un déblocage vital — et le motif est partagé, donc rentable.
+`checkDefaite` est un test sur **un seul état** : il attrape les caisses gelées *maintenant*,
+pas les états **condamnés mais pas encore gelés** (« il n'y a deadlock que quand on bouge une
+caisse de plus », dixit l'utilisateur). Motif type (niveaux 8/9) : une caisse sous un **mur**
+(donc immobile verticalement — un mur au-dessus bloque *les deux* sens) ne peut que glisser
+sur sa ligne ; la seule sortie vers le bas est loin ; deux caisses sur cette ligne se piègent
+mutuellement. `casesMortes` (une caisse seule s'échappe) et le gel (pas de mur perpendiculaire
+des deux côtés) ne le voient pas. **C'est un deadlock dynamique multi-caisses** — la frontière
+de la détection Sokoban, terrain du faux positif §3bis. Piste, à froid : détection de
+**région** (N caisses piégées dans une zone sans assez de buts atteignables). Juge : le canari.
+
+#### Prochaine étape : le REPLI ANYTIME (à faire)
+Rendre la macro sûre sur tous les niveaux : **passe 1** avec macro, plafonnée à un budget
+d'états (~2 M — au-dessus des 806 k du niveau 7, sous l'explosion des cas durs) ; **passe 2**
+sans macro seulement si le budget est épuisé. ⚠️ Un cas dur qui rame n'émet PAS « aucune
+solution » (la file ne se vide jamais) → le repli doit se déclencher sur le **budget**, pas
+sur l'échec. (Le mode propre `AstarMacro` est **fait** ; reste le budget/repli dans la
+fabrique. Nuance depuis le rebours : plus rien ne bloque *définitivement*, donc le repli
+borne surtout le *temps* des cas lents 8/9, il n'est plus vital.)
 
 ---
 

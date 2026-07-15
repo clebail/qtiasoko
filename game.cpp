@@ -55,7 +55,7 @@ Game::Game(const Game& other)
     gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes),
     regions(other.regions), nbRegions(other.nbRegions), distancePoussee(other.distancePoussee),
     distanceParBut(other.distanceParBut), nbButs(other.nbButs),
-    maxRegions(other.maxRegions)
+    maxRegions(other.maxRegions), ordreButs(other.ordreButs)
 {
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -86,6 +86,7 @@ Game& Game::operator=(const Game& other) {
     distancePoussee = other.distancePoussee;
     distanceParBut = other.distanceParBut;
     nbButs = other.nbButs;
+    ordreButs = other.ordreButs;
 
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -109,7 +110,7 @@ Game::Game(Game&& other) noexcept
       regions(std::move(other.regions)), nbRegions(std::move(other.nbRegions)),
       distancePoussee(std::move(other.distancePoussee)),
       distanceParBut(std::move(other.distanceParBut)), nbButs(other.nbButs),
-      maxRegions(other.maxRegions)
+      maxRegions(other.maxRegions), ordreButs(std::move(other.ordreButs))
 {
     other.cases = nullptr;   // sinon les deux destructeurs libéreraient le même tableau
 }
@@ -136,6 +137,7 @@ Game& Game::operator=(Game&& other) noexcept {
     distancePoussee = std::move(other.distancePoussee);
     distanceParBut = std::move(other.distanceParBut);
     nbButs = other.nbButs;
+    ordreButs = std::move(other.ordreButs);
 
     cases = other.cases;
 
@@ -538,7 +540,7 @@ int Game::getHeuristique(qint64* scoreGuidage) const {
     return h;
 }
 
-void Game::appliqueEtat(const quint16* cle) {
+int Game::appliqueEtat(const quint16* cle) {
     // 1. Plateau à nu. Mapping LOCAL, case par case : surtout pas de
     //    goals.contains(i), qui serait une recherche linéaire dans une QList —
     //    donc O(n²) sur l'ensemble du plateau.
@@ -554,9 +556,11 @@ void Game::appliqueEtat(const quint16* cle) {
 
     // 2. La clé = [id des N caisses triés] + [id canonique de la zone du joueur]
     //    (cf. getEtat()). Sa longueur est tailleCle(), le dernier est le joueur.
+    int nbSurBut = 0;
     for (int k = 0; k < nbCaisses; ++k) {
         const int idx = cle[k];
-        cases[idx] = (cases[idx] == Level::tcGoal) ? Level::tcGoalCaisse : Level::tcCaisse;
+        if (cases[idx] == Level::tcGoal) { cases[idx] = Level::tcGoalCaisse; ++nbSurBut; }
+        else                              cases[idx] = Level::tcCaisse;
     }
 
     const int idxJoueur = cle[nbCaisses];
@@ -571,6 +575,7 @@ void Game::appliqueEtat(const quint16* cle) {
     // Indispensable : sans ça 'gagne' resterait celui du modèle (faux), et le
     // solveur ne reconnaîtrait JAMAIS l'état gagnant qu'il vient de reconstruire.
     checkVictoire();
+    return nbSurBut;   // gratuit : compté pendant le placement (diagnostic §10)
 }
 
 bool Game::pousse(int idxCaisse, EDirection dir) {
@@ -746,4 +751,151 @@ void Game::calculDistancePoussee() {
                 distancePoussee[k] = v;
         }
     }
+
+    // Ordre de REMPLISSAGE des buts (§10.5) : profondeur décroissante. Profondeur
+    // d'un but = distance de poussée la plus GRANDE pour l'atteindre depuis une
+    // caisse de départ (le fond de la salle est loin, les coins encore plus). Les
+    // buts profonds/coincés passent donc en premier — l'ordre où on range à la main.
+    //
+    // ⚠️ Tenté puis ÉCARTÉ : trier par « enclavement = nombre de voisins qui sont
+    // des buts » (remplir le cœur du groupe d'abord). Résultat DÉSASTREUX (niveau 4
+    // à 1/20, niveau 5 cassé) : une caisse au centre d'une salle vide coupe le
+    // joueur en deux. Le bon « enclavé » est « au fond, loin de l'entrée » — ce que
+    // la profondeur capture déjà, pas « au cœur de la poche ».
+    QVector<int> prof(nbButs, -1);
+    for (int b = 0; b < nbButs; b++) {
+        int best = -1;
+        for (int c = 0; c < size; c++) {
+            if (cases[c] != Level::tcCaisse && cases[c] != Level::tcGoalCaisse) continue;
+            for (int r = 0; r < nbRegions[c]; r++) {
+                const int d = distanceParBut[((qsizetype)b * size + c) * maxRegions + r];
+                if (d > best) best = d;   // la plus grande distance d'accès = la plus profonde
+            }
+        }
+        prof[b] = best;
+    }
+    // GOAL-ORDERING À REBOURS (§10.5). La profondeur remplissait en couches
+    // concentriques (coins d'abord) → elle ENCLAVE le pourtour. Le bon ordre est
+    // colonne par colonne, du fond vers l'entrée — on l'obtient en partant de la
+    // salle PLEINE et en retirant les caisses dans l'ordre où on peut les TIRER
+    // vers une case libre (les autres caisses-buts comptant comme obstacles) ;
+    // l'ordre de retrait INVERSÉ est l'ordre de remplissage. Version géométrique :
+    // on vérifie que la case d'arrivée du tirage ET la case d'appui du joueur sont
+    // libres, sans prouver que le joueur les atteint — suffisant pour l'ordre de
+    // salle. À caisses également tirables, on retire la plus PROCHE de l'entrée
+    // (prof minimale) : le retrait va entrée→fond, le remplissage fond→entrée.
+    QVector<bool> estBut(size, false);
+    QVector<int>  butDe(size, -1);
+    for (int b = 0; b < nbButs; b++) { estBut[goals[b]] = true; butDe[goals[b]] = b; }
+
+    QVector<bool> retire(nbButs, false);
+    QVector<int>  retrait;
+    auto libre = [&](int x, int y) -> bool {
+        if (x < 0 || x >= largeur || y < 0 || y >= hauteur) return false;
+        const int c = x + y * largeur;
+        if (cases[c] == Level::tcMur) return false;
+        return !(estBut[c] && !retire[butDe[c]]);   // caisse-but encore posée = occupée
+    };
+
+    for (int step = 0; step < nbButs; step++) {
+        int choisi = -1, meilleurScore = 0, meilleurProf = INT_MAX;
+        for (int b = 0; b < nbButs; b++) {
+            if (retire[b]) continue;
+            const int cx = goals[b] % largeur, cy = goals[b] / largeur;
+            // Score de sortie : 2 = la caisse peut être tirée vers une case HORS
+            // buts (bord de la salle, sortie directe) ; 1 = seulement vers un but
+            // déjà libéré (intérieur). On retire d'abord les score 2, ce qui vide
+            // la salle COLONNE PAR COLONNE de l'entrée vers le fond au lieu de la
+            // dépiauter en couches.
+            int score = 0;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int dx = cx - directions[d].dx,   dy = cy - directions[d].dy;
+                const int ax = cx - 2*directions[d].dx, ay = cy - 2*directions[d].dy;
+                if (libre(dx, dy) && libre(ax, ay)) {
+                    const int s = estBut[dx + dy * largeur] ? 1 : 2;
+                    if (s > score) score = s;
+                }
+            }
+            if (score == 0) continue;   // pas tirable
+            if (score > meilleurScore || (score == meilleurScore && prof[b] < meilleurProf)) {
+                meilleurScore = score; meilleurProf = prof[b]; choisi = b;
+            }
+        }
+        if (choisi < 0) break;               // reste des caisses non sortables (fallback plus bas)
+        retire[choisi] = true;
+        retrait.append(choisi);
+    }
+    // Les buts non sortables (jamais tirables) restent à remplir en dernier ;
+    // on les met en tête du retrait (donc en queue du remplissage), par prof.
+    QVector<int> reste;
+    for (int b = 0; b < nbButs; b++) if (!retire[b]) reste.append(b);
+    std::sort(reste.begin(), reste.end(), [&prof](int a, int b){ return prof[a] < prof[b]; });
+
+    ordreButs.clear();
+    for (int k = retrait.size() - 1; k >= 0; k--) ordreButs.append(retrait[k]);   // retrait inversé
+    for (int b : reste) ordreButs.append(b);
+}
+
+bool Game::remplissageOrdonne() const {
+    bool vuVide = false;
+    for (int k = 0; k < nbButs; k++) {
+        if (cases[goals[ordreButs[k]]] == Level::tcGoalCaisse) {
+            if (vuVide) return false;   // but rempli APRÈS un but plus profond vide : désordre
+        } else {
+            vuVide = true;
+        }
+    }
+    return true;
+}
+
+int Game::nbCaissesSurBut() const {
+    int n = 0;
+    for (int i = 0; i < size; ++i)
+        if (cases[i] == Level::tcGoalCaisse) ++n;
+    return n;
+}
+
+int Game::butActif() const {
+    for (int k = 0; k < nbButs; k++)
+        if (cases[goals[ordreButs[k]]] != Level::tcGoalCaisse)
+            return ordreButs[k];
+    return -1;
+}
+
+bool Game::macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees) {
+    const int caseBut = goals[indexBut];
+    const int* dpb = distanceParBut.constData() + (qsizetype)indexBut * size * maxRegions;
+
+    int c = idxCaisse;
+    for (int garde = 0; c != caseBut && garde <= 2 * size; garde++) {
+        const QVector<bool> zone = getZoneJoueur();
+        const int joueurIdx = playerPoint.x() + playerPoint.y() * largeur;
+        const int rAvant = regions[joueurIdx * size + c];
+        if (rAvant < 0) return false;
+        const int dCur = dpb[c * maxRegions + rAvant];
+        if (dCur <= 0) return false;                 // -1 (inatteignable) ou déjà arrivé
+
+        const int cx = c % largeur, cy = c / largeur;
+        bool avance = false;
+        for (int d = 0; d < NB_DIRECTION && !avance; d++) {
+            const int devx = cx + directions[d].dx, devy = cy + directions[d].dy;   // case caisse après
+            const int appx = cx - directions[d].dx, appy = cy - directions[d].dy;   // appui joueur
+            if (devx < 0 || devx >= largeur || devy < 0 || devy >= hauteur) continue;
+            if (appx < 0 || appx >= largeur || appy < 0 || appy >= hauteur) continue;
+            const int devant = devx + devy * largeur;
+            const int appui  = appx + appy * largeur;
+            if (!isLibre(devant)) continue;          // arrivée occupée (mur / autre caisse)
+            if (!zone[appui]) continue;              // joueur ne peut pas se placer derrière
+            const int rApres = regions[c * size + devant];
+            if (rApres < 0) continue;
+            if (dpb[devant * maxRegions + rApres] == dCur - 1) {   // cette poussée avance vers le but
+                if (!pousse(c, (Game::EDirection)d)) return false;
+                poussees.append({c, d});
+                c = devant;
+                avance = true;
+            }
+        }
+        if (!avance) return false;                   // aucune poussée ne fait avancer : bloqué
+    }
+    return c == caseBut;
 }

@@ -22,6 +22,8 @@ public:
     // la mémoire.
     void setPassages(const QVector<int>& p);
     static QString formaterMillier(qint64 n);
+    void showPassage(bool show);
+    void setDuree(double duree);
 protected:
     virtual void paintEvent(QPaintEvent *);
 private:
@@ -29,6 +31,8 @@ private:
     qint64 etatsExplores = 0;
     QVector<int> passages;
     Sprite *sprites[NB_SPRITE];
+    bool show = false;
+    double duree = 0;
 
     void initSprites();
     void freeSprites();

@@ -65,17 +65,7 @@ void WGame::paintEvent(QPaintEvent *) {
         QString statDep    = QString("Déplacements : %1").arg(game->getNbDep());
         QString statCaisse = QString("Caisses : %1").arg(game->getNbDepCaisse());
         QString statEtats  = QString("Etats explores : %1").arg(formaterMillier(etatsExplores));
-
-        QFont font = painter.font();
-        font.setPointSize(14);
-        font.setBold(true);
-        painter.setFont(font);
-
-        painter.setPen(QColor(0x29, 0x80, 0xb9));
-        painter.drawText(8, 24, statNiveau);
-        painter.drawText(8, 46, statDep);
-        painter.drawText(8, 68, statCaisse);
-        painter.drawText(8, 90, statEtats);
+        QString statDuree  = QString("Temps de résolution : %1s").arg(duree);
 
         const int largeur = game->getLargeur();
         const int hauteur = game->getHauteur();
@@ -96,7 +86,7 @@ void WGame::paintEvent(QPaintEvent *) {
 
                 // Compteur de passages, par-dessus la case. Les murs n'en ont
                 // jamais.
-                if (idx < passages.size() && passages[idx] > 0 && c != Level::tcMur) {
+                if (show && idx < passages.size() && passages[idx] > 0 && c != Level::tcMur) {
                     const QRect r(margX + x * SPRITE_WIDTH, margY + y * SPRITE_HEIGHT,
                                   SPRITE_WIDTH, SPRITE_HEIGHT);
 
@@ -119,5 +109,27 @@ void WGame::paintEvent(QPaintEvent *) {
                 }
             }
         }
+
+        QFont font = painter.font();
+        font.setPointSize(14);
+        font.setBold(true);
+        painter.setFont(font);
+
+        painter.setPen(QColor(0x29, 0x80, 0xb9));
+        painter.drawText(8, 24, statNiveau);
+        painter.drawText(8, 46, statDep);
+        painter.drawText(8, 68, statCaisse);
+        painter.drawText(8, 90, statEtats);
+        painter.drawText(8, 112, statDuree);
     }
+}
+
+void WGame::showPassage(bool show) {
+    this->show = show;
+    update();
+}
+
+void WGame::setDuree(double duree) {
+    this->duree = duree;
+    update();
 }

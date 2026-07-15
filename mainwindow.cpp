@@ -17,6 +17,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     cbSolveur->setFocusPolicy(Qt::NoFocus);
     pbResoudre->setFocusPolicy(Qt::NoFocus);
     pbRevoir->setFocusPolicy(Qt::NoFocus);
+    cbNotePassages->setFocusPolicy(Qt::NoFocus);
     pbExport->setFocusPolicy(Qt::NoFocus);
 
     for (const Solveur::SType& t : Solveur::types()) {
@@ -46,8 +47,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(pbResoudre, &QPushButton::clicked, this, &MainWindow::onIALance);
     connect(pbRevoir, &QPushButton::clicked, this, &MainWindow::onRevoir);
     connect(pbExport, &QPushButton::clicked, this, &MainWindow::onExportPassages);
+    connect(pbExportXsb, &QPushButton::clicked, this, &MainWindow::onExportXsb);
+    connect(cbNotePassages, &QCheckBox::stateChanged, this, &MainWindow::onShowPassagesCaisse);
+    connect(cbEtatMax, &QCheckBox::stateChanged, this, &MainWindow::onToggleEtatMax);
     connect(&timerRejeu, &QTimer::timeout, this, &MainWindow::rejouerCoup);
     timerRejeu.setInterval(150);
+
+    // Game transporté par signal queued (thread solveur -> UI) pour l'état-max.
+    qRegisterMetaType<Game>("Game");
 
     if (cbNiveau->count() > 0) {
         onNiveauChange(0);
@@ -67,10 +74,17 @@ void MainWindow::onNiveauChange(int index) {
     derniereSolutionCoups.clear();
     pbRevoir->setEnabled(false);
 
+    // Nouveau niveau : l'état-max du précédent n'a plus de sens.
+    maxRangeesVu = 0;
+    cbEtatMax->setChecked(false);
+    cbEtatMax->setEnabled(false);
+    cbEtatMax->setText("Voir le max de caisses posées");
+
     initPassages();
 
     wGame->setGame(&game);
     wGame->setEtatsExplores(0);
+    wGame->setDuree(0);
     wGame->setPassages(passages);
     wGame->update();
 }
@@ -122,13 +136,23 @@ void MainWindow::onIALance() {
     if (solveur) return;   // résolution déjà en cours
 
     setControlesActifs(false);
+    wGame->setDuree(0.0);
+
+    // Nouvelle résolution : on repart d'un état-max vierge.
+    maxRangeesVu = 0;
+    cbEtatMax->setChecked(false);
+    cbEtatMax->setEnabled(false);
+    cbEtatMax->setText("Voir le max de caisses posées");
 
     const auto type = static_cast<Solveur::EType>(cbSolveur->currentData().toInt());
     solveur = Solveur::creer(type, game, this);
     connect(solveur, &Solveur::solutionTrouvee, this, &MainWindow::onSolutionTrouvee);
     connect(solveur, &Solveur::aucuneSolution, this, &MainWindow::onAucuneSolution);
+    connect(solveur, &Solveur::nouveauMaxCaisses, this, &MainWindow::onNouveauMax);
     connect(solveur, &QThread::finished, solveur, &QObject::deleteLater);
     solveur->start();
+
+    begin = chrono::high_resolution_clock::now();
 }
 
 void MainWindow::onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsExplores) {
@@ -141,7 +165,11 @@ void MainWindow::onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsE
     derniereSolutionEtats = etatsExplores;
     pbRevoir->setEnabled(true);
 
+    const auto end = std::chrono::high_resolution_clock::now();
+    const std::chrono::duration<double> diff = end - begin;
+
     wGame->setEtatsExplores(etatsExplores);
+    wGame->setDuree(ceil(diff.count()));
 
     const QMessageBox::StandardButton reponse = QMessageBox::question(
         this, "Solveur",
@@ -288,4 +316,65 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     }
 
     return QObject::eventFilter(obj, event);
+}
+
+void MainWindow::onExportXsb() {
+    // Exporte le plateau AFFICHÉ (état-max si la case est cochée, sinon le plateau
+    // courant) au format .xsb, pour l'inspecter/le partager facilement.
+    const Game& g = cbEtatMax->isChecked() ? gameMax : game;
+
+    const QString chemin = QFileDialog::getSaveFileName(
+        this, "Exporter le plateau (.xsb)",
+        QString("plateau_niveau%1.xsb").arg(g.getNumNiveau(), 2, 10, QChar('0')),
+        "Sokoban (*.xsb)");
+    if (chemin.isEmpty()) return;
+
+    QFile f(chemin);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Export", "Écriture impossible.");
+        return;
+    }
+
+    const int L = g.getLargeur(), H = g.getHauteur();
+    QTextStream out(&f);
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < L; x++) {
+            switch (g.getCase(x + y * L)) {
+                case Level::tcMur:        out << '#'; break;
+                case Level::tcCaisse:     out << '$'; break;
+                case Level::tcGoalCaisse: out << '*'; break;
+                case Level::tcGoal:       out << '.'; break;
+                case Level::tcPlayer:     out << '@'; break;
+                case Level::tcGoalPlayer: out << '+'; break;
+                default:                  out << ' '; break;
+            }
+        }
+        out << "\n";
+    }
+}
+
+void MainWindow::onShowPassagesCaisse() {
+    wGame->showPassage(cbNotePassages->isChecked());
+    pbExport->setEnabled(cbNotePassages->isChecked());
+}
+
+void MainWindow::onNouveauMax(Game etatMax, int nbRangees) {
+    gameMax = etatMax;
+    maxRangeesVu = nbRangees;
+    cbEtatMax->setEnabled(true);
+    cbEtatMax->setText(QString("Voir le max de caisses posées (%1/%2)")
+                           .arg(nbRangees).arg(gameMax.getNbButs()));
+    // Si l'utilisateur regarde déjà l'état-max, le rafraîchir en direct.
+    if (cbEtatMax->isChecked())
+        wGame->update();
+}
+
+void MainWindow::onToggleEtatMax(int state) {
+    if (state == Qt::Checked) {
+        timerRejeu.stop();               // fige l'affichage sur l'état-max
+        wGame->setGame(&gameMax);
+    } else {
+        wGame->setGame(&game);
+    }
+    wGame->update();
 }

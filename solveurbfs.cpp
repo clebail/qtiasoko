@@ -25,11 +25,18 @@ void SolveurBFS::run() {
     depart.getEtat(arene.reserve());
     vus.insert(Cle{arene.dernier()});
 
+    int maxRangees = 0;
     while (file.size()) {
         auto [g, idx] = file.dequeue();
         compteur++;
         if (compteur % 1000 == 0) {
             qDebug() << "SolveurBFS:" << compteur << "etats depiles, file =" << file.size() << ", vus =" << vus.size();
+        }
+
+        const int rangees = g.nbCaissesSurBut();
+        if (rangees > maxRangees) {
+            maxRangees = rangees;
+            emit nouveauMaxCaisses(g, rangees);   // diagnostic état-max (§10)
         }
 
         if(g.isGagne()) {

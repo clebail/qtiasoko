@@ -24,8 +24,8 @@ static bool compare(const SolveurAStar::SElement& a, const SolveurAStar::SElemen
     return a.guidage > b.guidage;
 }
 
-SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, QObject *parent)
-    : Solveur(etatDepart, parent), poids(poids) {
+SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, bool macro, QObject *parent)
+    : Solveur(etatDepart, parent), poids(poids), macro(macro) {
 }
 
 #ifdef DUMP_DEV
@@ -128,6 +128,8 @@ void SolveurAStar::run() {
     // et distancePoussee (QVector en partage implicite → copie quasi gratuite)
     // sans jamais relancer calculDistancePoussee(), qui est en O(size²).
     Game etat(depart);
+    int fileAvant = 0;   // taille de la file au dernier affichage (tendance)
+    int maxRangees = 0;  // plus grand nombre de caisses rangées atteint (jauge de blocage)
 
     while(file.size()) {
         // pop_heap n'enlève rien : il amène le meilleur élément en DERNIÈRE
@@ -148,10 +150,6 @@ void SolveurAStar::run() {
         }
 
         compteur++;
-        if (compteur % 1000 == 0) {
-            qDebug() << "SolveurAStar(w=" << poids << "):" << compteur << "etats depiles, file =" << file.size()
-                     << ", vus =" << meilleurG.size() << ", f =" << cur.f;
-        }
 
 #ifdef INSTRUM_F
         // Combien de mou reste-t-il à gratter dans h ? Pour TOUT état développé,
@@ -168,7 +166,27 @@ void SolveurAStar::run() {
 #endif
 
         // Le Game n'était pas dans la file : on le reconstruit depuis la clé.
-        etat.appliqueEtat(arene.lit(cur.cle.offset));
+        // appliqueEtat renvoie gratuitement le nombre de caisses déjà rangées.
+        const int rangees = etat.appliqueEtat(arene.lit(cur.cle.offset));
+        if (rangees > maxRangees) {
+            maxRangees = rangees;
+            emit nouveauMaxCaisses(etat, rangees);   // copie figée pour l'UI (§10)
+        }
+
+        if (compteur % 1000 == 0) {
+            // Diagnostic : TENDANCE de la file (Δ depuis le dernier point), reste
+            // ESTIMÉ h = f - g (descend vers 0 = fin proche), et CAISSES RANGÉES
+            // (courant + MAX atteint / nbButs). Voir plan §10 (jauges de convergence).
+            const int dfile = (int)file.size() - fileAvant;
+            fileAvant = (int)file.size();
+            const char* tend = dfile > 100 ? "MONTE" : (dfile < -100 ? "DESCEND" : "stagne");
+            qDebug().nospace()
+                << "w" << poids << " | " << compteur << " depiles"
+                << " | file " << file.size() << " (" << (dfile >= 0 ? "+" : "") << dfile << " " << tend << ")"
+                << " | vus " << meilleurG.size()
+                << " | f " << cur.f << " h(reste) " << (cur.f - cur.g)
+                << " | rangees " << rangees << " (max " << maxRangees << ")/" << etat.getNbButs();
+        }
 
 #ifdef DUMP_DEV
         // Les états RÉELLEMENT dépilés — et non l'ensemble {f <= C*}, qui est
@@ -191,60 +209,69 @@ void SolveurAStar::run() {
             return;
         }
 
+        // Enfile l'état 'e' (déjà obtenu, non perdu), atteint depuis 'cur' par la
+        // suite de poussées 'chaine' ((case caisse, dir)), de coût total gE. Gère
+        // la clé en arène, la dédup meilleurG/ferme, la chaîne de noeuds (un par
+        // poussée, pour que reconstruire() rejoue une macro à l'identique) et le
+        // push_heap. Partagé entre poussées simples et goal macro.
+        auto enfiler = [&](Game& e, int gE, const QVector<QPair<int,int>>& chaine) {
+            e.getEtat(arene.reserve());
+            Cle cle{arene.dernier()};
+            if (interditRedeveloppement && ferme.count(cle)) { arene.annule(); return; }
+            TableG::Slot* slot = meilleurG.cherche(cle);
+            if (slot) {
+                if (gE >= slot->g) { arene.annule(); return; }
+                slot->g = gE;
+                cle = slot->cle;
+                arene.annule();
+            } else {
+                meilleurG.insere(cle, gE);
+            }
+            int parent = cur.idxNoeud;
+            for (const auto& p : chaine) {
+                noeuds.append(Noeud{parent, (quint16)p.first, (quint8)p.second});
+                parent = noeuds.size() - 1;
+            }
+            qint64 score;
+            const int hE = e.getHeuristique(&score);
+            file.push_back({gE + poids * hE, gE, parent, cle, score});
+            std::push_heap(file.begin(), file.end(), compare);
+        };
+
         QVector<bool> zone = etat.getZoneJoueur();
         QVector<quint8> caisses = etat.getCaissesDeplacable(zone);
-        for(int i = 0; i < caisses.size(); i++) {
-            quint8 dirPoussePossible = caisses[i];
 
-            for (int d = 0; d < NB_DIRECTION; d++) {
-                quint8 mask = 1 << d;
-                if (dirPoussePossible & mask) {
+        // GOAL MACRO (§10.5) — régime d'ENGAGEMENT : si le but actif (le plus
+        // profond non rempli) peut être atteint par au moins une caisse, on ne
+        // génère QUE les macros qui l'y envoient (une branche par caisse capable),
+        // et rien d'autre. On abandonne ainsi toutes les façons de bouger ces
+        // caisses autrement — c'est ce qui coupe la combinatoire. Repli sur les
+        // poussées simples si aucune macro n'aboutit (caisse coincée par la
+        // congestion : la recherche doit d'abord démêler).
+        int macrosOk = 0;
+        if (macro) {
+            const int but = etat.butActif();
+            if (but >= 0) {
+                for (int i = 0; i < caisses.size(); i++) {
+                    if (caisses[i] == 0) continue;   // pas de caisse poussable ici
                     Game e(etat);
+                    QVector<QPair<int,int>> poussees;
+                    if (e.macroVersBut(i, but, poussees) && !e.isPerdu()) {
+                        enfiler(e, cur.g + poussees.size(), poussees);
+                        macrosOk++;
+                    }
+                }
+            }
+        }
 
-                    if(e.pousse(i, (Game::EDirection)d) && !e.isPerdu()) {
-                        // La clé s'écrit directement en fin d'arène — aucune
-                        // allocation. Si l'enfant se révèle être un doublon, on
-                        // la reprend par annule() : elle y figure déjà.
-                        e.getEtat(arene.reserve());
-                        Cle cle{arene.dernier()};
-
-                        int gE = cur.g + 1;   // une poussée = une arête de coût 1
-
-                        // Déjà développé : inutile de le ré-enfiler, on le
-                        // jetterait au dépilement — et la file gonflerait pour rien.
-                        if (interditRedeveloppement && ferme.count(cle)) {
-                            arene.annule();
-                            continue;
-                        }
-
-                        // Ce test commande l'ENFILAGE, pas seulement l'insertion
-                        // dans meilleurG : on n'enfile que si l'état est inconnu,
-                        // ou atteint par un chemin strictement meilleur. Le BFS
-                        // pouvait se contenter d'un ensemble de vus parce qu'une
-                        // FIFO découvre les états dans l'ordre du coût ; A* dépile
-                        // par f, pas par g, et n'a pas cette garantie.
-                        TableG::Slot* slot = meilleurG.cherche(cle);
-                        if (slot) {
-                            if (gE >= slot->g) {
-                                arene.annule();
-                                continue;
-                            }
-                            slot->g = gE;
-                            // L'état est déjà dans l'arène : on réutilise SA clé et
-                            // on rend celle qu'on vient d'écrire, sinon chaque
-                            // réenfilage d'un état connu la stockerait à nouveau.
-                            cle = slot->cle;
-                            arene.annule();
-                        } else {
-                            meilleurG.insere(cle, gE);
-                        }
-
-                        noeuds.append(Noeud{cur.idxNoeud, (quint16)i, (quint8)d});
-
-                        qint64 score;
-                        const int hE = e.getHeuristique(&score);
-                        file.push_back({gE + poids * hE, gE, noeuds.size()-1, cle, score});
-                        std::push_heap(file.begin(), file.end(), compare);
+        if (macrosOk == 0) {
+            for(int i = 0; i < caisses.size(); i++) {
+                quint8 dirPoussePossible = caisses[i];
+                for (int d = 0; d < NB_DIRECTION; d++) {
+                    if (dirPoussePossible & (1 << d)) {
+                        Game e(etat);
+                        if(e.pousse(i, (Game::EDirection)d) && !e.isPerdu())
+                            enfiler(e, cur.g + 1, {{i, d}});
                     }
                 }
             }

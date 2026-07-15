@@ -26,7 +26,8 @@ public:
     enum EType {
         Bfs,
         Astar,
-        AstarPondere
+        AstarPondere,
+        AstarMacro
     };
 
     struct SType {
@@ -42,6 +43,10 @@ public:
 signals:
     void solutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsExplores);
     void aucuneSolution();
+    // Émis quand la recherche bat son record de caisses rangées (§10, diagnostic) :
+    // porte une copie de l'état atteint et le nombre de caisses posées. L'UI peut
+    // l'afficher pour voir OÙ le solveur se coince (ex. niveau 4 plafonné à 17/20).
+    void nouveauMaxCaisses(Game etatMax, int nbRangees);
 
 protected:
     void run() override = 0;

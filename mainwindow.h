@@ -6,6 +6,9 @@
 #include "ui_mainwindow.h"
 #include "game.h"
 #include "solveur.h"
+#include<iostream>
+
+using namespace std;
 
 class MainWindow : public QMainWindow, private Ui::MainWindow
 {
@@ -24,6 +27,12 @@ private slots:
     void onRevoir();
     void rejouerCoup();
     void onExportPassages();
+    void onExportXsb();
+    void onShowPassagesCaisse();
+    // Reçoit du solveur l'état où un nouveau record de caisses posées est atteint.
+    void onNouveauMax(Game etatMax, int nbRangees);
+    // Bascule l'affichage entre le plateau courant et l'état-max mémorisé.
+    void onToggleEtatMax(int state);
 private:
     // Joue un coup et compte le passage de caisse s'il y en a un. Unique point
     // d'entrée : le clavier (humain) et le rejeu (solution) passent tous deux par
@@ -49,6 +58,10 @@ private:
     void setControlesActifs(bool actifs);
 
     Game game;
+    // État où le solveur a rangé le plus de caisses (diagnostic §10). Mémorisé
+    // pour rester valide tant que WGame le pointe.
+    Game gameMax;
+    int maxRangeesVu = 0;
     Solveur *solveur = nullptr;
     QTimer timerRejeu;
     QList<Game::EDirection> coupsRestants;
@@ -59,5 +72,6 @@ private:
     Game derniereSolutionDepart;
     QList<Game::EDirection> derniereSolutionCoups;
     qint64 derniereSolutionEtats = 0;
+    std::chrono::time_point<std::chrono::high_resolution_clock> begin;
 };
 #endif // MAINWINDOW_H

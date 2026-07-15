@@ -3,6 +3,7 @@
 
 #include <QByteArray>
 #include <QMetaType>
+#include <QPair>
 #include <QPoint>
 #include <QVector>
 #include "level.h"
@@ -53,6 +54,10 @@ public:
     bool deplace(EDirection dir) { return move(dir); }
     int getNbDep() const { return nbDep; }
     int getNbDepCaisse() const { return nbDepCaisse; }
+    int getNbButs() const { return nbButs; }
+    // Nombre de caisses posées sur un but. Recompte (O(size)) — pour le BFS, qui
+    // porte des Game complets ; A* utilise le retour d'appliqueEtat, gratuit.
+    int nbCaissesSurBut() const;
     int getNumNiveau() const { return numNiveau; }
     bool isGagne() const { return gagne; }
     bool isPerdu() const { return perdu; }
@@ -100,6 +105,25 @@ public:
     // vise son but le plus proche » (qui relâchait la contrainte de distinction) :
     // elle corrige les COLLISIONS de buts (N caisses réclamant le même but), erreur
     // dominante des niveaux à beaucoup de caisses.
+    // Coupe approchée (§10.5) : vrai si les buts sont remplis dans l'ordre de
+    // PROFONDEUR (ordreButs) — un but rempli ne suit jamais un but vide plus
+    // profond. Interdit les rangements « dans le désordre » de la salle de buts.
+    // ⚠️ Peut rendre insoluble un niveau dont l'ordre optimal contrarie celui-ci
+    // (rare, ~1/32 d'après le jeu à la main) → à utiliser en mode anytime avec un
+    // repli sans coupe.
+    bool remplissageOrdonne() const;
+    // Index du but ACTIF (§10.5) : le plus profond (ordreButs) pas encore rempli,
+    // ou -1 si tous le sont (état gagnant). C'est la cible de la goal macro.
+    int butActif() const;
+    // GOAL MACRO (§10.5) : pousse la caisse en 'idxCaisse' jusqu'au but d'index
+    // 'indexBut', le long de son trajet solo, en vérifiant à CHAQUE pas que la
+    // poussée est réellement jouable dans l'état courant (case d'arrivée libre,
+    // joueur capable d'atteindre l'appui — les autres caisses comptent). Joue les
+    // poussées sur *this et les empile dans 'poussees' ((case de la caisse, dir))
+    // pour la reconstruction. Rend true si le but est atteint ; false si la caisse
+    // se bloque en route (l'état est alors partiellement modifié — l'appelant
+    // travaille sur une copie jetable).
+    bool macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees);
     int getHeuristique() const { return getHeuristique(nullptr); }
     // Surcharge : calcule aussi le SCORE DE GUIDAGE (§10.2) via l'appariement du
     // couplage. Ordre lexicographique des distances-restantes par but (priorité =
@@ -126,7 +150,9 @@ public:
     // checkVictoire()/checkDefaite() ne dépendent que des caisses.
     //
     // 'cle' pointe sur tailleCle() shorts, au format de getEtat().
-    void appliqueEtat(const quint16* cle);
+    // Renvoie le nombre de caisses posées sur un but (compté gratuitement pendant
+    // le placement), pour la jauge de progression du diagnostic (§10).
+    int appliqueEtat(const quint16* cle);
 private:
     int largeur = 0;
     int hauteur = 0;
@@ -166,6 +192,12 @@ private:
     int nbButs = 0;
     int maxRegions = 0;
 
+    // Ordre de REMPLISSAGE des buts (§10.5) : ordreButs[k] = indice du but à
+    // remplir en k-ième. Les plus PROFONDS d'abord (coins, culs-de-sac où une
+    // caisse serait gelée), en remontant vers l'entrée. Profondeur = distance de
+    // poussée depuis la caisse la plus proche. Statique, partagé par COW.
+    QVector<int> ordreButs;
+
     bool move(EDirection dir);
     bool moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction);
     void checkVictoire();
@@ -182,5 +214,9 @@ private:
 };
 
 Q_DECLARE_METATYPE(Game::EDirection)
+// Permet de transporter un Game complet par signal queued (thread solveur -> UI),
+// pour l'affichage de l'état-max (§10, diagnostic). Copie profonde du plateau, mais
+// les tables statiques sont en COW : le coût reste modéré et l'émission est rare.
+Q_DECLARE_METATYPE(Game)
 
 #endif // GAME_H

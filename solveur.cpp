@@ -14,17 +14,21 @@ QVector<Solveur::SType> Solveur::types() {
     return {
         {Bfs, "BFS (optimal)"},
         {Astar, "A* (optimal)"},
-        {AstarPondere, "A* pondéré (rapide, approché)"}
+        {AstarPondere, "A* pondéré (rapide, approché)"},
+        {AstarMacro, "A* macro (rapide)"}
     };
 }
 
 Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
     switch (type) {
         case Bfs:          return new SolveurBFS(etatDepart, parent);
-        case Astar:        return new SolveurAStar(etatDepart, 1, parent);
+        case Astar:        return new SolveurAStar(etatDepart, 1, false, parent);
         // w=2 mesuré comme le meilleur compromis : w=3 et w=5 explorent PLUS
         // d'états que w=2 (une h trop gonflée fait perdre le fil au lieu de guider).
-        case AstarPondere: return new SolveurAStar(etatDepart, 2, parent);
+        case AstarPondere: return new SolveurAStar(etatDepart, 2, false, parent);
+        // Goal macro (§10.5) : optimal sur les petits niveaux, approché sur les gros
+        // congestionnés (le trajet solo peut y différer du réel), mais résout tout.
+        case AstarMacro:   return new SolveurAStar(etatDepart, 1, true, parent);
     }
     return nullptr;
 }

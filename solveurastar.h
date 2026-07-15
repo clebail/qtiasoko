@@ -41,13 +41,18 @@ public:
         qint64 guidage;   // départage lexicographique (§10.2) : plus PETIT = préféré
     } SElement;
 
-    explicit SolveurAStar(const Game& etatDepart, int poids = 1, QObject* parent = nullptr);
+    // 'macro' active la goal macro (§10.5) : rapide, optimal sur les niveaux à
+    // faible congestion, approché sur les gros (le trajet solo peut y différer du
+    // réel). 'false' = A* pur (optimal garanti, mais lent/inabouti sur les gros).
+    explicit SolveurAStar(const Game& etatDepart, int poids = 1, bool macro = false,
+                          QObject* parent = nullptr);
 
 protected:
     void run() override;
 
 private:
     const int poids;
+    const bool macro;
 };
 
 #endif // SOLVEURASTAR_H
