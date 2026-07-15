@@ -854,13 +854,20 @@ C*  =  Σ (trajets des caisses seules)  +  coût de congestion
 
 #### Ce qui est neuf : on sait OÙ le prix est payé
 
-Les **couloirs sont prédits SANS ERREUR**. Sur le niveau 17, l'écart case par case est
-**nul** sur les trois couloirs (trafic 11, 6 et 5 — des dizaines de cases), et
+> **Vocabulaire — « ARTÈRE DE TRAFIC », jamais « couloir ».** Une artère est une case
+> par laquelle beaucoup de caisses doivent transiter : c'est une propriété du **trafic**,
+> lue sur les trajets solos. À ne surtout pas confondre avec le « couloir » *géométrique*
+> (deux murs de chaque côté), qui était le critère des macro-poussées — piste essayée,
+> non concluante, supprimée du dépôt. Les deux notions portaient le même mot et n'ont
+> rien à voir : celle-ci est le meilleur résultat du projet, l'autre n'a rien donné.
+
+Les **artères de trafic sont prédites SANS ERREUR**. Sur le niveau 17, l'écart case par
+case est **nul** sur les trois artères (trafic 11, 6 et 5 — des dizaines de cases), et
 **tout** l'écart (12) est concentré dans la **zone de départ**, là où les 6 caisses sont
 massées et doivent se démêler. Sur le niveau 1, l'écart est dans la zone d'**arrivée**
 (le rangement final). Toujours : **là où les caisses se marchent dessus**.
 
-Une caisse lancée dans un corridor suit exactement son trajet solo. Les autres ne la
+Une caisse lancée dans une artère suit exactement son trajet solo. Les autres ne la
 dévient jamais.
 
 #### Ce que ça explique enfin
@@ -951,9 +958,15 @@ La seule formulation correcte reste : **une poussée est non productive quand el
 pas descendre `h`** (elle éloigne CETTE caisse de SON but), et `mou = 2 × (non productives)` —
 vérifié : 6 × 2 = 12 sur le 17.
 
-#### ⏭️ PROCHAIN CHANTIER : borner le coût de déblocage
+#### ⏭️ Borner le coût de déblocage — ⚠️ PAS EN PREMIER : lire le §10
 
-L'idée qui vient : *« si la caisse i est posée sur le trajet solo de j, elle devra être
+> **STOP.** Ce chantier est réel, mais il est en **troisième** position. Deux opérations
+> d'une heure passent avant (§10) : l'**oracle du mou**, qui décide si ce chantier vaut
+> la peine d'exister, et le **départage à `f` égal**, qui attaque un problème que ce
+> chantier-ci ne résoudra jamais (le niveau 1, 100 % de ses états à `f = C*`).
+> Se jeter ici directement, c'est refaire la faute que ce document dénonce partout.
+
+L'idée qui vient : *« si la caisse i est posée sur l'artère de trafic de j, elle devra être
 écartée → +2 »*. O(n²) sur les trajets solos, qu'on sait maintenant EXACTS (§9.7).
 
 **⚠️ Mais ce n'est PAS admissible tel quel** — à voir AVANT de coder :
@@ -987,6 +1000,78 @@ caisses** (BFS rétrograde sur `(case₁, case₂, région)`, ~313 Ko) — mais 
 pas le mou du 17 non plus (interaction de paire nulle), et son admissibilité demande un
 couplage **paires-de-caisses ↔ paires-de-buts**, pas une simple somme (qui surestimerait :
 deux paires disjointes en caisses peuvent viser les mêmes buts).
+
+---
+
+## 10. 🧭 PROCHAINES OPÉRATIONS — dans CET ordre (2026-07-14)
+
+> **À lire avant de toucher au §9.8.** Le §9.8 dit « prochain chantier : borner le coût
+> de déblocage ». C'est vrai, mais **il ne doit pas être le premier**. Deux opérations
+> d'une heure chacune viennent avant : l'une décide si le chantier existe, l'autre
+> attaque un problème que le chantier ne résoudra jamais.
+
+### 10.0 Il y a DEUX problèmes, pas un
+
+L'histogramme des `f` au dépilement (§9.2) le dit, mais la conclusion n'en avait pas été
+tirée :
+
+| niveau | `f < C*` (OBLIGATOIRES) | `f == C*` | états développés |
+|---|---|---|---|
+| 1  | **2** (0,0 %)  | 15 594 (100 %) | 15 596 |
+| 2  | 99,7 %         | 0,3 %          | 590 871 |
+| 17 | 93,3 %         | 6,7 %          | 1 091 295 |
+
+- **Niveaux 2 et 17** : la masse est **sous** `C*` — ces états sont *obligatoires*, A\*
+  n'a pas le choix, c'est le mou de `h`. → soignés par la **borne de déblocage** (§10.3).
+- **Niveau 1** : tout est **à** `C*`. `f` ne peut **structurellement pas** les départager.
+  Combler le mou du niveau 1 économiserait… **2 états**. C'est la multiplicité des chemins
+  optimaux (§9.4), et **aucune amélioration de `h` n'y touchera jamais**. → seul le
+  **départage** (§10.2) l'attaque.
+
+### 10.1 Opération 1 — L'ORACLE DU MOU (1 h, à faire EN PREMIER)
+
+**Mesurer le plafond du chantier de congestion AVANT de l'écrire.** On connaît `C*` et on
+connaît le mou exact (2 / 2 / 6 / 12, §9.7). Donc on triche : on ajoute une **constante**
+à `getHeuristique()` et on compte les états.
+
+- [ ] `h + 2` sur le niveau 2, `h + 12` sur le 17. Compter les états développés.
+- Si l'espace s'effondre → le §10.3 vaut tout ce qu'on y mettra.
+- S'il ne rend presque rien → **on abandonne le §10.3 sans l'avoir écrit**, et on a
+  économisé les deux jours que ce projet a déjà perdus trois fois de cette façon
+  (§3bis, §6.B, §8.5, macro-poussées).
+
+⚠️ **Ce n'est PAS admissible** et ce n'est pas censé l'être : le mou se résorbe à mesure
+que le démêlage se fait, donc `h + k` **surestime** près du but. C'est un **diagnostic
+jetable**, à ne jamais livrer. Le canari dira au passage de combien ça déborde.
+
+### 10.2 Opération 2 — LE DÉPARTAGE À `f` ÉGAL (1 h, AUCUN risque d'optimalité)
+
+Le comparateur d'A\* départage sur le `g` le plus grand (ce qui fait plonger). Mais à `f`
+**et** `g` égaux, l'ordre est **arbitraire** — et sur le niveau 1, c'est 100 % des états.
+
+- [ ] Ajouter un critère secondaire. Piste tirée des **artères de trafic** (§9.7) :
+  préférer l'enfant qui **dégage une case de forte affluence**, ou qui fait avancer une
+  caisse **le long de son artère** plutôt que d'en dévier.
+- **C'est le seul levier de cette liste qui ne peut PAS nous faire manquer l'optimum** :
+  un départage ne change que l'ordre de visite, jamais l'admissibilité. À ce titre il est
+  gratuit, et il attaque le seul problème (§9.4) que la borne de déblocage ne verra pas.
+
+### 10.3 Opération 3 — LA BORNE DE DÉBLOCAGE (le vrai chantier — SEULEMENT si 10.1 conclut)
+
+C'est le §9.8, dont tout le détail (variante prudente vs ambitieuse, et les trois raisons
+pour lesquelles le `+2` naïf n'est pas admissible) est déjà écrit là-bas. **Commencer par
+la variante PRUDENTE.**
+
+Elle **repose entièrement sur les artères de trafic** (§9.7) : « la caisse `i` est posée
+sur l'artère de `j`, elle devra être écartée → +2 » n'a de sens que parce qu'on sait **où
+passe `j`**, exactement — ce que `mesures/passages` a mesuré et validé (écart nul sur les
+artères du 17).
+
+⚠️ Rappel du §9.8 : le critère est **PAR CAISSE, jamais par case**. Une carte de trafic
+agrégée a perdu l'identité des caisses et ne peut structurellement pas voir la congestion.
+
+**Juge : le canari 4 / 97 / 131 / 134 / 213.** Une `h` qui surestime ne rend pas une
+solution un peu moins bonne — elle fait **manquer l'optimum sans aucun signal**.
 
 ---
 
