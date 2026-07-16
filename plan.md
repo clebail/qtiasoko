@@ -1226,6 +1226,137 @@ des deux côtés) ne le voient pas. **C'est un deadlock dynamique multi-caisses*
 de la détection Sokoban, terrain du faux positif §3bis. Piste, à froid : détection de
 **région** (N caisses piégées dans une zone sans assez de buts atteignables). Juge : le canari.
 
+#### ❌ Le LOOKAHEAD DE GEL — ÉCARTÉ AVANT D'ÊTRE CODÉ (2026-07-16)
+
+**Le motif du 8 est désormais PROUVÉ par un test**, et non plus décrit de mémoire
+(`gelLookahead`). La grille y est **en dur** : elle venait de `plateau_niveau08.xsb`, un fichier
+de travail non versionné — qui a disparu en cours de séance, emportant le test avec lui. Un test
+ne doit dépendre que de ce qu'il porte ou de ce qui est commité.
+Caisses en (8,2) et (10,2), **mur au-dessus des
+deux** (ligne `y=1`) : une caisse sous un mur ne peut JAMAIS être poussée verticalement — ni
+vers le haut (destination murée) ni vers le bas (le joueur devrait se tenir DANS le mur). Elles
+ne glissent que sur leur ligne, et une seule case les sépare : (9,2). Mesuré :
+
+```
+2 poussées légales sur TOUT le plateau — et les 2 mènent à un état perdu.
+Aucune caisse n'est gelée maintenant → checkDefaite() ne voit rien.
+```
+
+Vérifié aussi (piège du §3bis, sinon le test passerait pour la mauvaise raison) : après la
+poussée c'est bien le **GEL** qui conclut — la caisse gelée d'après n'est sur aucune case morte.
+`casesMortes` ne peut structurellement pas voir ce motif : **(9,2) est vivante EN SOLO** (une
+caisse seule y glisse jusqu'en (4,2), où le mur du haut s'interrompt, et le joueur monte dans
+l'alcôve pour la pousser vers le bas). **Le cul-de-sac n'est mortel qu'À DEUX.**
+
+##### Pourquoi `dynamicDeadlock` ne peut PAS appeler `caisseGelee` (la question posée)
+Parce qu'il est bâti comme une pure **lecture de tables** — son propre commentaire le dit :
+« Aucune simulation : la case d'arrivée et sa région se LISENT, on ne pousse rien. »
+`casesMortes[dest]` et `distancePoussee[dest][r]` sont des propriétés **statiques de la case**.
+Le gel, non : il dépend des **voisins** de `dest`. Or la caisse est encore en `idxCaisse`, qui
+est *précisément* un voisin de `dest` (`dest = idxCaisse + d`). Appeler `caisseGelee(dest)` tel
+quel, c'est donc :
+- interroger le gel d'une case **vide** (`estCaisse(dest)` est faux) ;
+- laisser `bloqueeSurAxe(dest, …)` compter la caisse **encore présente en `idxCaisse`** comme
+  obstacle, **sur l'axe même de la poussée** → *la caisse se bloque elle-même*.
+
+Ce n'est pas « le gel après la poussée » qu'on teste, c'est **un plateau qui n'existe pas**. Le
+gel ne rentre pas dans le moule « lecture seule » : il faudrait **simuler** (clone, ou mutation
+temporaire de `cases` puis restauration).
+
+##### ❌ Pourquoi c'est écarté quand même — la raison, et elle est générale
+Le raisonnement « toutes les poussées ACTUELLES mènent à un gel ⟹ deadlock » n'est **pas sûr** :
+entre maintenant et la première poussée de cette caisse, les **autres caisses peuvent bouger** et
+rouvrir une direction aujourd'hui fermée. `dynamicDeadlock` assume déjà ce pari (c'est écrit dans
+son commentaire) ; y ajouter le gel l'amplifie — sur le terrain exact où ce projet s'est fait
+avoir trois fois (§3bis, §6.B, §8.5).
+
+Sur *ce* plateau le raisonnement tient, parce que (9,2) n'est atteignable par le joueur qu'à
+travers (8,2) ou (10,2) : aucune autre caisse ne peut rien y ouvrir.
+
+> **⚠️ Mais c'est une propriété du MOTIF, pas du RAISONNEMENT.** Un élagage ne vaut que par ce
+> qu'il prouve en général, jamais par le cas qui l'a inspiré. Coder le lookahead, c'est graver la
+> chance de cet exemple dans une règle qui ne la garantit pas — et un faux positif ne rend pas une
+> solution un peu moins bonne : il fait **manquer l'optimum sans aucun signal**.
+
+Et ce qui rend (9,2) sûre ici — *le joueur ne peut pas l'atteindre* — est exactement ce que le
+**corral** vérifie par flood-fill, comme un **fait de l'état courant** au lieu d'une supposition.
+La poche (9,2) EST un corral. → **On va au corral (ci-dessous), pas au lookahead.**
+
+##### Retombées de la séance (mesurées)
+- **Tests de `caisseGelee` : 131 → 178** (`gelEtatInitial` sur les 32 niveaux, `gelCasesMortes`,
+  `gelPurete`, `gelGroupe`, `gelStable`, `gelLookahead`). **Aucun faux positif trouvé** :
+  `caisseGelee` résiste à tout ce qu'on lui a opposé.
+  - `gelEtatInitial` est le plus fort et ne coûte rien : les 32 niveaux sont solubles, donc **toute
+    caisse hors but déclarée gelée dans un état INITIAL serait un faux positif** — le niveau serait
+    insoluble avant le premier coup. Aucune grille à inventer, aucun oracle à écrire.
+  - La **règle 2** (`casesMortes[a] && casesMortes[b]`) n'avait **aucun test** : elle en a deux,
+    bâtis pour qu'elle soit *décisive* (assertion préalable sur `casesMortes`, sinon un mur
+    conclurait à sa place et le test ne prouverait rien).
+  - `gelStable` trace le nombre de poussées réellement jouées : **0 sur 5 grilles sur 6**. Un test
+    vert qui ne teste rien reste un test vert — la trace est ce qui l'avoue.
+- **Court-circuit de `bloqueeSurAxe`** (`result = true` → `return true`) : **gain dans le bruit**,
+  niveau 2 **8,76 → 8,62 s** (~1,5 %), états identiques au chiffre près. Mesuré binaire contre
+  binaire (ancien reconstruit dans un répertoire à part). Plus propre, mais **ce n'était pas un
+  loup** : `checkDefaite()` sort au premier deadlock et les amas réels sont petits, donc la
+  récursion gaspillée ne coûtait presque rien. ⚠️ Le premier `run` donnait 0,71 s contre 0,05 s —
+  **artefact de démarrage à froid**, effacé dès le second. Toujours alterner les binaires et
+  répéter.
+
+#### 🌾 Le CORRAL — la piste pour 8/9 (discutée 2026-07-16, À REPRENDRE, PAS ENCORE CODÉE)
+**Décisions déjà prises :** `dynamicDeadlock` est **gardé** (« ne coûte pas cher et optimise
+encore » : petits gains sur l'optimal — niveau 1 5638→5369, niveau 3 7,28 M→6,88 M ; canari
+intact). Il ne suffit pas pour 8/9 : il raisonne « toutes les poussées possibles mènent-elles
+sur une case morte ? », or le cul-de-sac droit du 8 est **vivant en solo** (`casesMortes` le
+laisse passer), donc il n'est jamais déclaré mort.
+
+**La bascule mentale du corral.** Au lieu de « cette caisse pourrait-elle s'échapper ? » (la
+question piégée : elle oblige à *supposer* que les autres caisses partent → faux positif
+§3bis), on raisonne sur **ce que le JOUEUR peut atteindre** — un **fait de l'état actuel**,
+vérifié par flood-fill, pas une supposition. C'est ce qui rend le corral **prouvablement sûr**.
+
+> **Le lookahead de gel a été écarté pour cette raison exacte** (section ci-dessus, 2026-07-16) :
+> il attrapait le 8, mais par une propriété du *motif* et non du *raisonnement*. Le corral est la
+> même intuition — la poche (9,2) du 8 —, rendue **prouvable**. C'est le point d'entrée du
+> chantier : le motif du 8 est déjà caractérisé par un test (`gelLookahead`), qui bascule au vert
+> le jour où la détection le voit.
+
+**Le mécanisme (PI-corral, version compétition) :**
+1. Zone atteignable du joueur = déjà calculée (`getZoneJoueur`).
+2. Une **poche que le joueur ne peut PAS atteindre**, fermée par caisses + murs = un **enclos**.
+3. Les caisses qui **bordent** l'enclos : le joueur étant coincé *dehors*, il ne peut les
+   pousser que **vers l'intérieur** de l'enclos, jamais les en sortir.
+4. Si toutes les poussées possibles de ces caisses les enfoncent dans l'enclos **et** que
+   l'enclos ne peut pas toutes les ranger sur des buts (pas assez de buts atteignables dedans,
+   ou cul-de-sac) → **deadlock prouvé**.
+
+**Pourquoi sûr, là où le reste échoue :** « le joueur ne peut pas atteindre cette poche » est
+*vrai maintenant*. On ne parie sur aucune caisse qui partirait — puisque justement le joueur ne
+peut pas les pousser. Le §3bis est désamorcé à la racine.
+
+**Comment ça mord sur le 8** (plateau `plateau_niveau08.xsb`) : joueur coincé en (7,2) entre
+deux caisses, il n'atteint pas la droite du couloir → il ne peut pousser (8,2)/(10,2) que **vers
+la droite**, dans le cul-de-sac. Le corral voit la poche droite fermée, constate que les caisses
+ne peuvent qu'y entrer et qu'elle ne mène à aucun but → mort. (Différence avec `dynamicDeadlock`
+qui, lui, *surestime* les poussées possibles : il ne vérifie pas l'accessibilité du joueur à
+l'appui, donc compte des poussées en réalité impossibles — plus permissif, plus sûr, mais rate.)
+
+**Le diable, à trancher ENSEMBLE avant de coder :** le corral « pur » veut vérifier « l'enclos
+peut-il ranger toutes ses caisses ? » — sous-question qui est un **mini-Sokoban** (coûteuse si
+résolue vraiment). Les solveurs de compétition la simplifient (« aucune poussée ne sort de
+l'enclos » suffit souvent). **Cadrage proposé :** partir du cas le plus simple et le plus sûr —
+*un enclos borné par des caisses où aucune poussée depuis l'extérieur ne peut en faire sortir
+une caisse* — voir s'il attrape déjà le 8, **avant** d'ajouter le comptage de buts.
+**Question ouverte laissée à l'utilisateur :** quand il range à la main, « sent »-il l'enclos
+comme *une zone où le perso ne peut plus aller*, ou comme *un groupe de caisses qui se tiennent* ?
+Coût attendu : un flood-fill de zone par état (déjà payé) ; la logique corral est le vrai
+morceau. Juge : canari 4/97/131/134/110/213 + solubilité des 32.
+
+**Le RN (idée utilisateur, EN RÉSERVE — discuter avant tout code) :** un réseau pour la
+détection de deadlock. Risque fatal = **faux positif** (insoluble en silence, §3bis). Viable
+seulement en deux formes sûres : (a) comme **guidage** (dé-prioriser un état suspect dans la
+file, **jamais** l'élaguer), ou (b) comme **mineur de motifs hors-ligne** dont on ne retient que
+des règles *validées* et prouvées sûres. Jamais en élagage direct appris.
+
 #### Prochaine étape : le REPLI ANYTIME (à faire)
 Rendre la macro sûre sur tous les niveaux : **passe 1** avec macro, plafonnée à un budget
 d'états (~2 M — au-dessus des 806 k du niveau 7, sous l'explosion des cas durs) ; **passe 2**

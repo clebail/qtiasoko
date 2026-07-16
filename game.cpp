@@ -188,33 +188,80 @@ void Game::checkDefaite() {
             int idx = x + y * largeur;
 
             if (cases[idx] == Level::tcCaisse) {
-                // Deadlock DYNAMIQUE : cette caisse ne peut plus atteindre aucun
-                // but avec le joueur de CE côté-ci. casesMortes ne peut pas le
-                // voir — elle n'est vraie que si la caisse est perdue pour TOUTES
-                // les régions. Sain pour la même raison que l'admissibilité de h :
-                // dans le vrai jeu le joueur est encore plus contraint (les autres
-                // caisses le gênent), donc une caisse déjà condamnée seule l'est
-                // a fortiori avec les autres.
-                //
-                // Ce test n'est pas qu'un bonus d'élagage : sans lui,
-                // getHeuristique() ajouterait ce -1 et se mettrait à SOUSTRAIRE.
-                // .at() et NON operator[] : checkDefaite() n'est pas const, donc
-                // l'operator[] non-const de QVector appelle detach(). Ces vecteurs
-                // sont partagés par COW entre tous les clones du solveur (refcount
-                // > 1), si bien que chaque lecture en faisait une COPIE PROFONDE —
-                // 97 Ko pour 'regions', à chaque poussée, des millions de fois.
-                // .at() est const et ne détache jamais.
-                const qint16 r = regions.at(idxJoueur * size + idx);
-
-                if(casesMortes.at(idx)
-                   || distancePoussee.at(idx * maxRegions + r) == -1
-                   || caisseGelee(idx, enCours)) {
+                if(staticDeadlock(idx, idxJoueur, enCours)) {
                     perdu = true;
                     return;
                 }
+
+                if(dynamicDeadlock(idx)) {
+                    perdu = true;
+                    return;
+                }
+
             };
         }
     }
+}
+
+bool Game::staticDeadlock(int idxCaisse, int idxJoueur, QVector<bool>& enCours) const {
+    // Deadlock DYNAMIQUE : cette caisse ne peut plus atteindre aucun
+    // but avec le joueur de CE côté-ci. casesMortes ne peut pas le
+    // voir — elle n'est vraie que si la caisse est perdue pour TOUTES
+    // les régions. Sain pour la même raison que l'admissibilité de h :
+    // dans le vrai jeu le joueur est encore plus contraint (les autres
+    // caisses le gênent), donc une caisse déjà condamnée seule l'est
+    // a fortiori avec les autres.
+    //
+    // Ce test n'est pas qu'un bonus d'élagage : sans lui,
+    // getHeuristique() ajouterait ce -1 et se mettrait à SOUSTRAIRE.
+    // .at() et NON operator[] : checkDefaite() n'est pas const, donc
+    // l'operator[] non-const de QVector appelle detach(). Ces vecteurs
+    // sont partagés par COW entre tous les clones du solveur (refcount
+    // > 1), si bien que chaque lecture en faisait une COPIE PROFONDE —
+    // 97 Ko pour 'regions', à chaque poussée, des millions de fois.
+    // .at() est const et ne détache jamais.
+    const qint16 r = regions.at(idxJoueur * size + idxCaisse);
+
+    if(casesMortes.at(idxCaisse)
+        || distancePoussee.at(idxCaisse * maxRegions + r) == -1
+        || caisseGelee(idxCaisse, enCours)) {
+        return true;
+    }
+
+    return false;
+}
+// Deadlock DYNAMIQUE par lookahead 1 coup (§10.6) : la caisse est condamnée si
+// TOUTES ses poussées possibles la déposent sur une case statiquement perdue
+// (morte, ou d'où elle n'atteint plus aucun but avec le joueur derrière). Aucune
+// simulation : la case d'arrivée et sa région se LISENT (casesMortes /
+// distancePoussee), on ne pousse rien.
+//
+// ⚠️ Faux positif ASSUMÉ (§3bis) : une direction bloquée par une CAISSE n'est pas
+// comptée (dest/appui non libre), or cette caisse peut partir et libérer une issue
+// vivante. C'est ce qui permet d'attraper les deadlocks dynamiques du 8/9 — mais
+// ça peut, en théorie, condamner une caisse qui ne l'est pas. Le canari juge.
+bool Game::dynamicDeadlock(int idxCaisse) const {
+    const int cx = idxCaisse % largeur, cy = idxCaisse / largeur;
+    int nbPoussable = 0, nbVersMort = 0;
+    for (int d = 0; d < NB_DIRECTION; d++) {
+        const int dx = directions[d].dx, dy = directions[d].dy;
+        const int destX = cx + dx, destY = cy + dy;   // où va la caisse
+        const int appX  = cx - dx, appY  = cy - dy;   // où se tient le joueur pour pousser
+        if (destX < 0 || destX >= largeur || destY < 0 || destY >= hauteur) continue;
+        if (appX  < 0 || appX  >= largeur || appY  < 0 || appY  >= hauteur) continue;
+        const int dest = destX + destY * largeur, app = appX + appY * largeur;
+        if (cases[dest] == Level::tcMur || estCaisse(dest)) continue;   // arrivée murée / occupée
+        if (cases[app]  == Level::tcMur || estCaisse(app))  continue;   // appui muré / occupé
+        nbPoussable++;
+        // Après la poussée, le joueur serait en idxCaisse ; la région de la caisse
+        // posée en dest, vue depuis là, est regions[idxCaisse * size + dest].
+        const qint16 r = regions.at(idxCaisse * size + dest);
+        if (r >= 0 && (casesMortes.at(dest) || distancePoussee.at(dest * maxRegions + r) == -1))
+            nbVersMort++;
+        // (r < 0 : direction douteuse — comptée poussable mais PAS mortelle, par
+        //  prudence, pour ne pas inventer de deadlock.)
+    }
+    return nbPoussable > 0 && nbPoussable == nbVersMort;
 }
 
 

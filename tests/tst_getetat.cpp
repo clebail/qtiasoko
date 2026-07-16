@@ -195,6 +195,44 @@ private slots:
     void gelDeadlock_data();
     void gelDeadlock();
 
+    // §3bis — L'invariant le plus fort : l'état INITIAL d'un niveau soluble ne
+    //         peut contenir aucune caisse gelée hors but. Une seule suffirait à
+    //         rendre le niveau insoluble d'entrée. Balaie les 32 vrais niveaux —
+    //         un faux positif de caisseGelee() n'a nulle part où se cacher.
+    void gelEtatInitial_data();
+    void gelEtatInitial();
+
+    // §3bis — La règle 2 (« les deux voisins de l'axe sont des cases mortes »)
+    //         n'était couverte par AUCUN test. On l'isole : la grille est bâtie
+    //         pour que ce soit elle, et elle seule, qui décide.
+    void gelCasesMortes_data();
+    void gelCasesMortes();
+
+    // §3bis — caisseGelee() doit être une FONCTION de l'état : même résultat quel
+    //         que soit l'ordre des appels, et deux appels de suite concordent. La
+    //         garde de récursion est un tampon partagé — si elle fuit, l'ordre de
+    //         balayage de checkDefaite() changerait le verdict.
+    void gelPurete_data();
+    void gelPurete();
+
+    // §3bis — Cohérence de groupe : dans un bloc gelé, TOUTES les caisses le sont.
+    //         Le gel est une propriété du groupe, pas de la caisse interrogée.
+    void gelGroupe_data();
+    void gelGroupe();
+
+    // §3bis — « Gelée » veut dire POUR TOUJOURS : aucune poussée légale d'une
+    //         AUTRE caisse ne peut dégeler X. Si une le pouvait, le gel aurait
+    //         confondu « bloquée maintenant » et « bloquée pour toujours » — la
+    //         distinction même sur laquelle repose tout le §3bis.
+    void gelStable_data();
+    void gelStable();
+
+    // §10.5 — Le motif des niveaux 8/9 : un état qui n'est PAS gelé, mais dont
+    //         TOUTE poussée mène à un gel. checkDefaite() ne le voit pas — il
+    //         teste un seul état. Ce test CARACTÉRISE le trou : il documente
+    //         l'état actuel (non détecté) et prouve le lookahead d'un coup.
+    void gelLookahead();
+
     // getCaissesDeplacable() : direction poussable = case d'arrivée libre +
     // point de poussée atteignable par le joueur sans traverser de caisse.
     void caissesDeplacables_data();
@@ -596,6 +634,455 @@ void TestGetEtat::gelDeadlock() {
     g.checkDefaite();
 
     QCOMPARE(g.isPerdu(), perduAttendu);
+}
+
+// --- §3bis : l'invariant de l'état initial ----------------------------------
+//
+// Le test le plus fort qu'on puisse écrire sur caisseGelee(), parce qu'il ne
+// dépend d'aucune grille inventée : les 32 niveaux sont solubles (le solveur les
+// résout, canari 4/97/131/134/110/213). Or une caisse gelée hors but est, par
+// définition, un deadlock : s'il y en avait UNE dans un état de départ, le
+// niveau serait insoluble avant le premier coup.
+//
+// Autrement dit : tout `true` rendu ici est un FAUX POSITIF, et un faux positif
+// fait manquer l'optimum sans le moindre signal (§3bis, §8.5).
+
+void TestGetEtat::gelEtatInitial_data() {
+    QTest::addColumn<int>("niveau");
+    for (int n = 1; n <= NB_NIVEAUX; ++n)
+        QTest::newRow(qPrintable(QString("niveau %1").arg(n))) << n;
+}
+
+void TestGetEtat::gelEtatInitial() {
+    QFETCH(int, niveau);
+
+    Level lvl;
+    lvl.load(cheminNiveau(niveau));
+    Game g(lvl);
+
+    QVector<bool> enCours(g.size, false);
+
+    for (int idx = 0; idx < g.size; ++idx) {
+        if (g.getCase(idx) != Level::tcCaisse) continue;   // hors but uniquement
+
+        const bool gelee = g.caisseGelee(idx, enCours);
+        QVERIFY2(!gelee,
+                 qPrintable(QString("niveau %1 : la caisse (%2,%3) est declaree GELEE "
+                                    "dans l'etat initial — le niveau serait insoluble "
+                                    "d'entree. C'est un faux positif.")
+                                .arg(niveau).arg(idx % g.getLargeur()).arg(idx / g.getLargeur())));
+    }
+
+    // Corollaire : aucun état initial n'est perdu.
+    g.checkDefaite();
+    QVERIFY2(!g.isPerdu(),
+             qPrintable(QString("niveau %1 : checkDefaite() declare l'etat INITIAL perdu")
+                            .arg(niveau)));
+}
+
+// --- §3bis : la règle 2 (cases mortes), isolée ------------------------------
+//
+// « Un axe est bloqué si ses DEUX voisins sont des cases mortes : y pousser mène
+// à un deadlock de toute façon, l'axe est donc inutilisable. »
+//
+// Aucun test ne la couvrait. Le piège du §3bis s'applique en plein ici : il faut
+// que la grille rende la règle 2 DÉCISIVE, sinon on croit l'éprouver alors que
+// c'est un mur qui conclut. On vérifie donc casesMortes AVANT le verdict — sans
+// cette assertion préalable, le test ne prouverait rien.
+
+void TestGetEtat::gelCasesMortes_data() {
+    QTest::addColumn<QString>("grille");
+    QTest::addColumn<int>("xCaisse");
+    QTest::addColumn<int>("yCaisse");
+    QTest::addColumn<int>("xMortA");     // voisins de l'axe que la règle 2 doit condamner
+    QTest::addColumn<int>("yMortA");
+    QTest::addColumn<int>("xMortB");
+    QTest::addColumn<int>("yMortB");
+    QTest::addColumn<bool>("geleeAttendu");
+
+    // GELÉE PAR LA RÈGLE 2, et par elle seule.
+    // Caisse-sur-but en (1,2) : mur à gauche (0,2) et mur à droite (2,2) → axe
+    // horizontal condamné par la règle 1. L'axe VERTICAL, lui, n'a aucun mur :
+    // (1,1) et (1,3) sont du sol — mais ce sont deux coins, donc deux cases
+    // mortes. Seule la règle 2 peut conclure. Sans elle, la caisse serait
+    // déclarée libre.
+    //   ######
+    //   #    #
+    //   #*#  #
+    //   #@  .#
+    //   ######
+    QTest::newRow("regle 2 decisive (axe vertical mort)")
+        << QString("######\n#    #\n#*#  #\n#@  .#\n######")
+        << 1 << 2 << 1 << 1 << 1 << 3 << true;
+
+    // NON GELÉE : UN SEUL des deux voisins de l'axe est mort.
+    // Caisse en (2,2), largeur 6, hauteur 5. Les lignes y=1 et y=3 longent les
+    // murs haut/bas et ne portent aucun but → mortes. L'axe vertical est donc
+    // condamné par la règle 2. Mais l'axe HORIZONTAL a (3,2) vivante (la caisse
+    // s'y pousse, puis vers le but en (4,2)) → un seul axe bloqué ≠ gel.
+    //   ######
+    //   #    #
+    //   # $ .#
+    //   #@   #
+    //   ######
+    QTest::newRow("regle 2 sur un seul axe (l'autre est vivant)")
+        << QString("######\n#    #\n# $ .#\n#@   #\n######")
+        << 2 << 2 << 2 << 1 << 2 << 3 << false;
+}
+
+void TestGetEtat::gelCasesMortes() {
+    QFETCH(QString, grille);
+    QFETCH(int, xCaisse);
+    QFETCH(int, yCaisse);
+    QFETCH(int, xMortA);
+    QFETCH(int, yMortA);
+    QFETCH(int, xMortB);
+    QFETCH(int, yMortB);
+    QFETCH(bool, geleeAttendu);
+
+    Game g = makeGame(grille.split('\n'));
+    const int L = g.getLargeur();
+    const int idx  = xCaisse + yCaisse * L;
+    const int mortA = xMortA + yMortA * L;
+    const int mortB = xMortB + yMortB * L;
+
+    QVERIFY2(g.getCase(idx) == Level::tcCaisse || g.getCase(idx) == Level::tcGoalCaisse,
+             "la grille de test ne place pas de caisse a la position indiquee");
+
+    // L'assertion qui donne son sens au test : ces deux voisins doivent bien être
+    // du SOL (pas des murs — sinon c'est la règle 1 qui conclut) et bien être
+    // MORTS (sinon la règle 2 ne s'applique pas et on teste autre chose).
+    QVERIFY2(g.getCase(mortA) != Level::tcMur && g.getCase(mortB) != Level::tcMur,
+             "grille invalide : un voisin de l'axe est un MUR, la regle 1 conclurait "
+             "a la place de la regle 2 — le test ne prouverait rien");
+    // Les DEUX voisins morts dans les deux scénarios : c'est ce qui arme la
+    // règle 2 sur cet axe. Ce qui distingue les cas, c'est l'AUTRE axe.
+    QVERIFY2(g.casesMortes.at(mortA) && g.casesMortes.at(mortB),
+             "grille invalide : les deux voisins de l'axe doivent etre des cases "
+             "mortes, sinon la regle 2 ne s'arme pas et on teste autre chose");
+
+    QVector<bool> enCours(g.size, false);
+    QCOMPARE(g.caisseGelee(idx, enCours), geleeAttendu);
+}
+
+// --- §3bis : caisseGelee() est-elle une FONCTION de l'état ? ----------------
+//
+// 'enCours' est un tampon partagé entre tous les appels d'un même checkDefaite()
+// (il est alloué une fois, hors de la boucle de balayage). Si la garde fuit — un
+// marquage laissé derrière, un résultat qui dépend de qui a été interrogé avant —
+// alors le verdict dépendrait de l'ORDRE DE BALAYAGE, c'est-à-dire de la position
+// des caisses dans la grille. Un tel bug serait parfaitement silencieux : le même
+// plateau serait perdu ou non selon le chemin par lequel on l'a atteint.
+
+void TestGetEtat::gelPurete_data() {
+    QTest::addColumn<QString>("grille");
+
+    // Des plateaux à PLUSIEURS caisses qui interagissent : c'est là que la garde
+    // de récursion travaille, donc là qu'elle peut fuir.
+    QTest::newRow("bloc 2x2")
+        << QString("######\n# .  #\n# $$ #\n# $$ #\n#  @ #\n######");
+    QTest::newRow("contre-exemple S")
+        << QString("########\n#  ..  #\n#      #\n# $$   #\n#  $$  #\n#  @   #\n########");
+    QTest::newRow("diagonale, murs opposes")
+        << QString("######\n#  . #\n##$  #\n# $# #\n#  @ #\n######");
+    QTest::newRow("paire sous un mur")
+        << QString("######\n# ## #\n# $$ #\n#  @ #\n######");
+}
+
+void TestGetEtat::gelPurete() {
+    QFETCH(QString, grille);
+
+    Game g = makeGame(grille.split('\n'));
+
+    QVector<int> caisses;
+    for (int idx = 0; idx < g.size; ++idx)
+        if (g.getCase(idx) == Level::tcCaisse || g.getCase(idx) == Level::tcGoalCaisse)
+            caisses.append(idx);
+    QVERIFY2(caisses.size() >= 2, "grille sans interaction : le test ne prouverait rien");
+
+    // Référence : chaque caisse interrogée sur un tampon NEUF, isolément.
+    QVector<bool> reference;
+    for (int idx : caisses) {
+        QVector<bool> enCours(g.size, false);
+        reference.append(g.caisseGelee(idx, enCours));
+    }
+
+    // 1. Balayage avant, tampon partagé (ce que fait checkDefaite()).
+    {
+        QVector<bool> enCours(g.size, false);
+        for (int i = 0; i < caisses.size(); ++i)
+            QVERIFY2(g.caisseGelee(caisses[i], enCours) == reference[i],
+                     "verdict different en balayage AVANT avec tampon partage : "
+                     "la garde de recursion fuit");
+    }
+
+    // 2. Balayage ARRIÈRE : le verdict ne doit pas dépendre de l'ordre.
+    {
+        QVector<bool> enCours(g.size, false);
+        for (int i = caisses.size() - 1; i >= 0; --i)
+            QVERIFY2(g.caisseGelee(caisses[i], enCours) == reference[i],
+                     "verdict different en balayage ARRIERE : caisseGelee() depend de "
+                     "l'ordre d'interrogation, ce n'est donc pas une fonction de l'etat");
+    }
+
+    // 3. Idempotence : deux appels de suite sur la même caisse.
+    for (int i = 0; i < caisses.size(); ++i) {
+        QVector<bool> enCours(g.size, false);
+        const bool a = g.caisseGelee(caisses[i], enCours);
+        const bool b = g.caisseGelee(caisses[i], enCours);
+        QVERIFY2(a == b, "caisseGelee() n'est pas idempotente");
+    }
+
+    // 4. La garde doit être rendue propre, y compris après un balayage complet.
+    {
+        QVector<bool> enCours(g.size, false);
+        for (int idx : caisses) g.caisseGelee(idx, enCours);
+        for (int i = 0; i < g.size; ++i)
+            QVERIFY2(!enCours[i], "la garde de recursion reste marquee apres balayage");
+    }
+}
+
+// --- §3bis : cohérence de groupe --------------------------------------------
+//
+// Le gel est une propriété du GROUPE de caisses, pas de celle qu'on interroge :
+// dans un amas mutuellement bloqué, toutes sont gelées. Si une seule répondait
+// « non », checkDefaite() rendrait un verdict dépendant de la caisse par laquelle
+// il entre dans l'amas.
+
+void TestGetEtat::gelGroupe_data() {
+    QTest::addColumn<QString>("grille");
+    QTest::addColumn<bool>("groupeGeleAttendu");
+
+    // Bloc 2x2 : chacune est bloquée sur ses deux axes par ses deux voisines.
+    // Vrai même en espace ouvert, loin de tout mur — c'est le deadlock 2x2.
+    QTest::newRow("bloc 2x2 (les 4 gelees)")
+        << QString("######\n# .  #\n# $$ #\n# $$ #\n#  @ #\n######") << true;
+
+    // Le S : AUCUNE n'est gelée (C peut monter/descendre, et tout se libère).
+    QTest::newRow("contre-exemple S (aucune gelee)")
+        << QString("########\n#  ..  #\n#      #\n# $$   #\n#  $$  #\n#  @   #\n########") << false;
+}
+
+void TestGetEtat::gelGroupe() {
+    QFETCH(QString, grille);
+    QFETCH(bool, groupeGeleAttendu);
+
+    Game g = makeGame(grille.split('\n'));
+
+    int nbCaisses = 0;
+    for (int idx = 0; idx < g.size; ++idx) {
+        if (g.getCase(idx) != Level::tcCaisse && g.getCase(idx) != Level::tcGoalCaisse)
+            continue;
+        ++nbCaisses;
+        QVector<bool> enCours(g.size, false);
+        QVERIFY2(g.caisseGelee(idx, enCours) == groupeGeleAttendu,
+                 qPrintable(QString("la caisse (%1,%2) contredit le groupe : le gel doit "
+                                    "etre une propriete de l'amas, pas de la caisse "
+                                    "interrogee").arg(idx % g.getLargeur()).arg(idx / g.getLargeur())));
+    }
+    QCOMPARE(nbCaisses, 4);
+}
+
+// --- §3bis : le gel est-il vraiment DÉFINITIF ? -----------------------------
+//
+// Toute la valeur du test de gel tient dans une distinction : « bloquée
+// maintenant » vs « bloquée pour toujours ». Seule la seconde autorise à élaguer.
+//
+// On l'éprouve pour de vrai : on joue TOUTES les poussées légales des AUTRES
+// caisses, une par une, et on revérifie. Une caisse gelée doit le rester quoi
+// qu'il arrive — sinon le gel a menti, et il a fait disparaître une branche
+// valide sans le moindre signal.
+//
+// (On ne pousse jamais X elle-même : le gel porte sur sa case actuelle.)
+
+void TestGetEtat::gelStable_data() {
+    QTest::addColumn<QString>("grille");
+    QTest::addColumn<int>("xCaisse");
+    QTest::addColumn<int>("yCaisse");
+
+    // Toutes les grilles où gel_data() attend geleeAttendu == true.
+    QTest::newRow("coin")
+        << QString("#####\n#$  #\n# . #\n# @ #\n#####") << 1 << 1;
+    QTest::newRow("diagonale, murs opposes (A)")
+        << QString("######\n#  . #\n##$  #\n# $# #\n#  @ #\n######") << 2 << 2;
+    QTest::newRow("diagonale, murs opposes (B)")
+        << QString("######\n#  . #\n##$  #\n# $# #\n#  @ #\n######") << 2 << 3;
+    QTest::newRow("bloc 2x2")
+        << QString("######\n# .  #\n# $$ #\n# $$ #\n#  @ #\n######") << 2 << 2;
+    QTest::newRow("paire sous un mur")
+        << QString("######\n# ## #\n# $$ #\n#  @ #\n######") << 2 << 2;
+
+    // Un amas gelé entouré de caisses LIBRES qui, elles, bougent : c'est le cas
+    // qui compte. Si le gel de l'amas dépendait d'une voisine mobile, une de ces
+    // poussées le dégèlerait. Le bloc 2x2 en (2,2)-(3,3) est gelé par lui-même ;
+    // les deux caisses en (5,1) et (5,4) n'ont rien à voir avec lui.
+    QTest::newRow("bloc 2x2 + caisses libres autour")
+        << QString("########\n# .. $ #\n# $$   #\n# $$   #\n# ..$@ #\n########") << 2 << 2;
+}
+
+void TestGetEtat::gelStable() {
+    QFETCH(QString, grille);
+    QFETCH(int, xCaisse);
+    QFETCH(int, yCaisse);
+
+    const QStringList lignes = grille.split('\n');
+    Game depart = makeGame(lignes);
+    const int L   = depart.getLargeur();
+    const int idx = xCaisse + yCaisse * L;
+
+    {
+        QVector<bool> enCours(depart.size, false);
+        QVERIFY2(depart.caisseGelee(idx, enCours),
+                 "grille invalide : la caisse de reference n'est pas gelee au depart");
+    }
+
+    // Toutes les poussées légales des AUTRES caisses.
+    const QVector<bool> zone = depart.getZoneJoueur();
+    const QVector<quint8> deplacables = depart.getCaissesDeplacable(zone);
+
+    int nbPousseesTestees = 0;
+    for (int c = 0; c < deplacables.size(); ++c) {
+        if (c == idx) continue;                 // jamais X elle-même
+        if (deplacables[c] == 0) continue;
+
+        for (int d = 0; d < NB_DIRECTION; ++d) {
+            if (!(deplacables[c] & (1 << d))) continue;
+
+            Game apres(depart);
+            if (!apres.pousse(c, (Game::EDirection)d)) continue;
+            ++nbPousseesTestees;
+
+            QVector<bool> enCours(apres.size, false);
+            QVERIFY2(apres.caisseGelee(idx, enCours),
+                     qPrintable(QString("pousser la caisse (%1,%2) en direction %3 a DEGELE "
+                                        "la caisse (%4,%5) : le gel n'etait donc pas definitif")
+                                    .arg(c % L).arg(c / L).arg(d).arg(xCaisse).arg(yCaisse)));
+        }
+    }
+
+    // Trace : sur les grilles closes il n'y a rien à pousser, et c'est normal —
+    // mais il faut le savoir, sinon le test passerait en ne testant RIEN.
+    qDebug() << "poussees d'autres caisses testees :" << nbPousseesTestees;
+}
+
+// --- §10.5 : le motif 8/9 — condamné, mais pas encore gelé ------------------
+//
+// Plateau `plateau_niveau08.xsb` (relevé par l'utilisateur). Deux caisses en
+// (8,2) et (10,2), un MUR au-dessus des deux (ligne y=1). Une caisse sous un mur
+// ne peut jamais être poussée verticalement — ni vers le haut (destination murée)
+// ni vers le bas (le joueur devrait se tenir DANS le mur). Elles ne glissent donc
+// que sur leur ligne, et il n'y a qu'une case libre entre elles : (9,2).
+//
+// Conséquence : TOUTE poussée les rend adjacentes sous le mur — le cas « paire
+// sous un mur », qui EST un gel. L'état est donc condamné... mais aucune caisse
+// n'est gelée MAINTENANT, donc checkDefaite() ne voit rien.
+//
+// Pourquoi casesMortes ne sauve pas : (9,2) est VIVANTE en solo. Une caisse seule
+// y glisse vers la gauche jusqu'en (4,2), où le mur du haut s'interrompt (y=1 vaut
+// '  #  #####...' : les colonnes 3 et 4 sont libres), le joueur monte dans
+// l'alcôve et la pousse enfin vers le bas. Le cul-de-sac n'est mortel qu'À DEUX.
+//
+// ⚠️ Ce test documente le comportement ACTUEL (perduAttendu == false). Il n'échoue
+// pas : il fixe le trou par écrit, pour qu'une future détection le fasse basculer
+// sciemment — et le canari jugera le faux positif.
+
+void TestGetEtat::gelLookahead() {
+    // Grille EN DUR, et pas un .xsb de travail : le plateau d'origine
+    // (`plateau_niveau08.xsb`) etait un fichier de scratch non versionne, donc
+    // susceptible de disparaitre — ce qui est arrive. Un test ne doit dependre
+    // que de ce qu'il porte ou de ce qui est commite.
+    // C'est le niveau 8 amene a la position litigieuse relevee par l'utilisateur.
+    const QStringList lignes = {
+        "  ####          ",
+        "  #  ###########",
+        "  #     $ $@   #",   // caisses (8,2) et (10,2), joueur (11,2)
+        "  #  #   #     #",
+        "  #       #    #",
+        "###  # #  #### #",
+        "# #       ##   #",
+        "#      # #   # #",
+        "#              #",
+        "#####  #########",
+        "   #      #     ",
+        "   #      #     ",
+        "   #......#     ",
+        "   #......#     ",
+        "   #......#     ",
+        "   ########     ",
+    };
+
+    Game g = makeGame(lignes);
+    const int L = g.getLargeur();
+
+    // Les deux caisses du motif, et le mur au-dessus de chacune.
+    const int c1 = 8 + 2 * L, c2 = 10 + 2 * L;
+    QVERIFY2(g.getCase(c1) == Level::tcCaisse && g.getCase(c2) == Level::tcCaisse,
+             "le plateau n'a plus ses caisses en (8,2) et (10,2) : test a reajuster");
+    QVERIFY2(g.getCase(8 + 1 * L) == Level::tcMur && g.getCase(10 + 1 * L) == Level::tcMur,
+             "le motif suppose un MUR au-dessus des deux caisses");
+
+    // 1. Aucune des deux n'est gelée : elles peuvent encore glisser.
+    {
+        QVector<bool> enCours(g.size, false);
+        QVERIFY2(!g.caisseGelee(c1, enCours), "(8,2) est deja gelee : ce n'est plus le motif");
+        QVERIFY2(!g.caisseGelee(c2, enCours), "(10,2) est deja gelee : ce n'est plus le motif");
+    }
+
+    // 2. Le trou, constaté : l'état n'est pas déclaré perdu.
+    g.checkDefaite();
+    QVERIFY2(!g.isPerdu(), "checkDefaite() detecte desormais ce motif — mettre le test a jour "
+                           "(et verifier le canari : 4/97/131/134/110/213)");
+
+    // 3. La preuve : TOUTE poussée légale, de N'IMPORTE quelle caisse, mène à un
+    //    état perdu. C'est ce qui rend l'état condamné — un fait qu'aucun test sur
+    //    un état isolé ne peut voir.
+    const QVector<bool> zone = g.getZoneJoueur();
+    const QVector<quint8> deplacables = g.getCaissesDeplacable(zone);
+
+    int nbPoussees = 0;
+    for (int c = 0; c < deplacables.size(); ++c) {
+        if (deplacables[c] == 0) continue;
+        for (int d = 0; d < NB_DIRECTION; ++d) {
+            if (!(deplacables[c] & (1 << d))) continue;
+
+            Game apres(g);
+            if (!apres.pousse(c, (Game::EDirection)d)) continue;
+            ++nbPoussees;
+
+            QVERIFY2(apres.isPerdu(),
+                     qPrintable(QString("pousser (%1,%2) en direction %3 ne mene PAS a un etat "
+                                        "perdu : l'etat n'est donc pas condamne, et le lookahead "
+                                        "d'un coup serait un FAUX POSITIF")
+                                    .arg(c % L).arg(c / L).arg(d)));
+
+            // Piège du §3bis : vérifier que c'est bien le GEL qui conclut, et non
+            // casesMortes. Sinon on croirait tenir le lookahead de gel alors que
+            // le lookahead de case morte (déjà en place) suffirait — et il ne
+            // suffit pas, puisque l'état passe aujourd'hui.
+            bool gelTrouve = false;
+            for (int i = 0; i < apres.size; ++i) {
+                if (apres.getCase(i) != Level::tcCaisse) continue;
+                QVector<bool> enCours(apres.size, false);
+                if (apres.caisseGelee(i, enCours)) {
+                    gelTrouve = true;
+                    QVERIFY2(!apres.casesMortes.at(i),
+                             qPrintable(QString("la caisse gelee (%1,%2) est AUSSI sur une case "
+                                                "morte : casesMortes suffirait, le test ne "
+                                                "prouverait pas le lookahead de gel")
+                                            .arg(i % L).arg(i / L)));
+                }
+            }
+            QVERIFY2(gelTrouve,
+                     qPrintable(QString("apres la poussee de (%1,%2) en direction %3, l'etat est "
+                                        "perdu mais AUCUNE caisse n'est gelee : c'est autre chose "
+                                        "que le gel qui conclut")
+                                    .arg(c % L).arg(c / L).arg(d)));
+        }
+    }
+
+    QVERIFY2(nbPoussees > 0, "aucune poussee legale : le test ne prouve rien");
+    qDebug() << "poussees legales, toutes perdantes :" << nbPoussees
+             << "-> l'etat est condamne, mais checkDefaite() ne le voit pas";
 }
 
 void TestGetEtat::caissesDeplacables_data() {

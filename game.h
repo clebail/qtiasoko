@@ -202,6 +202,8 @@ private:
     bool moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction);
     void checkVictoire();
     void checkDefaite();
+    bool staticDeadlock(int idxCaisse, int idxJoueur,  QVector<bool>& enCours) const;
+    bool dynamicDeadlock(int idxCaisse) const;
     short getMinIdx(const QVector<bool>& zone) const;
     bool isLibre(int idx) const;
     void calculCaseMorte();
