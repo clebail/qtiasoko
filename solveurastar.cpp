@@ -24,8 +24,9 @@ static bool compare(const SolveurAStar::SElement& a, const SolveurAStar::SElemen
     return a.guidage > b.guidage;
 }
 
-SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, bool macro, QObject *parent)
-    : Solveur(etatDepart, parent), poids(poids), macro(macro) {
+SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, bool macro, QObject *parent,
+                           bool macroCouplage)
+    : Solveur(etatDepart, parent), poids(poids), macro(macro), macroCouplage(macroCouplage) {
 }
 
 #ifdef DUMP_DEV
@@ -34,6 +35,13 @@ SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, bool macro, QObjec
 std::vector<std::pair<QByteArray,int>>& etatsDeveloppes() {
     static std::vector<std::pair<QByteArray,int>> v;
     return v;
+}
+// Plafond de dépilements, pour instrumenter un niveau qu'on NE SAIT PAS résoudre
+// (le 11 : `mou` ne peut rien y mesurer, il attend une solution qui n'arrive pas).
+// 0 = pas de plafond → comportement de `mou` strictement inchangé.
+int& limiteDepilements() {
+    static int n = 0;
+    return n;
 }
 #endif
 
@@ -66,6 +74,26 @@ static void imprimeHistoF(const std::vector<qint64>& histoF, int cStar, qint64 t
     fflush(stdout);
 }
 #endif
+
+
+#ifdef INSTRUM_DELTAF
+StatsDeltaF& statsDeltaF() {
+    static StatsDeltaF s;
+    return s;
+}
+#endif
+
+
+// LIVRAISON=5 : le test de livraison s'applique aux états ENFILÉS (cf. game.h).
+// Interrupteur de mesure, à retirer avec le verdict.
+static const bool livraisonSurEnfants = (qgetenv("LIVRAISON").toInt() == 5);
+
+// Corral unitaire : ACTIF par défaut (promu, cf. §6.1). Trappe `CORRAL=0` pour le
+// couper — réservée aux OUTILS DE MESURE (`fp`, `mort`) qui doivent collecter/
+// rejouer des états SANS que le corral les élague d'abord, sinon le juge est
+// aveugle aux faux positifs qu'il est censé chercher. La prod ne touche jamais
+// cette variable (défaut = actif).
+static const bool corralActif = (qgetenv("CORRAL") != "0");
 
 
 void SolveurAStar::run() {
@@ -131,6 +159,12 @@ void SolveurAStar::run() {
     int fileAvant = 0;   // taille de la file au dernier affichage (tendance)
     int maxRangees = 0;  // plus grand nombre de caisses rangées atteint (jauge de blocage)
 
+    // Tampons de flood-fill, hissés HORS de la boucle : réutilisés d'un état à
+    // l'autre, ils ne réallouent plus (cf. getZoneJoueur(QVector<bool>&)). Ne
+    // JAMAIS en garder une copie ailleurs, sinon le fill() détache et réalloue.
+    QVector<bool> zone;        // zone de l'état développé
+    QVector<bool> zoneEnfant;  // zone de l'enfant qu'on enfile
+
     while(file.size()) {
         // Arrêt demandé depuis l'UI : on sort AVANT de dépiler, de sorte que le
         // compteur affiché soit bien le nombre d'états réellement développés.
@@ -180,7 +214,9 @@ void SolveurAStar::run() {
         const int rangees = etat.appliqueEtat(arene.lit(cur.cle.offset));
         if (rangees > maxRangees) {
             maxRangees = rangees;
-            emit nouveauMaxCaisses(etat, rangees);   // copie figée pour l'UI (§10)
+            // Copie figée pour l'UI (§10) + le chemin qui y mène, pour le rejeu pas
+            // à pas d'un run qui n'aboutit pas.
+            emit nouveauMaxCaisses(etat, rangees, reconstruire(cur.idxNoeud));
         }
 
         if (compteur % 1000 == 0) {
@@ -204,6 +240,12 @@ void SolveurAStar::run() {
         // qu'une fraction. Échantillonner {f <= C*} au lieu de ceci fausse toute
         // mesure portant sur « ce que le solveur explore vraiment ».
         etatsDeveloppes().push_back({etat.getEtat(), cur.g});
+        if (limiteDepilements() && (int)etatsDeveloppes().size() >= limiteDepilements()) {
+            qDebug() << "SolveurAStar: PLAFOND d'instrumentation atteint apres"
+                     << compteur << "depilements — arret volontaire, ce n'est PAS un echec.";
+            emit aucuneSolution();
+            return;
+        }
 #endif
 
         if(etat.isGagne()) {
@@ -224,8 +266,35 @@ void SolveurAStar::run() {
         // la clé en arène, la dédup meilleurG/ferme, la chaîne de noeuds (un par
         // poussée, pour que reconstruire() rejoue une macro à l'identique) et le
         // push_heap. Partagé entre poussées simples et goal macro.
-        auto enfiler = [&](Game& e, int gE, const QVector<QPair<int,int>>& chaine) {
-            e.getEtat(arene.reserve());
+        auto enfiler = [&](Game& e, int gE, const QVector<QPair<int,int>>& chaine,
+                           [[maybe_unused]] bool estMacro) {
+            // Deadlock de LIVRAISON (§6.1) : un but vide qu'aucune caisse ne peut
+            // plus atteindre. Testé ICI et pas dans checkDefaite — sur un état
+            // intermédiaire de goal macro il ferait avorter la macro (mesuré :
+            // niveaux 3 et 5 perdus). Ici, la macro va au bout et c'est son
+            // RÉSULTAT qu'on juge.
+            if (livraisonSurEnfants && e.butNonLivrable(4)) return;
+            // Corral unitaire (§6.1 item 4) : élague l'enfant dont une case scellée
+            // prouve l'immobilité définitive d'une caisse hors but. Élagage PROUVÉ
+            // (0 faux positif au juge fp sur les 11 résolus), promu en défaut le
+            // 2026-07-27 : canari intact, ×6,6 sur le 4 et ×6,8 sur le 7, coût
+            // négligeable là où le motif est absent (cf. plan.md, USok).
+            // Testé à l'ENFILAGE et pas dans checkDefaite : marquer 'perdu' sur un
+            // état intermédiaire de goal macro ferait avorter la macro entière
+            // (mesuré, plan §6.1 — niveaux 3 et 5 perdus). Ici la macro va au bout,
+            // c'est son RÉSULTAT qu'on juge. Forme incrémentale (équivalence prouvée
+            // au balayage complet, cf. game.h) : seule la case de repos de la caisse
+            // déplacée — destination de la DERNIÈRE poussée de 'chaine' — peut avoir
+            // nouvellement scellé une voisine.
+            if (corralActif && !chaine.isEmpty()) {
+                const auto& last = chaine.last();
+                const int arrivee = e.caseApres(last.first, (Game::EDirection)last.second);
+                if (e.corralUnitaireMort(arrivee)) return;
+            }
+            // getEtat(cle) referait le flood-fill en interne, dans un QVector
+            // neuf — un par enfant enfilé. Le tampon évite l'allocation.
+            e.getZoneJoueur(zoneEnfant);
+            e.getEtat(arene.reserve(), zoneEnfant);
             Cle cle{arene.dernier()};
             if (interditRedeveloppement && ferme.count(cle)) { arene.annule(); return; }
             TableG::Slot* slot = meilleurG.cherche(cle);
@@ -244,11 +313,58 @@ void SolveurAStar::run() {
             }
             qint64 score;
             const int hE = e.getHeuristique(&score);
-            file.push_back({gE + poids * hE, gE, parent, cle, score});
+            const int fE = gE + poids * hE;
+#ifdef INSTRUM_DELTAF
+            {
+                StatsDeltaF& sd = statsDeltaF();
+                const int df = fE - cur.f;
+                const int i  = df + StatsDeltaF::DECALAGE;
+                if (i < 0 || i >= StatsDeltaF::TAILLE) sd.horsBornes++;
+                else (estMacro ? sd.histoMacro : sd.histoSimple)[i]++;
+
+                if (estMacro) {
+                    sd.nMacro++;
+                    sd.sommeDeltaMacro += df;
+                    const int n = chaine.size();
+                    sd.sommeLongMacro += n;
+                    if (n < (int)sd.parLongueur.size()) {
+                        sd.parLongueur[n]++;
+                        if (df == 0) sd.parLongueurNul[n]++;
+                        else if (df < 0) sd.parLongueurNeg[n]++;
+                    }
+                    // Pourquoi cet enfant est-il relégué ? On refait h sur
+                    // l'enfant avec le joueur du PARENT ('etat' n'a pas bougé :
+                    // les enfants sont des copies).
+                    if (df > 0) {
+                        const QPoint pp = etat.getPlayerPoint();
+                        const int jParent = pp.x() + pp.y() * etat.getLargeur();
+                        const int hFige   = e.getHeuristique(nullptr, jParent);
+                        const int hParent = (cur.f - cur.g) / poids;
+                        const int dhCaisses = hFige - hParent;
+                        const int dhJoueur  = hE - hFige;
+                        sd.nReleg++;
+                        sd.sommeDhCaisses += dhCaisses;
+                        sd.sommeDhJoueur  += dhJoueur;
+                        sd.sommeLongReleg += n;
+                        if (dhCaisses <= -n) sd.relegPurJoueur++;
+                        else                 sd.relegCouplage++;
+                        if (dhJoueur) {
+                            sd.dhJoueurNonNul++;
+                            if (dhJoueur > 0) sd.dhJoueurPositif++;
+                            else              sd.dhJoueurNegatif++;
+                        }
+                    }
+                } else {
+                    sd.nSimple++;
+                    sd.sommeDeltaSimple += df;
+                }
+            }
+#endif
+            file.push_back({fE, gE, parent, cle, score});
             std::push_heap(file.begin(), file.end(), compare);
         };
 
-        QVector<bool> zone = etat.getZoneJoueur();
+        etat.getZoneJoueur(zone);
         QVector<quint8> caisses = etat.getCaissesDeplacable(zone);
 
         // GOAL MACRO (§10.5) — régime d'ENGAGEMENT : si le but actif (le plus
@@ -262,14 +378,45 @@ void SolveurAStar::run() {
         if (macro) {
             const int but = etat.butActif();
             if (but >= 0) {
+                // Régime d'essai « but du couplage » (§6.3, 2026-07-24). On tente
+                // d'abord la SEULE caisse que le couplage destine à ce but : elle
+                // seule fait baisser h de N, donc elle seule produit un enfant à f
+                // constant, promu en tête par le tie-break « g le plus grand ».
+                // Toute autre caisse lui vole son but, le couplage se réarrange, et
+                // l'enfant part sur le palier f+2 (mesuré : 100 % des macros du
+                // niveau 12). Si elle ne passe pas, on rejoue la passe complète —
+                // ce régime ne RETIRE donc aucune branche, il en PRÉFÈRE une.
+                const int voulue = macroCouplage ? etat.caisseAssignee(but) : -1;
+                for (int passe = 0; passe < (voulue >= 0 ? 2 : 1); passe++) {
                 for (int i = 0; i < caisses.size(); i++) {
                     if (caisses[i] == 0) continue;   // pas de caisse poussable ici
+                    if (voulue >= 0) {
+                        // passe 0 : la caisse du couplage seule. passe 1 (repli,
+                        // seulement si la passe 0 n'a rien donné) : toutes les autres.
+                        if (passe == 0 && i != voulue) continue;
+                        if (passe == 1 && i == voulue) continue;
+                    }
+                    // Écarter AVANT de copier : près d'une tentative sur deux
+                    // n'avance même pas d'un pas (48,5 % au niveau 11), et la
+                    // copie du plateau était payée pour rien.
+                    if (!etat.macroPeutDemarrer(i, but, zone)) continue;
                     Game e(etat);
                     QVector<QPair<int,int>> poussees;
-                    if (e.macroVersBut(i, but, poussees) && !e.isPerdu()) {
-                        enfiler(e, cur.g + poussees.size(), poussees);
+                    // Backtracke sur les forks (game.h) au lieu de s'arrêter à la
+                    // première descente arbitraire — promu par défaut le 2026-07-23
+                    // (§6.3) : canari intact, gain net sur 5/9 (le 9 ne finissait
+                    // même pas sans), coût nul en l'absence de fork. 'zone' n'est
+                    // PAS réutilisée ici (contrairement à l'ancien macroVersBut) :
+                    // le prototype recalcule son propre premier flood-fill — perte
+                    // de perf connue, pas encore corrigée (cf. plan.md §6.3).
+                    if (e.macroVersButBacktrack(i, but, poussees) && !e.isPerdu()) {
+                        enfiler(e, cur.g + poussees.size(), poussees, true);
                         macrosOk++;
                     }
+                }
+                // La caisse du couplage a produit un enfant : on s'y ENGAGE, pas
+                // de passe de repli. C'est ce qui coupe la combinatoire.
+                if (macrosOk > 0) break;
                 }
             }
         }
@@ -281,7 +428,7 @@ void SolveurAStar::run() {
                     if (dirPoussePossible & (1 << d)) {
                         Game e(etat);
                         if(e.pousse(i, (Game::EDirection)d) && !e.isPerdu())
-                            enfiler(e, cur.g + 1, {{i, d}});
+                            enfiler(e, cur.g + 1, {{i, d}}, false);
                     }
                 }
             }

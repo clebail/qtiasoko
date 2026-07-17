@@ -22,7 +22,11 @@ mkdir -p build/bench && cd build/bench && qmake ../../bench.pro && make
 | outil | question | sortie clé |
 |---|---|---|
 | `bench <niv> [poids]` | Combien d'états / de poussées, et combien de mémoire ? | Le **canari** : `4 / 97 / 131 / 134 / 213` (niveaux 0/1/2/3/17). Avec `INSTRUM_F`, l'**histogramme des `f` au dépilement**. |
+| `usok.sh <niv> [mode]` | **Combien de TEMPS, indépendamment de la machine ?** | Unité **USok** (façon SBU de LFS) : `1 USok = bench 2 astar` (A\* pur, invariant du canari). Chronomètre l'étalon ET la cible sur le même binaire (meilleur de 3, jauge stderr jetée), rend la cible en multiples. `CORRAL=1 usok.sh 17 macro` = coût d'une feature sur la cible ; `USOK_REF=<s>` fige la calibration pour comparer deux régimes. Portable Linux/macOS (builtin `time`, pas `/usr/bin/time -f`). |
 | `mou <niv> [n]` | Les états qu'A\* développe sont-ils du gaspillage ? | Échantillonne les états **réellement dépilés** (`DUMP_DEV`) et résout depuis chacun : sur un chemin optimal / hors chemin / **deadlock non détecté**. |
+| `fp <niv> [variante] [astar\|macro]` | **Un élagage invente-t-il des morts ?** | `LIVRAISON=0 ./fp 17 4` : résout SANS le test, rejoue la solution gagnante et interroge le test sur chaque état traversé. Ces états sont solubles **par construction** → **toute détection est un faux positif prouvé**. C'est le juge qui a réfuté le test « but orphelin » (§6.1, 2026-07-21) là où l'échantillonnage de `mort` le déclarait sûr. Variante `-1` = **corral unitaire** (0 FP sur les 11 résolus, promu). |
+| `mort <niv> .. corral` | **Quelle FRÉQUENCE le motif corral a-t-il parmi les morts ?** | Comme le mode `livraison`/`couplage` mais le test bon marché est `corralUnitaireMort` : la ligne « capture » = part des états morts présentant le motif. ⚠️ **Collecter corral COUPÉ** (sinon la promotion élague les morts-à-motif avant qu'ils soient développés → capture 0). Mesuré (2026-07-27) : 100 % sur 4/7, 2 % sur 5/9 — prédit le gain, cf. plan §6.1. |
+| `deltaf <niv> [s] [macro\|astar]` | **La goal macro promeut-elle ses enfants dans la file ?** | À `f` égal, le tas préfère le `g` le plus grand : une macro de `N` poussées qui fait baisser `h` de `N` reste sur son palier et double tout le monde. Mesure `Δf = N + poids·Δh` sur les enfants **réellement enfilés**, et décompose Δh en part **caisses** / part **joueur** (h est joueur-aware). Mesuré le 2026-07-24 : 100 % de promus sur 9 niveaux, mais **0 % sur le 12** — cf. plan §6.3. |
 | `diverge <niv>` | `h` désigne-t-elle le bon coup ? | Rang du bon enfant parmi les enfants classés par `h`, et mou de `h` le long du chemin optimal. |
 | `paires <niv>` | Le mou vient-il d'une interaction entre 2 caisses ? | Matrice des suppléments d'interaction, par paire de caisses. |
 | `trace <niv> [pas]` | À quoi ressemble la solution ? | La grille poussée par poussée, avec les poussées **non productives** (les manœuvres). |
@@ -47,6 +51,12 @@ l'a occupée (1 sous chaque caisse au départ — elle y est déjà), et le bout
   `{f <= C*}` au lieu des états **dépilés** : 25× plus gros, car A\* s'arrête au but
   et n'en visite qu'une fraction. Résultat annoncé puis retiré : « 44 % de deadlocks
   non détectés » — un vrai chiffre sur la mauvaise population reste une erreur.
+- **Un chiffre trop propre est un chiffre à ne pas croire — vérifier que la sonde SONDE.**
+  `deltaf` a rendu « la position du joueur ne compte pour rien : 0 cas sur 154 000 ». Une moyenne
+  nulle pouvant masquer des valeurs opposées, on a d'abord compté les non-nuls séparément (toujours
+  0), puis ajouté un **self-test** : rejouer `h` depuis chaque case du niveau et compter les
+  valeurs distinctes (5 à 12 → le paramètre agit). Sans ce test, « 0 % » aurait aussi bien pu
+  vouloir dire « le paramètre est ignoré » — c'est-à-dire une mesure qui ne mesure rien.
 - **Un chiffre trop propre est un chiffre à ne pas croire.** `paires` a d'abord rendu
   un supplément de 1 sur **toutes** les paires : c'était le garde-fou de
   `getHeuristique()` (`game.cpp`, `n != nbButs` → repli sur l'ancienne borne), parce

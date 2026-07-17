@@ -2,6 +2,7 @@
 #include <QVarLengthArray>
 #include <climits>
 #include <utility>
+#include <vector>
 #include "game.h"
 
 static const Game::SDirection directions[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
@@ -12,6 +13,20 @@ static const Game::SDirection directions[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1
 //  - sens du tirage : l'inverse d'une poussée, pour le flood-fill à rebours
 //    depuis les buts (calculCaseMorte).
 static const Game::SDirection opposees[NB_DIRECTION] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
+
+// Interrupteur de mesure du test de livraison (§6.1), pour comparer les régimes SUR
+// LE MÊME BINAIRE. DÉFAUT = 0, coupé : le test s'est révélé FAUX POSITIF (mesuré
+// par mesures/fp.cpp le 2026-07-21, cf. game.h). Variantes :
+//   1 flood-fill du joueur, toutes caisses posées obstacles   — FP (2/3/5/6/7/17)
+//   2 idem, marche lue dans 'regions'                         — FP (idem)
+//   3 lecture de distanceParBut, aucun obstacle-caisse        — SÛR, mais 0 capture
+//   4 comme 2, seules les caisses GELÉES font obstacle        — FP (2 et 17)
+//   5 comme 4, mais testé par le solveur sur les états enfilés — FP (idem)
+//   6 comme 2 sans aucun obstacle-caisse (diagnostic)         — FP (17)
+static int livraisonMode() {
+    static const int mode = qgetenv("LIVRAISON").toInt();
+    return mode;
+}
 
 Game::Game() {
 }
@@ -198,6 +213,17 @@ void Game::checkDefaite() {
             };
         }
     }
+
+    // En dernier, parce que c'est le plus cher : le but orphelin (§6.1). Il voit
+    // ce qu'aucun test par caisse ne peut voir — un but que le PLATEAU ENTIER ne
+    // sait plus alimenter. Modes 1 à 4 seulement : au-delà, c'est le SOLVEUR qui
+    // l'appelle, sur les états qu'il enfile (cf. game.h — ici, il tuerait les
+    // goal macros en cours de route).
+    const int modeLiv = livraisonMode();
+    if (modeLiv >= 1 && modeLiv <= 4 && butNonLivrable()) {
+        perdu = true;
+        return;
+    }
 }
 
 bool Game::staticDeadlock(int idxCaisse, int idxJoueur, QVector<bool>& enCours) const {
@@ -261,6 +287,179 @@ bool Game::dynamicDeadlock(int idxCaisse) const {
     return nbPoussable > 0 && nbPoussable == nbVersMort;
 }
 
+// Test de LIVRAISON, dit « BUT ORPHELIN » (§6.1, mesuré le 2026-07-20 suite 3) :
+// un but VIDE vers lequel PLUS AUCUNE caisse ne peut être poussée rend l'état
+// insoluble. Mesuré par un BFS de poussées AVANT, multi-source (toutes les
+// caisses), dans une relaxation où :
+//  - une seule caisse bouge à la fois — les autres caisses NON posées sont
+//    traversées comme du sol, par la caisse comme par le joueur (relaxation
+//    franche : elle ne peut qu'agrandir l'ensemble atteignable) ;
+//  - le joueur doit réellement MARCHER jusqu'à la case d'appui, sans traverser
+//    la caisse qu'il pousse. C'est ce qui donne au test sa capture : sans cette
+//    marche il ne dit presque rien de plus que casesMortes.
+//
+// ⚠️ Un point n'est PAS une relaxation : les caisses DÉJÀ POSÉES sur un but sont
+// tenues pour des obstacles fixes, alors que le vrai jeu autorise à en ressortir
+// une pour livrer ailleurs. C'est ce qui CASSE LE CANARI (niveau 2 en macro :
+// 131 → 133 poussées, mesuré le 2026-07-21) — la sûreté « 0 faux positif » de
+// mesures/mort.cpp était de l'échantillonnage, pas une preuve, exactement comme
+// pour le test par COUPLAGE (§6.1).
+//
+// D'où les modes prouvables 3 et 4, où le seul obstacle est PERMANENT :
+//   3 — aucune caisse n'est un obstacle ; le test se lit dans les tables
+//       précalculées (distanceParBut/regions), coût O(buts × caisses) ;
+//   4 — seules les caisses GELÉES sur un but font obstacle (le gel est
+//       permanent par construction, c'est déjà l'hypothèse de caisseGelee).
+// Dans les deux cas, toute livraison réellement jouable reste jouable dans la
+// relaxation : l'impossibilité constatée est une PREUVE.
+//
+// Capture mesurée (modes non sûrs) parmi les états morts : 96 % (niv 7), 70 % (3),
+// 50 % (6), 45 % (17) ; 0 % sur 9/11, dont les morts sont d'un autre type.
+bool Game::butNonLivrable(int variante) const {
+    // Tampons réutilisés d'un appel à l'autre : ce test est dans le chemin chaud
+    // (une fois par poussée), une allocation par appel le rendrait inutilisable.
+    // 'vu'/'marqueJ' sont datés par un compteur (stamp) plutôt que remis à zéro.
+    static thread_local std::vector<qint64> vu, marqueJ;
+    static thread_local std::vector<int> joueurApres, file, fileJ;
+    static thread_local qint64 stamp = 0, stampJ = 0;
+    if ((int)vu.size() != size) {
+        vu.assign(size, 0); marqueJ.assign(size, 0); joueurApres.assign(size, -1);
+        stamp = 0; stampJ = 0;
+    }
+
+    const int mode = variante ? variante : livraisonMode();
+    const int idxJoueur = playerPoint.x() + playerPoint.y() * largeur;
+
+    // Combien de buts restent à livrer ? Aucun : rien à prouver.
+    int restants = 0;
+    for (int b = 0; b < goals.size(); b++) {
+        const Level::ETypeCase t = cases[goals.at(b)];
+        if (t == Level::tcGoal || t == Level::tcGoalPlayer) restants++;
+    }
+    if (restants == 0) return false;
+
+    // MODE 3 — le test PROUVABLE bon marché : aucune caisse ne fait obstacle, si
+    // bien que « telle caisse peut-elle atteindre tel but ? » se LIT dans
+    // distanceParBut (caisse seule, joueur-aware), déjà calculée par niveau. C'est
+    // le symétrique exact de staticDeadlock : celui-ci coupe quand une CAISSE
+    // n'atteint plus aucun but, celui-là quand un BUT n'est atteint par aucune
+    // caisse. Même argument d'admissibilité, donc même sûreté.
+    if (mode == 3) {
+        for (int b = 0; b < nbButs; b++) {
+            const Level::ETypeCase tb = cases[goals.at(b)];
+            if (tb != Level::tcGoal && tb != Level::tcGoalPlayer) continue;   // déjà rempli
+            bool livrable = false;
+            for (int cell = 0; cell < size && !livrable; cell++) {
+                if (cases[cell] != Level::tcCaisse && cases[cell] != Level::tcGoalCaisse) continue;
+                const qint16 r = regions.at(idxJoueur * size + cell);
+                if (r < 0) continue;
+                if (distanceParBut.at(((qsizetype)b * size + cell) * maxRegions + r) >= 0)
+                    livrable = true;
+            }
+            if (!livrable) return true;
+        }
+        return false;
+    }
+
+    // MODE 4 — les caisses GELÉES sur un but, elles, ne repartiront jamais : les
+    // compter comme obstacles reste une preuve. C'est le mode 2 avec ce seul
+    // durcissement légitime.
+    static thread_local std::vector<char> fige;
+    if (mode == 4) {
+        fige.assign(size, 0);
+        QVector<bool> enCours(size, false);
+        for (int c = 0; c < size; c++)
+            if (cases[c] == Level::tcGoalCaisse && caisseGelee(c, enCours)) fige[c] = 1;
+    }
+
+    // Sol franchissable dans la relaxation : les murs, toujours ; les caisses
+    // posées sur un but selon le mode (1/2 : toutes — NON PROUVÉ ; 4 : seulement
+    // les gelées).
+    auto libre = [&](int c) -> bool {
+        if (cases[c] == Level::tcMur) return false;
+        if (mode == 6) return true;          // aucune caisse n'est un obstacle (diagnostic)
+        if (mode == 4) return !fige[c];
+        return cases[c] != Level::tcGoalCaisse;
+    };
+
+    // Variante RAPIDE (LIVRAISON=2) : la marche du joueur se LIT dans 'regions'
+    // (composantes du plateau moins UNE caisse, précalculées par niveau) au lieu
+    // d'un flood-fill par case. O(1) au lieu de O(size), mais le joueur y traverse
+    // les caisses posées sur but — relaxation SUPPLÉMENTAIRE, donc encore moins de
+    // faux positifs que la version fidèle, et moins de capture. La caisse poussée,
+    // elle, reste bloquée par les caisses posées dans les deux variantes.
+    const bool rapide = (mode == 2 || mode == 4 || mode == 6);
+    auto joueurAtteintRapide = [&](int depart, int cible, int caseCaisse) -> bool {
+        if (depart == cible) return true;
+        const qint16 rd = regions.at(depart * size + caseCaisse);
+        return rd != -1 && rd == regions.at(cible * size + caseCaisse);
+    };
+
+    // Marque la zone où le joueur peut marcher, la caisse poussée étant en
+    // 'caseCaisse' (qu'il ne traverse pas) et lui-même partant de 'depart'.
+    auto floodJoueur = [&](int depart, int caseCaisse) {
+        stampJ++;
+        fileJ.clear();
+        fileJ.push_back(depart);
+        marqueJ[depart] = stampJ;
+        for (size_t h = 0; h < fileJ.size(); h++) {
+            const int c = fileJ[h], cx = c % largeur, cy = c / largeur;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int nx = cx + directions[d].dx, ny = cy + directions[d].dy;
+                if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+                const int n = nx + ny * largeur;
+                if (marqueJ[n] == stampJ || n == caseCaisse || !libre(n)) continue;
+                marqueJ[n] = stampJ;
+                fileJ.push_back(n);
+            }
+        }
+    };
+
+    stamp++;
+    file.clear();
+    for (int c = 0; c < size; c++) {
+        if (cases[c] == Level::tcCaisse || cases[c] == Level::tcGoalCaisse) {
+            vu[c] = stamp;
+            joueurApres[c] = idxJoueur;
+            file.push_back(c);
+        }
+    }
+
+    for (size_t h = 0; h < file.size(); h++) {
+        const int c = file[h], cx = c % largeur, cy = c / largeur;
+
+        // D'abord les directions plausibles, SANS faire marcher le joueur : le
+        // flood-fill est le poste coûteux, et la plupart des cases dépilées
+        // n'ouvrent sur rien de neuf.
+        int arrivee[NB_DIRECTION], appui[NB_DIRECTION], n = 0;
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int ax = cx + directions[d].dx, ay = cy + directions[d].dy;
+            const int px = cx - directions[d].dx, py = cy - directions[d].dy;
+            if (ax < 0 || ax >= largeur || ay < 0 || ay >= hauteur) continue;
+            if (px < 0 || px >= largeur || py < 0 || py >= hauteur) continue;
+            const int a = ax + ay * largeur, p = px + py * largeur;
+            if (vu[a] == stamp || !libre(a) || !libre(p)) continue;
+            arrivee[n] = a; appui[n] = p; n++;
+        }
+        if (n == 0) continue;
+
+        if (!rapide) floodJoueur(joueurApres[c], c);
+        for (int k = 0; k < n; k++) {
+            if (rapide ? !joueurAtteintRapide(joueurApres[c], appui[k], c)
+                       : marqueJ[appui[k]] != stampJ) continue;
+            const int a = arrivee[k];
+            vu[a] = stamp;
+            joueurApres[a] = c;   // la poussée faite, le joueur est là où était la caisse
+            file.push_back(a);
+            const Level::ETypeCase t = cases[a];
+            // Sortie anticipée : dès que tous les buts vides sont livrables, le
+            // test ne dira rien — inutile de finir le BFS.
+            if ((t == Level::tcGoal || t == Level::tcGoalPlayer) && --restants == 0) return false;
+        }
+    }
+
+    return true;   // il reste un but vide qu'aucune caisse ne peut atteindre
+}
 
 bool Game::move(EDirection dir) {
     if (gagne || perdu) return false;
@@ -360,45 +559,53 @@ short Game::getMinIdx(const QVector<bool>& zone) const {
     return result;
 }
 
-QVector<bool> Game::getZoneJoueur() const {
-    QList<short> file;
-    QVector<bool> visite(size, false);
+void Game::getZoneJoueur(QVector<bool>& visite) const {
+    // fill(v, n) ne réalloue que si la taille diffère : sur un tampon réutilisé
+    // d'un appel à l'autre, c'est un simple memset. C'est tout l'intérêt de cette
+    // surcharge — le flood-fill est le point le plus chaud du solveur (~10 appels
+    // par état développé avant les correctifs du §6.3), et la version qui rend un
+    // QVector allouait un tableau neuf à chaque fois.
+    visite.fill(false, size);
+
+    // File du parcours : au plus une entrée par case, donc dimensionnable au pire
+    // cas d'emblée. En QVarLengthArray, elle tient sur la PILE pour tous les
+    // plateaux usuels (size <= 512) — là où QList<short> faisait un malloc par appel.
+    QVarLengthArray<short, 512> file(size);
+    int tete = 0, fin = 0;
     short idx = playerPoint.x() + playerPoint.y() * largeur;
 
-    file.append(idx);
+    file[fin++] = idx;
     visite[idx] = true;
 
-    while(file.size()) {
+    while(tete < fin) {
         short vHaut, vDroite, vBas, vGauche;
 
-        idx = file.takeFirst();
+        idx = file[tete++];
 
         vHaut = idx - largeur;
         if(vHaut >= 0 && isLibre(vHaut) && !visite[vHaut]) {
-            file.append(vHaut);
+            file[fin++] = vHaut;
             visite[vHaut] = true;
         }
 
         vDroite = idx + 1;
         if((idx % largeur) != largeur -1  && isLibre(vDroite) && !visite[vDroite]) {
-            file.append(vDroite);
+            file[fin++] = vDroite;
             visite[vDroite] = true;
         }
 
         vBas = idx + largeur;
         if(vBas < largeur * hauteur && isLibre(vBas) && !visite[vBas]) {
-            file.append(vBas);
+            file[fin++] = vBas;
             visite[vBas] = true;
         }
 
         vGauche = idx - 1;
         if(idx % largeur != 0 && isLibre(vGauche) && !visite[vGauche]) {
-            file.append(vGauche);
+            file[fin++] = vGauche;
             visite[vGauche] = true;
         }
     }
-
-    return visite;
 }
 
 bool Game::isLibre(const QPoint& p) const {
@@ -514,9 +721,11 @@ static int hongrois(const int* cout, int n, int* affectation = nullptr) {
     return total;
 }
 
-int Game::getHeuristique(qint64* scoreGuidage) const {
+int Game::getHeuristique(qint64* scoreGuidage, int posJoueur, int* caisseParBut) const {
     if (scoreGuidage) *scoreGuidage = 0;
-    const int j = playerPoint.x() + playerPoint.y() * largeur;
+    if (caisseParBut) for (int b = 0; b < nbButs; b++) caisseParBut[b] = -1;
+    const int j = (posJoueur >= 0) ? posJoueur
+                                   : (playerPoint.x() + playerPoint.y() * largeur);
 
     // Recense les caisses (colonnes = buts, lignes = caisses de la matrice).
     QVarLengthArray<int, 32> caisses;
@@ -554,7 +763,13 @@ int Game::getHeuristique(qint64* scoreGuidage) const {
     // Le guidage a besoin de l'appariement caisse<->but (l'identité) : on le
     // récupère dans 'affectation', qu'on jetait jusqu'ici.
     QVarLengthArray<int, 32> affectation(n);
-    const int h = hongrois(cout.constData(), n, scoreGuidage ? affectation.data() : nullptr);
+    const bool veutAffectation = (scoreGuidage != nullptr) || (caisseParBut != nullptr);
+    const int h = hongrois(cout.constData(), n, veutAffectation ? affectation.data() : nullptr);
+
+    // L'appariement, rendu en index de CASE (affectation[b] est un rang dans
+    // 'caisses', pas une case — c'est le piège du §7 sur idxCaisse).
+    if (caisseParBut)
+        for (int b = 0; b < n; b++) caisseParBut[b] = caisses[affectation[b]];
 
     // Score de DÉPARTAGE (§10.2) : ordre lexicographique des distances par but.
     // Les buts sont pris dans leur ordre d'index (priorité fixe) ; minimiser ce
@@ -580,6 +795,134 @@ int Game::getHeuristique(qint64* scoreGuidage) const {
     }
 
     return h;
+}
+
+bool Game::corralSMort(int s) const {
+    const int idxJoueur = playerPoint.x() + playerPoint.y() * largeur;
+
+    // ⚠️ tcNone est le SOL LIBRE dans ce projet (cf. isLibre), pas du vide : le
+    // seul bloquant est tcMur. Le confondre avec un mur rend TOUTE case scellée
+    // — c'est le premier bug de ce test, qui inventait des morts partout.
+    // S doit être libre et sans le joueur : s'il y est, elle est accessible.
+    if (!isLibre(s) || s == idxJoueur) return false;
+
+    const int sx = s % largeur, sy = s / largeur;
+
+    // 1. S est-elle scellée ? (4 voisins murs ou caisses)  Et on récolte au
+    //    passage les caisses qui la bordent.
+    int frontiere[NB_DIRECTION];
+    int nbFrontiere = 0;
+    bool scellee = true;
+    for (int d = 0; d < NB_DIRECTION && scellee; d++) {
+        const int vx = sx + directions[d].dx, vy = sy + directions[d].dy;
+        if (vx < 0 || vx >= largeur || vy < 0 || vy >= hauteur) continue;   // hors grille = mur
+        const int v = vx + vy * largeur;
+        if (cases[v] == Level::tcMur) continue;
+        if (estCaisse(v)) { frontiere[nbFrontiere++] = v; continue; }
+        scellee = false;   // voisin libre (ou joueur) : le joueur peut entrer
+    }
+    if (!scellee || nbFrontiere == 0) return false;
+
+    // 2. Classer chaque caisse-frontière par ses poussées LÉGALES. Une poussée est
+    //    définitivement impossible si :
+    //      - la destination est un MUR, ou l'appui est un MUR      (géométrie)
+    //      - l'appui est DANS S                                    (circularité)
+    //      - la destination est une case morte                     (branche perdante)
+    //
+    // ⚠️ Une caisse sur la destination ou sur l'appui ne prouve RIEN : elle peut
+    // s'écarter plus tard. Tenir une caisse pour un obstacle permanent est le
+    // piège qui a déjà tué quatre tests ici (gel naïf, h qui soustrait,
+    // caisses=murs, gelées=murs — cf. plan.md §6.1). On ne conclut pas dans ce cas.
+    //
+    // ⚠️ Corollaire IMPORTANT (fonde le corral incrémental) : cette classification
+    // ne dépend QUE de la géométrie statique (murs, cases mortes) et de S — jamais
+    // de la position des autres caisses. Donc, S étant scellée, sa fatalité ne
+    // change que si l'occupation de ses 4 voisines change.
+    //
+    // Trois classes :
+    //   - LIBRE    : une poussée mène AILLEURS que dans S → la caisse peut quitter
+    //                la région de S → on ne peut RIEN conclure, on abandonne S.
+    //   - CAPTIVE  : au moins une poussée, mais TOUTES ont pour destination S.
+    //   - IMMOBILE : aucune poussée légale.
+    int nOffGoal = 0;
+    bool existeCaptive = false;
+    for (int k = 0; k < nbFrontiere; k++) {
+        const int c = frontiere[k];
+        if (cases[c] == Level::tcCaisse) nOffGoal++;   // tcGoalCaisse = déjà posée
+        const int cx = c % largeur, cy = c / largeur;
+
+        bool versAilleurs = false, versS = false;
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int dx = directions[d].dx, dy = directions[d].dy;
+            const int destX = cx + dx,  destY = cy + dy;
+            const int appX  = cx - dx,  appY  = cy - dy;
+            // Hors grille = mur (la bordure est murée) : poussée impossible.
+            if (destX < 0 || destX >= largeur || destY < 0 || destY >= hauteur) continue;
+            if (appX  < 0 || appX  >= largeur || appY  < 0 || appY  >= hauteur) continue;
+            const int dest = destX + destY * largeur;
+            const int app  = appX  + appY  * largeur;
+
+            if (cases[dest] == Level::tcMur) continue;   // arrivée murée, pour toujours
+            if (cases[app]  == Level::tcMur) continue;   // appui muré, pour toujours
+            if (app == s)                    continue;   // LA circularité
+            if (casesMortes.at(dest))        continue;   // branche déjà perdante
+
+            if (dest == s) versS = true;                 // poussée POSSIBLE vers S
+            else         { versAilleurs = true; break; } // poussée POSSIBLE ailleurs
+        }
+        if (versAilleurs) return false;   // caisse LIBRE : aucune conclusion sur S
+        if (versS) existeCaptive = true;  // sinon : IMMOBILE (rien) ou CAPTIVE
+    }
+
+    // Toutes les caisses-frontière sont IMMOBILES ou CAPTIVES : aucune ne quitte la
+    // région de S. Leurs positions finales sont figées, SAUF une seule captive qui
+    // peut se garer dans S (qui n'a qu'UNE place et se re-scelle sitôt occupée). S
+    // ne « recase » donc une caisse hors but que si elle est elle-même un but et
+    // qu'une captive peut l'y prendre. S'il reste plus de caisses hors but que S
+    // n'en peut recaser, au moins une gèle hors but pour toujours → MORT.
+    //
+    // Réduit EXACTEMENT à l'ancienne règle quand tout est immobile (existeCaptive =
+    // false → capacite = 0 → mort ssi une caisse hors but) : rien ne change sur les
+    // états déjà élagués ; n'AJOUTE que le cas des captives (la pince à deux
+    // caisses, plan.md §6.1). Preuve : au plus une caisse quitte sa case, les k−1
+    // autres restent gelées, donc nOffGoal − capacite caisses restent hors but.
+    const int capacite = (cases[s] == Level::tcGoal && existeCaptive) ? 1 : 0;
+    return nOffGoal > capacite;
+}
+
+bool Game::corralUnitaireMort() const {
+    for (int s = 0; s < size; s++)
+        if (corralSMort(s)) return true;
+    return false;
+}
+
+bool Game::corralUnitaireMort(int caisseArrivee) const {
+    // Version incrémentale, PROUVABLEMENT équivalente au balayage complet sur un
+    // parent déjà jugé vivant (cf. la preuve dans game.h). Sceller une case S
+    // exige de remplir son DERNIER voisin libre ; or la seule case qui a gagné une
+    // caisse depuis le parent est 'caisseArrivee' (une transition ne déplace
+    // qu'UNE caisse, et vers une seule case finale). Donc seules les 4 voisines de
+    // 'caisseArrivee' peuvent être devenues scellées, et la fatalité d'un S déjà
+    // scellé n'a pas pu changer (cf. corollaire dans corralSMort). Vérifié :
+    // états identiques à l'unité contre le balayage complet (CORRAL=2).
+    const int cx = caisseArrivee % largeur, cy = caisseArrivee / largeur;
+    for (int d = 0; d < NB_DIRECTION; d++) {
+        const int sx = cx + directions[d].dx, sy = cy + directions[d].dy;
+        if (sx < 0 || sx >= largeur || sy < 0 || sy >= hauteur) continue;
+        if (corralSMort(sx + sy * largeur)) return true;
+    }
+    return false;
+}
+
+int Game::caseApres(int idxCase, EDirection dir) const {
+    return idxCase + directions[dir].dx + directions[dir].dy * largeur;
+}
+
+int Game::caisseAssignee(int indexBut) const {
+    if (indexBut < 0 || indexBut >= nbButs) return -1;
+    QVarLengthArray<int, 32> parBut(nbButs);
+    getHeuristique(nullptr, -1, parBut.data());
+    return parBut[indexBut];
 }
 
 int Game::appliqueEtat(const quint16* cle) {
@@ -844,6 +1187,17 @@ QVector<int> Game::ordreParPrecedence() const {
         return {prolonge, mur};
     };
 
+    // LIVRABILITÉ DURCIE (§6.2, salle à deux bouches du 12). La garde ci-dessous ne
+    // regarde que la reachability (dist != -1) — elle laisse filer la précédence
+    // (15,y)<(13,y) parce que la « danse de coin » garde (15,y) livrable après avoir
+    // bloqué (13,y). Mais cette livraison de secours est plus LONGUE. Signal gratuit,
+    // déjà calculé par la garde : si poser b ALLONGE la livraison d'un autre but h
+    // (apres > dist, au lieu de simplement rester ≥ 0), c'est que b est un appui de h
+    // → h doit passer avant b. On PÉNALISE b d'autant de buts qu'il détourne, et le
+    // tie-break préfère poser d'abord ceux qui ne détournent personne.
+    //   LIVR_DURE=0 (défaut) coupé ; 1 = pénalité en tête ; 2 = après la contiguité.
+    const int livrDure = qEnvironmentVariableIntValue("LIVR_DURE");
+
     for (int step = 0; step < nbButs; step++) {
         const QVector<int> dist = distanceLivraison(bloque);
 
@@ -853,13 +1207,55 @@ QVector<int> Game::ordreParPrecedence() const {
             if (!pose[b] && dist[goals[b]] != -1) candidats.append(b);
 
         // (b) garde anti-échouage : poser ce but laisse-t-il tous les autres livrables ?
+        //     + pénalité de détour (livrabilité durcie, cf. entête de la boucle).
         QVector<int> surs;
+        QVector<int> penalite(nbButs, 0);
         for (int b : candidats) {
             bloque[goals[b]] = true;
             const QVector<int> apres = distanceLivraison(bloque);
             bool ok = true;
-            for (int h = 0; h < nbButs && ok; h++)
-                if (!pose[h] && h != b && apres[goals[h]] == -1) ok = false;
+            int  pen = 0;
+            for (int h = 0; h < nbButs; h++) {
+                if (pose[h] || h == b) continue;
+                if (apres[goals[h]] == -1)               ok = false;   // rendu inaccessible
+                else if (apres[goals[h]] > dist[goals[h]]) pen++;      // livrable mais DÉTOURNÉ
+            }
+
+            // LIVR_DURE=3 : reachability JOUEUR ancrée à sa vraie position (pas le
+            // modèle relâché de distanceLivraison). Poser b (obstacle) déconnecte-t-il
+            // l'appui d'un but restant de la zone où le perso peut MARCHER ? Un couloir
+            // rempli qui mure le perso hors d'une bouche est puni lourdement. (Ne voit
+            // que les murs + buts posés, PAS les caisses d'acheminement : borne haute.)
+            if (livrDure == 3) {
+                QVector<bool> vu(size, false);
+                QList<int> f;
+                const int dep = playerPoint.x() + playerPoint.y() * largeur;
+                if (cases[dep] != Level::tcMur && !bloque[dep]) { f.append(dep); vu[dep] = true; }
+                while (!f.isEmpty()) {
+                    const int c = f.takeFirst();
+                    const int cx = c % largeur, cy = c / largeur;
+                    for (int d = 0; d < NB_DIRECTION; d++) {
+                        const int nx = cx + directions[d].dx, ny = cy + directions[d].dy;
+                        if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+                        const int n = nx + ny * largeur;
+                        if (vu[n] || cases[n] == Level::tcMur || bloque[n]) continue;
+                        vu[n] = true; f.append(n);
+                    }
+                }
+                for (int h = 0; h < nbButs; h++) {
+                    if (pose[h] || h == b) continue;
+                    const int gx = goals[h] % largeur, gy = goals[h] / largeur;
+                    bool joignable = false;
+                    for (int d = 0; d < NB_DIRECTION && !joignable; d++) {
+                        const int ax = gx + directions[d].dx, ay = gy + directions[d].dy;
+                        if (ax < 0 || ax >= largeur || ay < 0 || ay >= hauteur) continue;
+                        if (vu[ax + ay * largeur]) joignable = true;
+                    }
+                    if (!joignable) pen += 1000;   // appui déconnecté du joueur
+                }
+            }
+
+            penalite[b] = pen;
             bloque[goals[b]] = false;
             if (ok) surs.append(b);
         }
@@ -879,11 +1275,14 @@ QVector<int> Game::ordreParPrecedence() const {
             const int da = dist[goals[b]], dc = dist[goals[choisi]];
             const int ga = degre(b),       gc = degre(choisi);
             const auto ca = contiguite(b), cc = contiguite(choisi);
+            const int pa = penalite[b],    pc = penalite[choisi];
             bool mieux;
-            if (ca.first  != cc.first)       mieux = (ca.first  > cc.first);
-            else if (ca.second != cc.second) mieux = (ca.second > cc.second);
-            else if (ga != gc)               mieux = (ga < gc);
-            else                             mieux = (da < dc);
+            if ((livrDure == 1 || livrDure == 3) && pa != pc) mieux = (pa < pc);  // durci : ne pas stranguler un appui
+            else if (ca.first  != cc.first)     mieux = (ca.first  > cc.first);
+            else if (ca.second != cc.second)    mieux = (ca.second > cc.second);
+            else if (livrDure == 2 && pa != pc) mieux = (pa < pc);
+            else if (ga != gc)                  mieux = (ga < gc);
+            else                                mieux = (da < dc);
             if (mieux) choisi = b;
         }
 
@@ -1123,40 +1522,362 @@ int Game::butActif() const {
     return -1;
 }
 
-bool Game::macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees) {
+int Game::avanceVersBut(int c, int d, int dCur, const int* dpb,
+                        const QVector<bool>& zone) const {
+    const int cx = c % largeur, cy = c / largeur;
+    const int devx = cx + directions[d].dx, devy = cy + directions[d].dy;   // case caisse après
+    const int appx = cx - directions[d].dx, appy = cy - directions[d].dy;   // appui joueur
+    if (devx < 0 || devx >= largeur || devy < 0 || devy >= hauteur) return -1;
+    if (appx < 0 || appx >= largeur || appy < 0 || appy >= hauteur) return -1;
+    const int devant = devx + devy * largeur;
+    const int appui  = appx + appy * largeur;
+    if (!isLibre(devant)) return -1;         // arrivée occupée (mur / autre caisse)
+    if (!zone[appui]) return -1;             // joueur ne peut pas se placer derrière
+    const int rApres = regions[c * size + devant];
+    if (rApres < 0) return -1;
+    return (dpb[devant * maxRegions + rApres] == dCur - 1) ? devant : -1;
+}
+
+QVector<int> Game::champDistanceButActif() const {
+    const int b = butActif();
+    if (b < 0) return {};
+
+    QVector<int> champ(size, -1);
+    const int joueurIdx = playerPoint.x() + playerPoint.y() * largeur;
+    const int* dpb = distanceParBut.constData() + (qsizetype)b * size * maxRegions;
+    const QVector<bool> zone = getZoneJoueur();
+
+    // Une caisse à la fois — comme macroPeutDemarrer/macroVersBut le feraient
+    // pour chaque candidate. dCur se lit avec la position RÉELLE du joueur
+    // (c'est bien elle, avant toute poussée) ; les voisins, eux, passent par
+    // avanceVersBut — seule source de vérité sur ce qui est un coup légal.
+    for (int cell = 0; cell < size; cell++) {
+        if (cases[cell] != Level::tcCaisse && cases[cell] != Level::tcGoalCaisse) continue;
+
+        const int rAvant = regions[joueurIdx * size + cell];
+        if (rAvant < 0) continue;
+        const int dCur = dpb[cell * maxRegions + rAvant];
+        if (dCur < 0) continue;
+        champ[cell] = dCur;
+        if (dCur == 0) continue;   // déjà sur le but : rien à avancer (garde de macroPeutDemarrer)
+
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int devant = avanceVersBut(cell, d, dCur, dpb, zone);
+            if (devant >= 0) champ[devant] = dCur - 1;
+        }
+    }
+    return champ;
+}
+
+QVector<int> Game::cheminMacro(int idxCaisse) const {
+    if (cases[idxCaisse] != Level::tcCaisse && cases[idxCaisse] != Level::tcGoalCaisse) return {};
+    const int b = butActif();
+    if (b < 0) return {};
+
+    const int* dpb = distanceParBut.constData() + (qsizetype)b * size * maxRegions;
+    const int joueurIdx = playerPoint.x() + playerPoint.y() * largeur;
+    const int rAvant = regions[joueurIdx * size + idxCaisse];
+    if (rAvant < 0) return {};
+    const int dCur = dpb[idxCaisse * maxRegions + rAvant];
+    if (dCur < 0) return {};
+
+    QVector<int> champ(size, -1);
+    champ[idxCaisse] = dCur;
+
+    // Copie jetable : macroVersBut POUSSE réellement la caisse (pousse(),
+    // checkDefaite compris) — *this doit rester intact, c'est un simple clic
+    // de diagnostic, pas un coup joué.
+    Game copie(*this);
+    QVector<QPair<int, int>> poussees;
+    copie.macroVersBut(idxCaisse, b, poussees);
+
+    // Chaque élément de 'poussees' est (case AVANT le coup, direction) : la
+    // case d'arrivée s'en déduit par translation, comme dans macroVersBut
+    // lui-même. La distance décroît d'exactement 1 par construction — c'est
+    // un trajet réellement joué, pas une lecture indépendante par case.
+    int d = dCur;
+    for (const auto& p : poussees) {
+        const int c   = p.first;
+        const int dir = p.second;
+        const int devant = c + directions[dir].dx + directions[dir].dy * largeur;
+        d--;
+        champ[devant] = d;
+    }
+    return champ;
+}
+
+QVector<bool> Game::arbreMacro(int idxCaisse, qint64 budgetNoeuds) const {
+    QVector<bool> visite(size, false);
+    if (cases[idxCaisse] != Level::tcCaisse && cases[idxCaisse] != Level::tcGoalCaisse) return visite;
+    const int b = butActif();
+    if (b < 0) return visite;
+    const int caseBut = goals[b];
+    const int* dpb = distanceParBut.constData() + (qsizetype)b * size * maxRegions;
+
+    visite[idxCaisse] = true;
+
+    // Pile de branches à explorer : (état à cet instant, case de la caisse).
+    // Comme macroVersButBacktrack, mais on ne s'arrête PAS au premier succès
+    // — on empile TOUTES les directions qui avancent, pas seulement celles
+    // en réserve, pour matérialiser la totalité de l'arbre.
+    struct Noeud { Game etat; int caisse; };
+    QVector<Noeud> pile;
+    pile.append({Game(*this), idxCaisse});
+
+    qint64 budget = budgetNoeuds;
+    while (!pile.isEmpty() && budget-- > 0) {
+        Noeud n = pile.takeLast();
+        if (n.caisse == caseBut) continue;
+
+        QVector<bool> zone = n.etat.getZoneJoueur();
+        const int joueurIdx = n.etat.playerPoint.x() + n.etat.playerPoint.y() * largeur;
+        const int rAvant = n.etat.regions[joueurIdx * size + n.caisse];
+        if (rAvant < 0) continue;
+        const int dCur = dpb[n.caisse * maxRegions + rAvant];
+        if (dCur <= 0) continue;
+
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int devant = n.etat.avanceVersBut(n.caisse, d, dCur, dpb, zone);
+            if (devant < 0) continue;
+            Game suite(n.etat);
+            if (!suite.pousse(n.caisse, (Game::EDirection)d) || suite.isPerdu()) continue;
+            visite[devant] = true;
+            pile.append({std::move(suite), devant});
+        }
+    }
+    return visite;
+}
+
+bool Game::macroPeutDemarrer(int idxCaisse, int indexBut, const QVector<bool>& zone) const {
+    // Le PREMIER pas de macroVersBut, sans rien copier ni modifier. Si c'est non,
+    // la macro échouerait au pas 0 — mesuré (mesures/macro) : 48,5 % des tentatives
+    // du niveau 11, chacune payant jusqu'ici une copie complète de Game pour rien.
+    //
+    // La condition est partagée avec la boucle (avanceVersBut) : elle ne peut pas
+    // en diverger. Ne JAMAIS la réécrire ici — ce serait un filtre qui écarte des
+    // macros réellement jouables, donc une perte silencieuse d'enfants.
+    if (idxCaisse == goals[indexBut]) return true;   // déjà sur le but : macro triviale
+    const int* dpb = distanceParBut.constData() + (qsizetype)indexBut * size * maxRegions;
+    const int joueurIdx = playerPoint.x() + playerPoint.y() * largeur;
+    const int rAvant = regions[joueurIdx * size + idxCaisse];
+    if (rAvant < 0) return false;
+    const int dCur = dpb[idxCaisse * maxRegions + rAvant];
+    if (dCur <= 0) return false;
+    for (int d = 0; d < NB_DIRECTION; d++)
+        if (avanceVersBut(idxCaisse, d, dCur, dpb, zone) >= 0) return true;
+    return false;
+}
+
+bool Game::macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees,
+                        const QVector<bool>* zoneInitiale) {
     const int caseBut = goals[indexBut];
     const int* dpb = distanceParBut.constData() + (qsizetype)indexBut * size * maxRegions;
 
+#ifdef INSTRUM_MACRO
+    StatsMacro& st = statsMacro();
+    st.tentatives++;
+    int forks = 0;
+    // Compte l'échec 'quoi' au pas 'pas', avec la distance restante 'reste'.
+    auto echec = [&](qint64& quoi, int pas, int reste) {
+        quoi++;
+        if (forks) st.echecAvecFork++;
+        if ((size_t)pas >= st.histoEchecPas.size()) st.histoEchecPas.resize(pas + 1, 0);
+        st.histoEchecPas[pas]++;
+        st.resteAuBlocage += reste;
+        st.forksTotal += forks;
+        st.pasTotal += pas;
+    };
+#endif
+
+    // La zone du joueur, recalculée UNIQUEMENT quand elle est périmée. Au premier
+    // pas, le plateau n'a pas encore bougé : c'est exactement la zone que
+    // l'appelant vient de calculer pour cet état, et qu'il nous passe (il en a
+    // besoin de son côté pour getCaissesDeplacable). Comme il essaie une macro
+    // par caisse candidate — ~5 par état développé —, la recalculer ici faisait
+    // la MOITIÉ des flood-fills du solveur (mesuré : 4,36 M sur 8,8 M au niveau
+    // 11, cf. mesures/macro). 'zoneCourante' à nullptr = à recalculer.
+    QVector<bool> zoneLocale;
+    const QVector<bool>* zoneCourante = zoneInitiale;
+
     int c = idxCaisse;
     for (int garde = 0; c != caseBut && garde <= 2 * size; garde++) {
-        const QVector<bool> zone = getZoneJoueur();
+        if (!zoneCourante) {
+            getZoneJoueur(zoneLocale);   // tampon réutilisé d'un pas à l'autre
+            zoneCourante = &zoneLocale;
+        }
+        const QVector<bool>& zone = *zoneCourante;
         const int joueurIdx = playerPoint.x() + playerPoint.y() * largeur;
         const int rAvant = regions[joueurIdx * size + c];
-        if (rAvant < 0) return false;
+        if (rAvant < 0) {
+#ifdef INSTRUM_MACRO
+            echec(st.echecRegion, garde, 0);
+#endif
+            return false;
+        }
         const int dCur = dpb[c * maxRegions + rAvant];
-        if (dCur <= 0) return false;                 // -1 (inatteignable) ou déjà arrivé
+        if (dCur <= 0) {                             // -1 (inatteignable) ou déjà arrivé
+#ifdef INSTRUM_MACRO
+            echec(st.echecDistance, garde, 0);
+#endif
+            return false;
+        }
 
-        const int cx = c % largeur, cy = c / largeur;
+        auto avanceVers = [&](int d) { return avanceVersBut(c, d, dCur, dpb, zone); };
+
+#ifdef INSTRUM_MACRO
+        // Combien de descentes optimales s'offraient ICI ? Plus d'une = la boucle
+        // ci-dessous fait un choix ARBITRAIRE (première dans l'ordre de l'énum),
+        // sur lequel elle ne reviendra jamais.
+        int nbCand = 0;
+        for (int d = 0; d < NB_DIRECTION; d++) if (avanceVers(d) >= 0) nbCand++;
+        if (nbCand > 1) forks++;
+#endif
+
         bool avance = false;
         for (int d = 0; d < NB_DIRECTION && !avance; d++) {
-            const int devx = cx + directions[d].dx, devy = cy + directions[d].dy;   // case caisse après
-            const int appx = cx - directions[d].dx, appy = cy - directions[d].dy;   // appui joueur
-            if (devx < 0 || devx >= largeur || devy < 0 || devy >= hauteur) continue;
-            if (appx < 0 || appx >= largeur || appy < 0 || appy >= hauteur) continue;
-            const int devant = devx + devy * largeur;
-            const int appui  = appx + appy * largeur;
-            if (!isLibre(devant)) continue;          // arrivée occupée (mur / autre caisse)
-            if (!zone[appui]) continue;              // joueur ne peut pas se placer derrière
-            const int rApres = regions[c * size + devant];
-            if (rApres < 0) continue;
-            if (dpb[devant * maxRegions + rApres] == dCur - 1) {   // cette poussée avance vers le but
-                if (!pousse(c, (Game::EDirection)d)) return false;
-                poussees.append({c, d});
-                c = devant;
-                avance = true;
+            const int devant = avanceVers(d);
+            if (devant < 0) continue;
+            if (!pousse(c, (Game::EDirection)d)) {
+#ifdef INSTRUM_MACRO
+                echec(st.echecPousse, garde, dCur);
+#endif
+                return false;
             }
+            poussees.append({c, d});
+            c = devant;
+            avance = true;
+            zoneCourante = nullptr;   // la caisse a bougé : la zone est PÉRIMÉE
         }
-        if (!avance) return false;                   // aucune poussée ne fait avancer : bloqué
+        if (!avance) {                               // aucune poussée ne fait avancer : bloqué
+#ifdef INSTRUM_MACRO
+            echec(st.echecBloque, garde, dCur);
+#endif
+            return false;
+        }
     }
+#ifdef INSTRUM_MACRO
+    if (c == caseBut) {
+        st.succes++;
+        if (forks) st.succesAvecFork++;
+        st.forksTotal += forks;
+        st.pasTotal += poussees.size();
+        if (poussees.size() >= (int)st.histoSuccesLong.size())
+            st.histoSuccesLong.resize(poussees.size() + 1, 0);
+        st.histoSuccesLong[poussees.size()]++;
+    }
+#endif
     return c == caseBut;
 }
+
+bool Game::macroVersButBacktrack(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees,
+                                  qint64* essaisOut, qint64 budgetBranches) {
+    if (cases[idxCaisse] != Level::tcCaisse && cases[idxCaisse] != Level::tcGoalCaisse) {
+        if (essaisOut) *essaisOut = 0;
+        return false;
+    }
+    const int caseBut = goals[indexBut];
+    const int* dpb = distanceParBut.constData() + (qsizetype)indexBut * size * maxRegions;
+
+    // Un fork mémorisé : l'état du plateau À CET INSTANT (une seule caisse a
+    // bougé depuis le départ, les tables statiques restent partagées COW —
+    // la copie reste bon marché), la case de la caisse, la direction NON
+    // essayée, et le chemin joué jusque-là. Rejouer depuis un fork = repartir
+    // de cette copie plutôt que de tenter un « undo » manuel (plus sûr : on
+    // ne réinvente pas la logique de move()/checkDefaite).
+    struct Fork { Game etat; int caisse; int direction; QVector<QPair<int,int>> chemin; };
+    QVector<Fork> pile;
+
+    Game etat(*this);
+    int c = idxCaisse;
+    QVector<QPair<int,int>> chemin;
+    qint64 essais = 1;
+
+    // Joue la direction 'd' (déjà connue valide par avanceVersBut) sur
+    // 'etat' : peut encore échouer via pousse() (checkDefaite au passage,
+    // comme echecPousse dans macroVersBut) — dans ce cas la branche est
+    // morte, on ne le découvre parfois qu'ici.
+    auto joue = [&](int d) -> bool {
+        const int devant = c + directions[d].dx + directions[d].dy * largeur;
+        if (!etat.pousse(c, (Game::EDirection)d)) return false;
+        chemin.append({c, d});
+        c = devant;
+        return true;
+    };
+
+    bool bloque = false;
+    for (;;) {
+        if (!bloque) {
+            while (c != caseBut) {
+                QVector<bool> zone = etat.getZoneJoueur();
+                const int joueurIdx = etat.playerPoint.x() + etat.playerPoint.y() * largeur;
+                const int rAvant = etat.regions[joueurIdx * size + c];
+                if (rAvant < 0) { bloque = true; break; }
+                const int dCur = dpb[c * maxRegions + rAvant];
+                if (dCur <= 0) { bloque = true; break; }
+
+                QVarLengthArray<int, NB_DIRECTION> candidats;
+                for (int d = 0; d < NB_DIRECTION; d++)
+                    if (etat.avanceVersBut(c, d, dCur, dpb, zone) >= 0) candidats.append(d);
+                if (candidats.isEmpty()) { bloque = true; break; }
+
+                // Empile les branches non retenues AVANT de jouer la
+                // première : dans l'ordre inverse, pour dépiler dans l'ordre
+                // de l'énum si plusieurs sont un jour ouvertes.
+                for (int i = candidats.size() - 1; i >= 1; i--)
+                    pile.append({etat, c, candidats[i], chemin});
+
+                if (!joue(candidats[0])) { bloque = true; break; }
+            }
+        }
+
+        if (!bloque && c == caseBut) {
+            poussees = chemin;
+            // macroVersBut mute *this DIRECTEMENT (pousse() est appelé sur
+            // l'objet lui-même) : l'appelant (solveurastar.cpp) récupère le
+            // résultat en relisant 'e' après coup, pas via une valeur de
+            // retour. Ici tout le travail se fait sur la copie locale 'etat'
+            // (nécessaire pour pouvoir revenir en arrière) — il FAUT la
+            // recopier dans *this avant de rendre la main, sinon l'appelant
+            // voit un état inchangé (silencieusement dupliqué du parent,
+            // rejeté par la dédup : c'est exactement le bug qui a cassé le
+            // canari au premier essai — cf. plan.md).
+            *this = std::move(etat);
+            if (essaisOut) *essaisOut = essais;
+#ifdef INSTRUM_MACRO
+            StatsMacro& st = statsMacro();
+            st.btTentatives++;
+            st.btSucces++;
+            if (essais > 1) st.btSuccesApresBacktrack++;
+            st.btEssaisTotal += essais;
+            if (essais > st.btEssaisMax) st.btEssaisMax = essais;
+#endif
+            return true;
+        }
+
+        if (pile.isEmpty() || essais >= budgetBranches) {
+            // Échec : *this finit « partiellement modifié », comme
+            // macroVersBut (contrat documenté en game.h) — l'appelant traite
+            // toujours 'e' comme une copie jetable dans ce cas.
+            *this = std::move(etat);
+            if (essaisOut) *essaisOut = essais;
+#ifdef INSTRUM_MACRO
+            StatsMacro& st = statsMacro();
+            st.btTentatives++;
+            st.btEssaisTotal += essais;
+            if (essais > st.btEssaisMax) st.btEssaisMax = essais;
+#endif
+            return false;
+        }
+
+        Fork f = pile.takeLast();
+        etat = f.etat;
+        c = f.caisse;
+        chemin = f.chemin;
+        essais++;
+        bloque = !joue(f.direction);
+    }
+}
+
+#ifdef INSTRUM_MACRO
+StatsMacro& statsMacro() { static StatsMacro s; return s; }
+#endif

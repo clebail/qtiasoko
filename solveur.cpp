@@ -15,7 +15,8 @@ QVector<Solveur::SType> Solveur::types() {
         {Bfs, "BFS (optimal)"},
         {Astar, "A* (optimal)"},
         {AstarPondere, "A* pondéré (rapide, approché)"},
-        {AstarMacro, "A* macro (rapide)"}
+        {AstarMacro, "A* macro (rapide)"},
+        {AstarMacroCouplage, "A* macro — but du couplage (essai)"}
     };
 }
 
@@ -29,6 +30,9 @@ Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
         // Goal macro (§10.5) : optimal sur les petits niveaux, approché sur les gros
         // congestionnés (le trajet solo peut y différer du réel), mais résout tout.
         case AstarMacro:   return new SolveurAStar(etatDepart, 1, true, parent);
+        // Régime d'essai (§6.3, 2026-07-24) : même solveur, la macro vise d'abord
+        // la caisse que le couplage assigne au but actif.
+        case AstarMacroCouplage: return new SolveurAStar(etatDepart, 1, true, parent, true);
     }
     return nullptr;
 }

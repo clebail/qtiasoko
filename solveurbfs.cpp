@@ -42,7 +42,7 @@ void SolveurBFS::run() {
         const int rangees = g.nbCaissesSurBut();
         if (rangees > maxRangees) {
             maxRangees = rangees;
-            emit nouveauMaxCaisses(g, rangees);   // diagnostic état-max (§10)
+            emit nouveauMaxCaisses(g, rangees, reconstruire(idx));   // diagnostic état-max (§10)
         }
 
         if(g.isGagne()) {

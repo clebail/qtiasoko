@@ -20,6 +20,7 @@ int main(int argc, char** argv) {
     const QString md = (argc > 2) ? argv[2] : "astar";
     const Solveur::EType type =
         (md == "macro")   ? Solveur::AstarMacro   :
+        (md == "couplage")? Solveur::AstarMacroCouplage :
         (md == "pondere" || md == "2") ? Solveur::AstarPondere :
         (md == "bfs")     ? Solveur::Bfs          : Solveur::Astar;
 

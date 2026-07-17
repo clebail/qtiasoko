@@ -28,7 +28,13 @@ public:
         Bfs,
         Astar,
         AstarPondere,
-        AstarMacro
+        AstarMacro,
+        // Même chose, mais la macro pousse en PRIORITÉ la caisse que le couplage
+        // hongrois destine au but actif (cf. plan.md §6.3, 2026-07-24). Régime
+        // d'ESSAI, à comparer à AstarMacro sur le même niveau : sur le 12, 100 %
+        // des enfants de macro partaient à f+2 parce que la caisse posée volait
+        // son but à une autre. Repli sur les autres caisses si celle-là ne passe pas.
+        AstarMacroCouplage
     };
 
     struct SType {
@@ -57,7 +63,13 @@ signals:
     // Émis quand la recherche bat son record de caisses rangées (§10, diagnostic) :
     // porte une copie de l'état atteint et le nombre de caisses posées. L'UI peut
     // l'afficher pour voir OÙ le solveur se coince (ex. niveau 4 plafonné à 17/20).
-    void nouveauMaxCaisses(Game etatMax, int nbRangees);
+    //
+    // 'chemin' porte en plus la suite de coups qui MÈNE à cet état, pour pouvoir le
+    // rejouer pas à pas — c'est le seul moyen de voir COMMENT un run qui n'aboutit
+    // pas en est arrivé là (sur un run gagnant, solutionTrouvee suffit). Reconstruit
+    // à chaque record seulement : rare (au plus une fois par but), donc le coût des
+    // AStar de marche de reconstruire() est négligeable.
+    void nouveauMaxCaisses(Game etatMax, int nbRangees, QList<Game::EDirection> chemin);
 
 protected:
     void run() override = 0;

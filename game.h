@@ -12,6 +12,44 @@
 #define NB_COIN_TO_CHECK            2
 #define NB_MUR_TO_CHECK             2
 
+#ifdef INSTRUM_MACRO
+#include <vector>
+// Instrumentation hors-ligne de la GOAL MACRO (harnais mesures/macro). Ne compile
+// que dans les harnais : le code produit ne définit jamais INSTRUM_MACRO.
+//
+// Question posée : quand macroVersBut() échoue, est-ce parce que la caisse est
+// VRAIMENT bloquée, ou parce que la descente a pris arbitrairement l'une des
+// plusieurs descentes optimales possibles et s'est peinte dans un coin ? La
+// boucle prend la première direction décroissante dans l'ordre de l'énumération
+// et ne revient jamais dessus — 'forks' compte les pas où une ALTERNATIVE de même
+// coût existait, donc les points où un backtracking aurait eu de quoi mordre.
+struct StatsMacro {
+    qint64 tentatives = 0, succes = 0;
+    qint64 echecRegion = 0;     // le joueur n'est plus dans une région valide
+    qint64 echecDistance = 0;   // but inatteignable depuis cette caisse (d < 0)
+    qint64 echecBloque = 0;     // aucune poussée n'avance  <- LE CAS INTÉRESSANT
+    qint64 echecPousse = 0;     // pousse() a refusé (deadlock au passage)
+    qint64 echecAvecFork = 0;   // échec ALORS QU'un choix arbitraire avait eu lieu
+    qint64 succesAvecFork = 0;
+    qint64 forksTotal = 0;      // nombre de pas offrant >= 2 descentes optimales
+    qint64 pasTotal = 0;        // pas réellement joués (succès + échecs)
+    qint64 resteAuBlocage = 0;  // somme des distances restantes au moment du blocage
+    std::vector<qint64> histoEchecPas;    // à quel pas l'échec survient
+    std::vector<qint64> histoSuccesLong;  // longueur des chaînes réussies
+
+    // Prototype du 2026-07-23 (§6.3, « mémoriser les forks ») —
+    // macroVersButBacktrack : combien de BRANCHES (essais) une tentative a
+    // réellement coûté, et combien de succès n'existaient QUE grâce au
+    // retour en arrière (essais > 1 — la descente gloutonne seule aurait
+    // échoué là).
+    qint64 btTentatives = 0, btSucces = 0;
+    qint64 btSuccesApresBacktrack = 0;   // succes ET essais > 1
+    qint64 btEssaisTotal = 0;            // pour la moyenne d'essais par tentative
+    qint64 btEssaisMax = 0;
+};
+StatsMacro& statsMacro();
+#endif
+
 class Game {
     // Accès aux membres privés pour les tests unitaires (tests/tst_getetat.cpp).
     friend class TestGetEtat;
@@ -65,7 +103,14 @@ public:
     // ci-dessous quand plusieurs requêtes portent sur le même état (le
     // solveur appelle typiquement getEtat() ET getCaissesDeplacable() par
     // état exploré).
-    QVector<bool> getZoneJoueur() const;
+    QVector<bool> getZoneJoueur() const { QVector<bool> v; getZoneJoueur(v); return v; }
+    // Même chose dans un tampon FOURNI, réutilisable d'un appel à l'autre : à
+    // taille déjà bonne, plus aucune allocation (ni le QVector rendu, ni la file
+    // du parcours). C'est la forme du chemin chaud — le flood-fill est le point
+    // le plus appelé du solveur. ⚠️ Le tampon doit être détenu en propre : si une
+    // copie du QVector traîne ailleurs, le fill() initial détache et réalloue,
+    // ce qui annule tout le bénéfice (sans nuire à la correction).
+    void getZoneJoueur(QVector<bool>& visite) const;
     // Longueur de la clé d'état, en shorts : les N caisses + la case canonique du
     // joueur. CONSTANTE sur toute une résolution — aucune caisse n'apparaît ni ne
     // disparaît —, ce qui permet au solveur de ranger toutes ses clés bout à bout
@@ -109,6 +154,51 @@ public:
     // Index du but ACTIF (§10.5) : le plus profond (ordreButs) pas encore rempli,
     // ou -1 si tous le sont (état gagnant). C'est la cible de la goal macro.
     int butActif() const;
+    // Case (index plat) du but d'indice 'indexBut' — même indexation que
+    // butActif()/ordreButs. Pour l'UI, qui a besoin d'une position à surligner.
+    int getCaseBut(int indexBut) const { return goals[indexBut]; }
+    // Champ de distances vers le BUT ACTIF, SPARSE : une valeur uniquement sur
+    // les caisses réellement posées (leur dCur) et sur celles de leurs cases
+    // voisines vers lesquelles une poussée est LÉGALE dans l'état courant
+    // (dCur-1). Toutes les autres cases valent -1 (rien à afficher).
+    //
+    // ⚠️ Pas un champ dense sur tout le plateau : une première version
+    // affichait dpb[cell][regions[joueurRéel][cell]] pour CHAQUE case,
+    // indépendamment les unes des autres. C'était FAUX pour les voisins d'une
+    // caisse — regions[joueurRéel][cell] répond à « si le SEUL obstacle du
+    // plateau était une caisse ici, dans quelle région tomberait le joueur
+    // réel, où qu'il soit ? », pas à « si je pousse VRAIMENT cette caisse
+    // jusqu'ici, quelle distance ? ». La bonne référence, après une poussée,
+    // c'est la case que la caisse vient de quitter (le joueur s'y tient) — pas
+    // la position réelle et figée du joueur. C'est exactement ce que fait
+    // avanceVersBut (regions[c][devant], PAS regions[joueur][devant]), donc
+    // cette fonction rappelle avanceVersBut lui-même plutôt que de refaire le
+    // calcul : chaque valeur affichée est un coup que la macro jouerait
+    // réellement, jamais une distance orpheline sur une case que rien ne peut
+    // atteindre en un coup légal (mur, appui occupé par une AUTRE caisse...).
+    //
+    // Vide si aucun but actif (état gagné). À n'appeler que pour l'affichage
+    // humain (getZoneJoueur() + un balayage de 'size' cases), jamais dans le
+    // solveur.
+    QVector<int> champDistanceButActif() const;
+    // Trajet COMPLET de la goal macro pour la caisse 'idxCaisse' vers le but
+    // actif : rejoue macroVersBut sur une COPIE (ne modifie pas *this) et
+    // rend un champ sparse, une valeur (distance restante) sur CHAQUE case
+    // traversée — du départ ('idxCaisse') jusqu'à l'arrivée si la macro
+    // réussit, ou jusqu'à la case de BLOCAGE si elle échoue en route (auquel
+    // cas la dernière valeur du chemin n'est pas 0 : c'est justement ce qui
+    // montre où et pourquoi ça coince). Vide si 'idxCaisse' n'est pas une
+    // caisse, ou si aucun but n'est actif.
+    QVector<int> cheminMacro(int idxCaisse) const;
+    // Comme cheminMacro, mais rend TOUTES les branches explorées par les
+    // forks (pas juste celle qui gagne) : chaque case visitée par AU MOINS
+    // UN chemin monotone (distance strictement décroissante) depuis
+    // 'idxCaisse', qu'il mène au but ou se bloque. Sert à visualiser la forme
+    // de l'arbre de choix — un pas sans fork n'ajoute qu'une case, un pas
+    // avec fork fait bifurquer plusieurs branches à la fois. Coûte une
+    // exploration bornée (budget de nœuds) sur des copies jetables ; à
+    // n'appeler que pour l'affichage humain, jamais dans le solveur.
+    QVector<bool> arbreMacro(int idxCaisse, qint64 budgetNoeuds = 5000) const;
     // GOAL MACRO (§10.5) : pousse la caisse en 'idxCaisse' jusqu'au but d'index
     // 'indexBut', le long de son trajet solo, en vérifiant à CHAQUE pas que la
     // poussée est réellement jouable dans l'état courant (case d'arrivée libre,
@@ -117,14 +207,121 @@ public:
     // pour la reconstruction. Rend true si le but est atteint ; false si la caisse
     // se bloque en route (l'état est alors partiellement modifié — l'appelant
     // travaille sur une copie jetable).
-    bool macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees);
+    // 'zoneInitiale' (optionnel) : la zone du joueur pour l'état COURANT, quand
+    // l'appelant l'a déjà sous la main. Elle n'est valable que pour le premier
+    // pas — dès qu'une caisse bouge, la macro la recalcule elle-même. Le solveur
+    // essaie une macro par caisse candidate (~5 par état) et dispose déjà de
+    // cette zone : sans ce paramètre, la moitié des flood-fills du solveur sont
+    // des recalculs à l'identique.
+    bool macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees,
+                      const QVector<bool>* zoneInitiale = nullptr);
+    // PROTOTYPE (2026-07-23, §6.3) — même contrat que macroVersBut, mais
+    // BACKTRACKE sur les forks au lieu de les oublier : à chaque pas où
+    // plusieurs directions font baisser la distance, mémorise les autres
+    // (une copie de l'état à cet instant, bon marché — une seule caisse
+    // bouge pendant tout l'appel, les tables statiques sont en COW) et, si
+    // la branche courante finit par se bloquer, reprend à la dernière non
+    // essayée au lieu d'abandonner. N'existe qu'à côté de macroVersBut — ne
+    // le remplace pas, mesuré séparément avant toute décision.
+    // 'essais' (optionnel) : nombre de branches réellement tentées (1 = la
+    // descente gloutonne a suffi). 'budgetBranches' borne le total, protection
+    // contre un niveau à forks denses ; dépassé => échec propre (pas un crash).
+    bool macroVersButBacktrack(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees,
+                                qint64* essais = nullptr, qint64 budgetBranches = 1000);
+    // Filtre bon marché : la macro pourrait-elle faire AU MOINS UN pas ? Répond
+    // sans copier le Game ni rien modifier — c'est le premier pas de
+    // macroVersBut, dont il partage la condition exacte (avanceVersBut). Un
+    // 'false' garantit que macroVersBut échouerait au pas 0.
+    bool macroPeutDemarrer(int idxCaisse, int indexBut, const QVector<bool>& zone) const;
     int getHeuristique() const { return getHeuristique(nullptr); }
     // Surcharge : calcule aussi le SCORE DE GUIDAGE (§10.2) via l'appariement du
     // couplage. Ordre lexicographique des distances-restantes par but (priorité =
     // index du but) : à f et g égaux, A* préfère le score le plus PETIT, ce qui
     // impose un ordre canonique de rangement et casse la multiplicité (§9.4).
     // Pur tie-break : sans effet sur l'optimalité. scoreGuidage peut être nul.
-    int getHeuristique(qint64* scoreGuidage) const;
+    //
+    // 'posJoueur' (index de case, -1 = la position réelle) sert UNIQUEMENT à
+    // l'instrumentation : h est joueur-aware (distanceParBut est indexée par la
+    // région du joueur), donc déplacer le joueur change h à caisses IDENTIQUES.
+    // Recalculer h sur l'enfant avec la position du PARENT isole la part de Δh
+    // due aux caisses de celle due au joueur (harnais mesures/deltaf). Le chemin
+    // chaud n'en paie qu'un test sur un int, devant un hongrois en O(n³).
+    //
+    // 'caisseParBut' (tableau de nbButs entiers, ou nul) reçoit l'APPARIEMENT du
+    // couplage : pour chaque but, l'index de CASE de la caisse que le hongrois lui
+    // destine (-1 si indéterminé — matrice non carrée). C'est la même affectation
+    // qui sert déjà au score de guidage : on la rend au lieu de la jeter, plutôt
+    // que de refaire un hongrois ailleurs.
+    int getHeuristique(qint64* scoreGuidage, int posJoueur = -1,
+                       int* caisseParBut = nullptr) const;
+
+    // CORRAL UNITAIRE (§6.1, item 4 — cas dégénéré, taille 1). Une case libre S
+    // dont les 4 voisins sont murs ou caisses est inaccessible au joueur. Si TOUTE
+    // poussée légale des caisses qui la bordent a son appui DANS S, ou mène à une
+    // case morte, alors aucune ne bougera jamais :
+    //
+    //   débloquer une caisse-frontière exige un appui en S
+    //   → S ne s'ouvre que si une caisse-frontière bouge
+    //   → CIRCULARITÉ, donc immobilité PROUVÉE (pas seulement constatée).
+    //
+    // L'état est mort dès qu'une de ces caisses n'est pas sur un but.
+    //
+    // ⚠️ Ce qui rend ce test sûr n'est PAS que S soit inaccessible « maintenant » —
+    // ce serait l'erreur qui a tué le couplage de Hall (52 % de faux positifs sur
+    // le niveau 1) : l'atteignabilité instantanée n'est pas une relaxation valide.
+    // C'est la circularité, elle, qui est une preuve. Ne jamais relâcher la
+    // condition « appui DANS S » en « appui hors de la zone du joueur ».
+    //
+    // Motif 1 (le plus courant) : deux caisses en diagonale qui scellent un coin mort.
+    //
+    //        #                     A ne peut que monter (appui en S)
+    //     A #                      B ne peut qu'aller à gauche (appui en S)
+    //    B S #                     S = coin mort, scellé par A et B
+    //   #####
+    //
+    // Motif 2 — la PINCE (ajouté 2026-07-27, idée utilisateur). Deux caisses
+    // scellent S, mais chacune PEUT bouger — seulement vers S :
+    //
+    //   ###                        A ne peut qu'entrer dans S (descente = appui mur)
+    //   A S B                      B ne peut qu'entrer dans S (idem)
+    //    #                         S n'a qu'UNE place → l'une gèle hors but → MORT
+    //
+    // D'où la règle GÉNÉRALE (corralSMort). On classe chaque caisse-frontière :
+    // LIBRE (une poussée mène hors de S → on ne conclut rien), CAPTIVE (poussées
+    // possibles, mais TOUTES vers S), IMMOBILE (aucune poussée). Si aucune n'est
+    // LIBRE, leurs positions finales sont figées sauf UNE captive qui peut se garer
+    // dans S ; donc `capacite = 1` ssi S est un but et qu'une captive existe. Mort
+    // ssi `nOffGoal > capacite`. Le motif 1 est le cas où tout est immobile
+    // (capacite = 0, mort ssi une caisse hors but) : la règle générale le contient.
+    //
+    // Deux formes. Le balayage COMPLET teste toutes les cases — c'est le juge de
+    // référence (mesures/fp) qui interroge des états quelconques. Le chemin chaud
+    // du solveur, lui, appelle la forme INCRÉMENTALE : elle ne teste que les
+    // voisines de la caisse qui vient d'arriver, et c'est une ÉQUIVALENCE prouvée,
+    // pas une heuristique. Preuve (elle vaut sur un parent déjà jugé vivant, ce que
+    // garantit l'appel à l'enfilage de chaque enfant) :
+    //   - Sceller une case S = rendre caisse/mur son DERNIER voisin libre. La seule
+    //     case qui a gagné une caisse depuis le parent est 'caisseArrivee' (une
+    //     transition — poussée simple ou goal macro — ne déplace qu'UNE caisse et
+    //     vers une seule case de repos). Donc seules les voisines de caisseArrivee
+    //     peuvent passer de non-scellée à scellée.
+    //   - Un S DÉJÀ scellé chez le parent (non voisin de caisseArrivee) ne peut pas
+    //     devenir fatal : sa fatalité (immobilité des caisses-frontière + une hors
+    //     but) ne dépend que de la géométrie STATIQUE et de l'occupation de ses 4
+    //     voisines (cf. corralSMort), toutes inchangées.
+    // Vérifié empiriquement : compteurs d'états identiques à l'unité (CORRAL=2).
+    bool corralUnitaireMort() const;                 // balayage complet (juge)
+    bool corralUnitaireMort(int caisseArrivee) const; // incrémental (chemin chaud)
+    // Case voisine de 'idxCase' dans la direction 'dir' (index de CASE). Sans
+    // vérification de borne : l'appelant garantit que la case existe (bordure
+    // murée). Sert au solveur à retrouver la case de repos de la caisse déplacée.
+    int caseApres(int idxCase, EDirection dir) const;
+    // Quelle caisse le couplage destine-t-il à ce but ? Index de CASE, -1 si aucune.
+    // Utilisé par le régime de macro « but du couplage » (solveurastar.cpp) : pousser
+    // vers un but la caisse que le couplage lui assigne garantit Δh = −N, donc un
+    // enfant à f CONSTANT ; pousser une autre caisse fait que le couplage se
+    // réarrange et que h ne baisse pas (mesuré : plan.md §6.3, 2026-07-24).
+    int caisseAssignee(int indexBut) const;
     // Applique une poussée sans faire marcher le joueur : le TÉLÉPORTE sur la
     // case d'appui, puis pousse via move() (qui fait checkVictoire/checkDefaite).
     // Précondition, NON vérifiée : la case d'appui doit être dans la zone du
@@ -147,7 +344,33 @@ public:
     // Renvoie le nombre de caisses posées sur un but (compté gratuitement pendant
     // le placement), pour la jauge de progression du diagnostic (§10).
     int appliqueEtat(const quint16* cle);
+    // Deadlock de LIVRAISON (§6.1) : vrai s'il reste un but VIDE qu'aucune caisse
+    // ne peut plus atteindre. 'variante' choisit la relaxation (cf. game.cpp) ;
+    // 0 = celle de la variable d'environnement LIVRAISON (défaut : test COUPÉ).
+    //
+    // ⚠️ DÉSACTIVÉ, ET POUR CAUSE (mesuré le 2026-07-21 avec mesures/fp.cpp, qui
+    // rejoue une solution GAGNANTE et interroge le test sur chacun de ses états —
+    // tous solubles par construction, donc toute détection est un faux positif
+    // PROUVÉ). Deux défauts indépendants :
+    //   1. le BFS de livraison n'est PAS joueur-aware — il ne retient qu'UNE
+    //      position de joueur par case atteinte, alors qu'une même case atteinte
+    //      « par l'autre côté » ouvre d'autres poussées. C'est la faille du
+    //      prototype mesures/mort.cpp, et elle rend 86 faux positifs sur le 17 ;
+    //   2. tenir les caisses posées pour des obstacles fixes est faux, même
+    //      restreint aux caisses GELÉES (1 faux positif sur le 2).
+    // Seule la variante 3, qui lit distanceParBut (joueur-aware, elle), est sûre —
+    // et elle ne capture rien de plus que staticDeadlock.
+    //
+    // PUBLIC parce que le point d'appel naturel, checkDefaite, est le mauvais :
+    // marquer 'perdu' sur un état INTERMÉDIAIRE de goal macro fait avorter la
+    // macro entière (move() refuse de jouer sur un état perdu) — niveaux 3 et 5
+    // perdus. Le solveur peut donc l'appeler sur les états qu'il ENFILE.
+    bool butNonLivrable(int variante = 0) const;
 private:
+    // Coeur du corral unitaire pour UNE case S : facteur commun du balayage
+    // complet et de la forme incrémentale (cf. corralUnitaireMort ci-dessus).
+    bool corralSMort(int s) const;
+
     int largeur = 0;
     int hauteur = 0;
     int size = 0;
@@ -205,6 +428,13 @@ private:
     bool caisseGelee(int idxCaisse, QVector<bool>& enCours) const;
     bool bloqueeSurAxe(int idxCaisse, EDirection dirA, EDirection dirB, QVector<bool>& enCours) const;
     bool estCaisse(int idx) const;
+    // Une poussée de la caisse en 'c' vers 'd' la fait-elle AVANCER vers le but
+    // (distance dCur -> dCur-1), le joueur pouvant se mettre à l'appui ? Rend la
+    // case d'arrivée, ou -1. 'dpb' = la tranche de distanceParBut du but visé.
+    // Exemplaire UNIQUE de la condition de descente : macroVersBut et
+    // macroPeutDemarrer s'en servent tous les deux (cf. game.cpp).
+    int avanceVersBut(int c, int d, int dCur, const int* dpb,
+                      const QVector<bool>& zone) const;
     void calculDistancePoussee();
 
 // Distance de livraison d'une caisse (poussées) depuis les caisses de départ, les

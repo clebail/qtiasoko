@@ -45,14 +45,19 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(cbNiveau, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onNiveauChange);
     connect(pbResoudre, &QPushButton::clicked, this, &MainWindow::onIALance);
     connect(pbRevoir, &QPushButton::clicked, this, &MainWindow::onRevoir);
+    connect(pbPasPrec, &QPushButton::clicked, this, &MainWindow::onPasPrec);
+    connect(pbPasSuiv, &QPushButton::clicked, this, &MainWindow::onPasSuiv);
+    connect(slPas, &QSlider::valueChanged, this, &MainWindow::onPasSlider);
     connect(pbExport, &QPushButton::clicked, this, &MainWindow::onExportPassages);
     connect(pbExportXsb, &QPushButton::clicked, this, &MainWindow::onExportXsb);
     connect(cbNotePassages, &QCheckBox::stateChanged, this, &MainWindow::onShowPassagesCaisse);
+    connect(cbDistanceButActif, &QCheckBox::stateChanged, this, &MainWindow::onShowChampButActif);
     connect(cbEtatMax, &QCheckBox::stateChanged, this, &MainWindow::onToggleEtatMax);
     connect(&timerRejeu, &QTimer::timeout, this, &MainWindow::rejouerCoup);
     timerRejeu.setInterval(150);
 
     connect(wGame, &WGame::joueurDeplace, this, &MainWindow::onJoueurDeplace);
+    connect(wGame, &WGame::caseCliquee, this, &MainWindow::onCaseCliquee);
 
     // Les stats sont peintes au coin de la partie VISIBLE du plateau (cf.
     // WGame::paintEvent) : un défilement les déplace, il faut donc repeindre. Qt
@@ -87,7 +92,11 @@ void MainWindow::onNiveauChange(int index) {
     lvl.load(cbNiveau->itemData(index).toString());
     game = Game(lvl, cbNiveau->itemData(index, RoleNumero).toInt());
 
+    historique.clear();   // nouvel état de départ : l'undo ne doit pas franchir le chargement
     derniereSolutionCoups.clear();
+    indicesPoussees.clear();
+    posPas = 0;
+    majNavigationPas();   // le chemin du niveau précédent n'est plus navigable
     pbRevoir->setEnabled(false);
 
     // Nouveau niveau : l'état-max du précédent n'a plus de sens.
@@ -99,9 +108,19 @@ void MainWindow::onNiveauChange(int index) {
     wGame->setEtatsExplores(0);
     wGame->setDuree(0);
     wGame->setPassages(passages);
+    majChampButActif(game);
     wGame->update();
 
     centrerSurJoueur();
+}
+
+void MainWindow::majChampButActif(const Game& g) {
+    const int b = g.butActif();
+    wGame->setChampButActif(g.champDistanceButActif(), b >= 0 ? g.getCaseBut(b) : -1);
+    // L'arbre d'un clic précédent ne vaut que pour L'ÉTAT où il a été
+    // calculé : périmé dès qu'un coup est joué, donc effacé à chaque
+    // rafraîchissement du champ par défaut, pas seulement sur un nouveau clic.
+    wGame->setArbreMacro({});
 }
 
 void MainWindow::onJoueurDeplace(QPoint centre) {
@@ -147,7 +166,14 @@ bool MainWindow::joue(Game::EDirection dir) {
     const QPoint avant  = game.getPlayerPoint();
     const int    caisses = game.getNbDepCaisse();
 
+    // Undo : on mémorise l'état AVANT un coup HUMAIN (pas le rejeu auto d'une
+    // solution, qui repart de son propre départ). La copie est COW, donc légère.
+    const bool humain = !timerRejeu.isActive();
+    CoupHist snap;
+    if (humain) { snap.etat = game; snap.passages = passages; }
+
     if (!game.deplace(dir)) return false;
+    if (humain) historique.append(std::move(snap));
 
     const QPoint apres = game.getPlayerPoint();
     const bool poussee = game.getNbDepCaisse() > caisses;
@@ -181,8 +207,29 @@ bool MainWindow::joue(Game::EDirection dir) {
     // 'game' est déjà à l'arrivée : l'affichage seul retarde, le temps que le
     // perso (et la caisse) glissent depuis la case d'où ils partent.
     wGame->animerCoup(dir, avant, poussee);
+    majChampButActif(game);
 
     return true;
+}
+
+// Défait le dernier coup HUMAIN : on dépile l'état d'avant et on l'affiche tel
+// quel (saut direct, l'animation en cours est coupée). Sans effet pendant un
+// rejeu ou si l'historique est vide.
+void MainWindow::annuleCoup() {
+    if (timerRejeu.isActive() || historique.isEmpty()) return;
+
+    CoupHist prec = historique.takeLast();
+    game     = std::move(prec.etat);       // move-assign en place : &game inchangé, WGame le pointe toujours
+    passages = std::move(prec.passages);
+
+    wGame->arreteAnimation();
+    wGame->setEtatsExplores(0);
+    wGame->setPassages(passages);
+    majChampButActif(game);
+    wGame->update();
+    centrerSurJoueur();
+
+    qDebug().noquote() << "[undo] retour arriere";
 }
 
 // Contrôles verrouillés pendant qu'un solveur tourne ou qu'une solution se
@@ -234,6 +281,9 @@ void MainWindow::onIALance() {
     resetEtatMax();
 
     const auto type = static_cast<Solveur::EType>(cbSolveur->currentData().toInt());
+    // L'état sur lequel le solveur part : c'est l'origine de tout chemin qu'il
+    // renverra. À figer ici, car 'game' bouge si on navigue pendant le run.
+    departSolveur = game;
     solveur = Solveur::creer(type, game, this);
     connect(solveur, &Solveur::solutionTrouvee, this, &MainWindow::onSolutionTrouvee);
     connect(solveur, &Solveur::aucuneSolution, this, &MainWindow::onAucuneSolution);
@@ -252,10 +302,13 @@ void MainWindow::onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsE
     majSpinner();
     majBoutonResoudre();   // plus rien à arrêter, y compris derrière la boîte de dialogue
 
-    // 'game' n'a pas encore bougé (le solveur travaillait sur sa propre copie) :
-    // c'est le point de départ à conserver pour pouvoir revisionner plus tard.
-    derniereSolutionDepart = game;
-    derniereSolutionCoups = chemin;
+    // Le point de départ du chemin est celui sur lequel le solveur a été LANCÉ, pas
+    // 'game' : depuis que la navigation pas à pas existe, 'game' a pu être déplacé
+    // pendant le run (on peut visionner le meilleur chemin sans attendre la fin).
+    // Prendre 'game' ici rejouerait la solution depuis un état qui n'est pas le sien.
+    chargeCheminVisionne(departSolveur, chemin, true);
+    game = departSolveur;
+    wGame->setGame(&game);
     derniereSolutionEtats = etatsExplores;
     pbRevoir->setEnabled(true);
 
@@ -307,6 +360,7 @@ void MainWindow::onRevoir() {
     if (timerRejeu.isActive() || derniereSolutionCoups.isEmpty()) return;
 
     game = derniereSolutionDepart;
+    historique.clear();   // on repart du départ de la solution : l'undo humain d'avant n'a plus de sens
     coupsRestants = derniereSolutionCoups;
 
     // On repart du départ : le compteur aussi (1 sous chaque caisse), sinon deux
@@ -316,12 +370,15 @@ void MainWindow::onRevoir() {
     wGame->setGame(&game);
     wGame->setEtatsExplores(derniereSolutionEtats);
     wGame->setPassages(passages);
+    majChampButActif(game);
 
     setControlesActifs(false);
     pbRevoir->setEnabled(false);
     centrerSurJoueur();
 
+    posPas = 0;
     timerRejeu.start();
+    majNavigationPas();   // grise la navigation manuelle pendant le rejeu auto
 }
 
 void MainWindow::rejouerCoup() {
@@ -329,6 +386,10 @@ void MainWindow::rejouerCoup() {
         timerRejeu.stop();
         setControlesActifs(true);
         pbRevoir->setEnabled(!derniereSolutionCoups.isEmpty());
+        // Le rejeu automatique laisse le plateau à la FIN du chemin : la navigation
+        // pas à pas doit repartir de là, pas d'une position périmée.
+        posPas = derniereSolutionCoups.size();
+        majNavigationPas();
         return;
     }
 
@@ -336,6 +397,125 @@ void MainWindow::rejouerCoup() {
     joue(dir);
     wGame->update();
 }
+
+// Installe un chemin à visionner : soit une solution, soit — et c'est le cas qui
+// motive tout ceci — le meilleur chemin d'un run qui n'aboutit PAS. Les deux se
+// rejouent exactement pareil ; seul le libellé diffère.
+void MainWindow::chargeCheminVisionne(const Game& depart,
+                                      const QList<Game::EDirection>& coups,
+                                      bool estSolution) {
+    derniereSolutionDepart = depart;
+    derniereSolutionCoups  = coups;
+    cheminEstSolution      = estSolution;
+
+    // Repérage des poussées : on REJOUE le chemin sur une copie et on note les
+    // coups où le compteur de caisses déplacées bouge. Le relire depuis l'état
+    // courant serait faux — une case libre au coup 12 ne l'est plus au coup 200.
+    indicesPoussees.clear();
+    Game g(depart);
+    int caisses = g.getNbDepCaisse();
+    for (int i = 0; i < coups.size(); i++) {
+        if (!g.deplace(coups[i])) break;   // chemin incohérent : on s'arrête là
+        if (g.getNbDepCaisse() > caisses) { indicesPoussees.append(i); caisses = g.getNbDepCaisse(); }
+    }
+
+    // Le plateau affiché est celui du DÉPART (le solveur a travaillé sur sa propre
+    // copie, 'game' n'a pas bougé) : la position doit dire 0, pas la fin, sinon le
+    // libellé annonce un état que la grille ne montre pas.
+    posPas = 0;
+    majNavigationPas();
+}
+
+// Rejoue les n premiers coups depuis le départ du chemin. Jamais d'undo : on
+// reconstruit, donc l'état affiché ne peut pas dériver de l'état réel.
+void MainWindow::allerAuPas(int n) {
+    if (derniereSolutionCoups.isEmpty()) return;
+    n = qBound(0, n, (int)derniereSolutionCoups.size());
+
+    game = derniereSolutionDepart;
+    historique.clear();          // l'undo humain n'a plus de sens dans un rejeu
+    initPassages();
+
+    // timerRejeu est à l'arrêt ici, donc joue() croirait à des coups HUMAINS et
+    // empilerait tout l'historique. On joue directement, sans passer par lui —
+    // les passages sont recalculés juste après, de toute façon.
+    int caisses = game.getNbDepCaisse();
+    int joues = 0;
+    for (int i = 0; i < n; i++) {
+        const QPoint avant = game.getPlayerPoint();
+        // Un coup REFUSÉ ne peut venir que de move() : état gagné, ou état déclaré
+        // perdu par checkDefaite. On s'arrête, et posPas doit dire où on s'est
+        // arrêté RÉELLEMENT — sinon le libellé annonce une position que la grille
+        // ne montre pas, et l'outil ment sur ce qu'il affiche.
+        if (!game.deplace(derniereSolutionCoups[i])) break;
+        joues++;
+        if (game.getNbDepCaisse() > caisses) {
+            const QPoint delta  = game.getPlayerPoint() - avant;
+            const QPoint caisse = game.getPlayerPoint() + delta;
+            const int idx = caisse.x() + caisse.y() * game.getLargeur();
+            if (idx >= 0 && idx < passages.size()) passages[idx]++;
+            caisses = game.getNbDepCaisse();
+        }
+    }
+    posPas = joues;
+
+    wGame->setGame(&game);
+    wGame->setPassages(passages);
+    majChampButActif(game);
+    wGame->update();
+    majNavigationPas();
+}
+
+void MainWindow::majNavigationPas() {
+    const int total = derniereSolutionCoups.size();
+    const bool actif = total > 0 && !timerRejeu.isActive();
+
+    pbPasPrec->setEnabled(actif && posPas > 0);
+    pbPasSuiv->setEnabled(actif && posPas < total);
+    slPas->setEnabled(actif);
+
+    // setValue rappellerait onPasSlider, qui rejouerait le chemin : on coupe le
+    // signal le temps de recaler le curseur.
+    slPas->blockSignals(true);
+    slPas->setRange(0, total);
+    slPas->setValue(posPas);
+    slPas->blockSignals(false);
+
+    if (!total) { lbPas->setText("—"); return; }
+
+    // Combien de poussées ont déjà été jouées à cette position.
+    int poussees = 0;
+    while (poussees < indicesPoussees.size() && indicesPoussees[poussees] < posPas) poussees++;
+
+    lbPas->setText(QString("%1 : coup %2/%3 — poussée %4/%5")
+                       .arg(cheminEstSolution ? "solution" : "meilleur état")
+                       .arg(posPas).arg(total)
+                       .arg(poussees).arg(indicesPoussees.size()));
+}
+
+void MainWindow::onPasSuiv() {
+    // Maj = sauter à la poussée suivante : entre deux poussées, le joueur ne fait
+    // que marcher, et le solveur ne raisonne qu'en poussées.
+    if (QApplication::keyboardModifiers() & Qt::ShiftModifier) {
+        for (int i : indicesPoussees)
+            if (i >= posPas) { allerAuPas(i + 1); return; }
+        allerAuPas(derniereSolutionCoups.size());
+        return;
+    }
+    allerAuPas(posPas + 1);
+}
+
+void MainWindow::onPasPrec() {
+    if (QApplication::keyboardModifiers() & Qt::ShiftModifier) {
+        for (int k = indicesPoussees.size() - 1; k >= 0; k--)
+            if (indicesPoussees[k] + 1 < posPas) { allerAuPas(indicesPoussees[k] + 1); return; }
+        allerAuPas(0);
+        return;
+    }
+    allerAuPas(posPas - 1);
+}
+
+void MainWindow::onPasSlider(int valeur) { allerAuPas(valeur); }
 
 // Export texte de la carte des passages, à côté de la grille du niveau, pour
 // pouvoir la lire et l'annoter hors de l'app.
@@ -411,6 +591,9 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
         }
 
         QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+
+        if (keyEvent->key() == Qt::Key_Backspace) { annuleCoup(); return true; }
+
         bool moved = false;
 
         switch (keyEvent->key()) {
@@ -470,23 +653,68 @@ void MainWindow::onShowPassagesCaisse() {
     pbExport->setEnabled(cbNotePassages->isChecked());
 }
 
-void MainWindow::onNouveauMax(Game etatMax, int nbRangees) {
+void MainWindow::onShowChampButActif() {
+    // Le champ n'est pas tenu à jour en continu (contrairement à 'passages',
+    // rafraîchi à chaque coup) : le recalculer ICI rattrape le cas où il a
+    // périmé pendant que la case était décochée.
+    majChampButActif(cbEtatMax->isChecked() ? gameMax : game);
+    wGame->showChampButActif(cbDistanceButActif->isChecked());
+}
+
+void MainWindow::onCaseCliquee(int idx) {
+    const Game& g = cbEtatMax->isChecked() ? gameMax : game;
+    if (g.getCase(idx) != Level::tcCaisse && g.getCase(idx) != Level::tcGoalCaisse) return;
+
+    const QVector<int> chemin = g.cheminMacro(idx);
+    if (chemin.isEmpty()) return;   // aucun but actif (état gagné) : rien à montrer
+
+    // setChecked() déclenche onShowChampButActif (champ PAR DÉFAUT) si la case
+    // n'était pas déjà cochée : le pousser AVANT de poser 'chemin', pour que ce
+    // soit bien lui qui reste affiché ensuite, pas le champ par défaut qui
+    // vient de l'écraser.
+    if (!cbDistanceButActif->isChecked())
+        cbDistanceButActif->setChecked(true);
+
+    const int b = g.butActif();
+    wGame->setChampButActif(chemin, b >= 0 ? g.getCaseBut(b) : -1);
+    wGame->showChampButActif(true);
+
+    // Toutes les branches de l'arbre de fork, pas juste celle qui gagne —
+    // matérialise « les autres chemins qui marchent aussi », en aplat bleu.
+    wGame->setArbreMacro(g.arbreMacro(idx));
+}
+
+void MainWindow::onNouveauMax(Game etatMax, int nbRangees, QList<Game::EDirection> chemin) {
     gameMax = etatMax;
     maxRangeesVu = nbRangees;
     cbEtatMax->setEnabled(true);
     cbEtatMax->setText(QString("%1 (%2/%3)")
                            .arg(texteEtatMax).arg(nbRangees).arg(gameMax.getNbButs()));
+
+    // Le chemin du MEILLEUR état devient le chemin visionnable : sur un run qui
+    // n'aboutira pas, c'est la seule façon de voir comment le solveur en est
+    // arrivé là. Écrasé à chaque nouveau record — c'est voulu, le dernier record
+    // est le plus intéressant. 'departSolveur' et non 'game' : l'utilisateur peut
+    // avoir navigué en pas à pas pendant le run, ce qui a déplacé 'game'.
+    if (!chemin.isEmpty()) {
+        chargeCheminVisionne(departSolveur, chemin, false);
+        pbRevoir->setEnabled(true);
+    }
     // Si l'utilisateur regarde déjà l'état-max, le rafraîchir en direct.
-    if (cbEtatMax->isChecked())
+    if (cbEtatMax->isChecked()) {
+        majChampButActif(gameMax);
         wGame->update();
+    }
 }
 
 void MainWindow::onToggleEtatMax(int state) {
     if (state == Qt::Checked) {
         timerRejeu.stop();               // fige l'affichage sur l'état-max
         wGame->setGame(&gameMax);
+        majChampButActif(gameMax);
     } else {
         wGame->setGame(&game);
+        majChampButActif(game);
     }
     majSpinner();
     wGame->update();

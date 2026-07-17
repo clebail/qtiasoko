@@ -31,8 +31,20 @@ private slots:
     void onExportPassages();
     void onExportXsb();
     void onShowPassagesCaisse();
-    // Reçoit du solveur l'état où un nouveau record de caisses posées est atteint.
-    void onNouveauMax(Game etatMax, int nbRangees);
+    void onShowChampButActif();
+    // Clic sur une caisse (WGame::caseCliquee) : montre son trajet de macro
+    // COMPLET vers le but actif, au lieu du champ par défaut (toutes les
+    // caisses, un pas). Sans effet sur une autre case (mur, sol, joueur...).
+    void onCaseCliquee(int idx);
+    // Reçoit du solveur l'état où un nouveau record de caisses posées est atteint,
+    // et le chemin qui y mène (rejouable pas à pas).
+    void onNouveauMax(Game etatMax, int nbRangees, QList<Game::EDirection> chemin);
+    // Navigation pas à pas dans le chemin visionné. Maj enfoncée = saut à la
+    // POUSSÉE voisine au lieu du coup voisin (le solveur raisonne en poussées : les
+    // coups de marche entre deux poussées n'apprennent rien).
+    void onPasPrec();
+    void onPasSuiv();
+    void onPasSlider(int valeur);
     // Bascule l'affichage entre le plateau courant et l'état-max mémorisé.
     void onToggleEtatMax(int state);
     // Fait suivre la vue au perso pendant qu'il se déplace.
@@ -54,10 +66,22 @@ private:
     // ici, sinon le compteur ne verrait que la moitié des poussées.
     bool joue(Game::EDirection dir);
 
+    // Défait le dernier coup joué À LA MAIN (touche Retour arrière) : restaure
+    // l'état et les compteurs de passage empilés avant ce coup.
+    void annuleCoup();
+
     // Remet le compteur à l'état de DÉPART : 1 sous chaque caisse, 0 ailleurs.
     // Une caisse OCCUPE déjà sa case initiale — partir de 0 ferait afficher 0 sous
     // une caisse qui ne bouge jamais, comme si elle n'existait pas.
     void initPassages();
+
+    // Recalcule le champ de distances vers le but actif de 'g' et le pousse à
+    // wGame. À rappeler à chaque fois que le plateau AFFICHÉ change d'état
+    // (coup joué, changement de niveau, bascule état-max) — contrairement à
+    // 'passages', ce champ n'est pas cumulatif, il ne vaut que pour l'état
+    // courant. Sans effet si la checkbox est décochée (juste un peu de calcul
+    // perdu, jamais faux) : plus simple que de dupliquer la garde partout.
+    void majChampButActif(const Game& g);
 
     // passages[case] = nombre de fois qu'une caisse a été poussée SUR cette case
     // depuis le chargement du niveau. CUMULÉ : une caisse qui repasse au même
@@ -90,6 +114,14 @@ private:
     QString texteEtatMax;
 
     Game game;
+
+    // Historique des coups joués À LA MAIN, pour l'undo (Retour arrière). On empile
+    // une COPIE de 'game' (COW : les tables statiques sont partagées, seul l'état de
+    // jeu diffère) + les compteurs de passage, AVANT chaque coup humain. Le rejeu
+    // automatique (timerRejeu) n'y touche pas ; vidé au (re)chargement du niveau.
+    struct CoupHist { Game etat; QVector<int> passages; };
+    QVector<CoupHist> historique;
+
     // État où le solveur a rangé le plus de caisses (diagnostic §10). Mémorisé
     // pour rester valide tant que WGame le pointe.
     Game gameMax;
@@ -104,6 +136,28 @@ private:
     Game derniereSolutionDepart;
     QList<Game::EDirection> derniereSolutionCoups;
     qint64 derniereSolutionEtats = 0;
+
+    // REJEU PAS À PAS. 'posPas' = nombre de coups de derniereSolutionCoups déjà
+    // joués depuis derniereSolutionDepart. On ne défait jamais un coup : aller à la
+    // position n rejoue les n premiers coups depuis le départ (allerAuPas). C'est
+    // O(n) par saut — quelques centaines de coups, instantané — et surtout ça ne
+    // peut pas diverger de l'état réel, contrairement à une pile d'undo à maintenir.
+    //
+    // Le chemin visionné n'est PAS forcément une solution : sur un run qui
+    // n'aboutit pas, c'est celui du meilleur état atteint (nouveauMaxCaisses).
+    // 'cheminEstSolution' ne sert qu'à l'affichage du libellé.
+    int posPas = 0;
+    bool cheminEstSolution = false;
+    // État sur lequel le solveur a été lancé : origine de tout chemin qu'il rend.
+    // Figé au lancement, car 'game' bouge dès qu'on navigue pendant le run.
+    Game departSolveur;
+    void allerAuPas(int n);
+    // Indices, dans derniereSolutionCoups, des coups qui POUSSENT une caisse.
+    // Recalculé avec le chemin ; sert aux sauts de poussée à poussée.
+    QVector<int> indicesPoussees;
+    void majNavigationPas();
+    void chargeCheminVisionne(const Game& depart, const QList<Game::EDirection>& coups,
+                              bool estSolution);
     std::chrono::time_point<std::chrono::high_resolution_clock> begin;
 };
 #endif // MAINWINDOW_H
