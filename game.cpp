@@ -2,6 +2,7 @@
 #include <QVarLengthArray>
 #include <climits>
 #include <utility>
+#include <vector>
 #include "game.h"
 
 static const Game::SDirection directions[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
@@ -12,6 +13,20 @@ static const Game::SDirection directions[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1
 //  - sens du tirage : l'inverse d'une poussée, pour le flood-fill à rebours
 //    depuis les buts (calculCaseMorte).
 static const Game::SDirection opposees[NB_DIRECTION] = {{0, 1}, {-1, 0}, {0, -1}, {1, 0}};
+
+// Interrupteur de mesure du test de livraison (§6.1), pour comparer les régimes SUR
+// LE MÊME BINAIRE. DÉFAUT = 0, coupé : le test s'est révélé FAUX POSITIF (mesuré
+// par mesures/fp.cpp le 2026-07-21, cf. game.h). Variantes :
+//   1 flood-fill du joueur, toutes caisses posées obstacles   — FP (2/3/5/6/7/17)
+//   2 idem, marche lue dans 'regions'                         — FP (idem)
+//   3 lecture de distanceParBut, aucun obstacle-caisse        — SÛR, mais 0 capture
+//   4 comme 2, seules les caisses GELÉES font obstacle        — FP (2 et 17)
+//   5 comme 4, mais testé par le solveur sur les états enfilés — FP (idem)
+//   6 comme 2 sans aucun obstacle-caisse (diagnostic)         — FP (17)
+static int livraisonMode() {
+    static const int mode = qgetenv("LIVRAISON").toInt();
+    return mode;
+}
 
 Game::Game() {
 }
@@ -198,6 +213,17 @@ void Game::checkDefaite() {
             };
         }
     }
+
+    // En dernier, parce que c'est le plus cher : le but orphelin (§6.1). Il voit
+    // ce qu'aucun test par caisse ne peut voir — un but que le PLATEAU ENTIER ne
+    // sait plus alimenter. Modes 1 à 4 seulement : au-delà, c'est le SOLVEUR qui
+    // l'appelle, sur les états qu'il enfile (cf. game.h — ici, il tuerait les
+    // goal macros en cours de route).
+    const int modeLiv = livraisonMode();
+    if (modeLiv >= 1 && modeLiv <= 4 && butNonLivrable()) {
+        perdu = true;
+        return;
+    }
 }
 
 bool Game::staticDeadlock(int idxCaisse, int idxJoueur, QVector<bool>& enCours) const {
@@ -261,6 +287,179 @@ bool Game::dynamicDeadlock(int idxCaisse) const {
     return nbPoussable > 0 && nbPoussable == nbVersMort;
 }
 
+// Test de LIVRAISON, dit « BUT ORPHELIN » (§6.1, mesuré le 2026-07-20 suite 3) :
+// un but VIDE vers lequel PLUS AUCUNE caisse ne peut être poussée rend l'état
+// insoluble. Mesuré par un BFS de poussées AVANT, multi-source (toutes les
+// caisses), dans une relaxation où :
+//  - une seule caisse bouge à la fois — les autres caisses NON posées sont
+//    traversées comme du sol, par la caisse comme par le joueur (relaxation
+//    franche : elle ne peut qu'agrandir l'ensemble atteignable) ;
+//  - le joueur doit réellement MARCHER jusqu'à la case d'appui, sans traverser
+//    la caisse qu'il pousse. C'est ce qui donne au test sa capture : sans cette
+//    marche il ne dit presque rien de plus que casesMortes.
+//
+// ⚠️ Un point n'est PAS une relaxation : les caisses DÉJÀ POSÉES sur un but sont
+// tenues pour des obstacles fixes, alors que le vrai jeu autorise à en ressortir
+// une pour livrer ailleurs. C'est ce qui CASSE LE CANARI (niveau 2 en macro :
+// 131 → 133 poussées, mesuré le 2026-07-21) — la sûreté « 0 faux positif » de
+// mesures/mort.cpp était de l'échantillonnage, pas une preuve, exactement comme
+// pour le test par COUPLAGE (§6.1).
+//
+// D'où les modes prouvables 3 et 4, où le seul obstacle est PERMANENT :
+//   3 — aucune caisse n'est un obstacle ; le test se lit dans les tables
+//       précalculées (distanceParBut/regions), coût O(buts × caisses) ;
+//   4 — seules les caisses GELÉES sur un but font obstacle (le gel est
+//       permanent par construction, c'est déjà l'hypothèse de caisseGelee).
+// Dans les deux cas, toute livraison réellement jouable reste jouable dans la
+// relaxation : l'impossibilité constatée est une PREUVE.
+//
+// Capture mesurée (modes non sûrs) parmi les états morts : 96 % (niv 7), 70 % (3),
+// 50 % (6), 45 % (17) ; 0 % sur 9/11, dont les morts sont d'un autre type.
+bool Game::butNonLivrable(int variante) const {
+    // Tampons réutilisés d'un appel à l'autre : ce test est dans le chemin chaud
+    // (une fois par poussée), une allocation par appel le rendrait inutilisable.
+    // 'vu'/'marqueJ' sont datés par un compteur (stamp) plutôt que remis à zéro.
+    static thread_local std::vector<qint64> vu, marqueJ;
+    static thread_local std::vector<int> joueurApres, file, fileJ;
+    static thread_local qint64 stamp = 0, stampJ = 0;
+    if ((int)vu.size() != size) {
+        vu.assign(size, 0); marqueJ.assign(size, 0); joueurApres.assign(size, -1);
+        stamp = 0; stampJ = 0;
+    }
+
+    const int mode = variante ? variante : livraisonMode();
+    const int idxJoueur = playerPoint.x() + playerPoint.y() * largeur;
+
+    // Combien de buts restent à livrer ? Aucun : rien à prouver.
+    int restants = 0;
+    for (int b = 0; b < goals.size(); b++) {
+        const Level::ETypeCase t = cases[goals.at(b)];
+        if (t == Level::tcGoal || t == Level::tcGoalPlayer) restants++;
+    }
+    if (restants == 0) return false;
+
+    // MODE 3 — le test PROUVABLE bon marché : aucune caisse ne fait obstacle, si
+    // bien que « telle caisse peut-elle atteindre tel but ? » se LIT dans
+    // distanceParBut (caisse seule, joueur-aware), déjà calculée par niveau. C'est
+    // le symétrique exact de staticDeadlock : celui-ci coupe quand une CAISSE
+    // n'atteint plus aucun but, celui-là quand un BUT n'est atteint par aucune
+    // caisse. Même argument d'admissibilité, donc même sûreté.
+    if (mode == 3) {
+        for (int b = 0; b < nbButs; b++) {
+            const Level::ETypeCase tb = cases[goals.at(b)];
+            if (tb != Level::tcGoal && tb != Level::tcGoalPlayer) continue;   // déjà rempli
+            bool livrable = false;
+            for (int cell = 0; cell < size && !livrable; cell++) {
+                if (cases[cell] != Level::tcCaisse && cases[cell] != Level::tcGoalCaisse) continue;
+                const qint16 r = regions.at(idxJoueur * size + cell);
+                if (r < 0) continue;
+                if (distanceParBut.at(((qsizetype)b * size + cell) * maxRegions + r) >= 0)
+                    livrable = true;
+            }
+            if (!livrable) return true;
+        }
+        return false;
+    }
+
+    // MODE 4 — les caisses GELÉES sur un but, elles, ne repartiront jamais : les
+    // compter comme obstacles reste une preuve. C'est le mode 2 avec ce seul
+    // durcissement légitime.
+    static thread_local std::vector<char> fige;
+    if (mode == 4) {
+        fige.assign(size, 0);
+        QVector<bool> enCours(size, false);
+        for (int c = 0; c < size; c++)
+            if (cases[c] == Level::tcGoalCaisse && caisseGelee(c, enCours)) fige[c] = 1;
+    }
+
+    // Sol franchissable dans la relaxation : les murs, toujours ; les caisses
+    // posées sur un but selon le mode (1/2 : toutes — NON PROUVÉ ; 4 : seulement
+    // les gelées).
+    auto libre = [&](int c) -> bool {
+        if (cases[c] == Level::tcMur) return false;
+        if (mode == 6) return true;          // aucune caisse n'est un obstacle (diagnostic)
+        if (mode == 4) return !fige[c];
+        return cases[c] != Level::tcGoalCaisse;
+    };
+
+    // Variante RAPIDE (LIVRAISON=2) : la marche du joueur se LIT dans 'regions'
+    // (composantes du plateau moins UNE caisse, précalculées par niveau) au lieu
+    // d'un flood-fill par case. O(1) au lieu de O(size), mais le joueur y traverse
+    // les caisses posées sur but — relaxation SUPPLÉMENTAIRE, donc encore moins de
+    // faux positifs que la version fidèle, et moins de capture. La caisse poussée,
+    // elle, reste bloquée par les caisses posées dans les deux variantes.
+    const bool rapide = (mode == 2 || mode == 4 || mode == 6);
+    auto joueurAtteintRapide = [&](int depart, int cible, int caseCaisse) -> bool {
+        if (depart == cible) return true;
+        const qint16 rd = regions.at(depart * size + caseCaisse);
+        return rd != -1 && rd == regions.at(cible * size + caseCaisse);
+    };
+
+    // Marque la zone où le joueur peut marcher, la caisse poussée étant en
+    // 'caseCaisse' (qu'il ne traverse pas) et lui-même partant de 'depart'.
+    auto floodJoueur = [&](int depart, int caseCaisse) {
+        stampJ++;
+        fileJ.clear();
+        fileJ.push_back(depart);
+        marqueJ[depart] = stampJ;
+        for (size_t h = 0; h < fileJ.size(); h++) {
+            const int c = fileJ[h], cx = c % largeur, cy = c / largeur;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int nx = cx + directions[d].dx, ny = cy + directions[d].dy;
+                if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+                const int n = nx + ny * largeur;
+                if (marqueJ[n] == stampJ || n == caseCaisse || !libre(n)) continue;
+                marqueJ[n] = stampJ;
+                fileJ.push_back(n);
+            }
+        }
+    };
+
+    stamp++;
+    file.clear();
+    for (int c = 0; c < size; c++) {
+        if (cases[c] == Level::tcCaisse || cases[c] == Level::tcGoalCaisse) {
+            vu[c] = stamp;
+            joueurApres[c] = idxJoueur;
+            file.push_back(c);
+        }
+    }
+
+    for (size_t h = 0; h < file.size(); h++) {
+        const int c = file[h], cx = c % largeur, cy = c / largeur;
+
+        // D'abord les directions plausibles, SANS faire marcher le joueur : le
+        // flood-fill est le poste coûteux, et la plupart des cases dépilées
+        // n'ouvrent sur rien de neuf.
+        int arrivee[NB_DIRECTION], appui[NB_DIRECTION], n = 0;
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int ax = cx + directions[d].dx, ay = cy + directions[d].dy;
+            const int px = cx - directions[d].dx, py = cy - directions[d].dy;
+            if (ax < 0 || ax >= largeur || ay < 0 || ay >= hauteur) continue;
+            if (px < 0 || px >= largeur || py < 0 || py >= hauteur) continue;
+            const int a = ax + ay * largeur, p = px + py * largeur;
+            if (vu[a] == stamp || !libre(a) || !libre(p)) continue;
+            arrivee[n] = a; appui[n] = p; n++;
+        }
+        if (n == 0) continue;
+
+        if (!rapide) floodJoueur(joueurApres[c], c);
+        for (int k = 0; k < n; k++) {
+            if (rapide ? !joueurAtteintRapide(joueurApres[c], appui[k], c)
+                       : marqueJ[appui[k]] != stampJ) continue;
+            const int a = arrivee[k];
+            vu[a] = stamp;
+            joueurApres[a] = c;   // la poussée faite, le joueur est là où était la caisse
+            file.push_back(a);
+            const Level::ETypeCase t = cases[a];
+            // Sortie anticipée : dès que tous les buts vides sont livrables, le
+            // test ne dira rien — inutile de finir le BFS.
+            if ((t == Level::tcGoal || t == Level::tcGoalPlayer) && --restants == 0) return false;
+        }
+    }
+
+    return true;   // il reste un but vide qu'aucune caisse ne peut atteindre
+}
 
 bool Game::move(EDirection dir) {
     if (gagne || perdu) return false;

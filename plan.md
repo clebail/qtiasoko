@@ -48,6 +48,7 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `bench <niv> [poids]` | états / poussées / mémoire ; avec `INSTRUM_F`, histogramme des `f` au dépilement |
 | `mou <niv> [n]` | les états dépilés sont-ils du gaspillage ? (sur chemin / hors chemin / **deadlock**) |
 | `mort <niv> …` | **(neuf, 2026-07-17)** taux de deadlocks non détectés sur un niveau qu'on NE sait PAS résoudre |
+| `fp <niv> [variante]` | **(neuf, 2026-07-21) LE JUGE D'UN ÉLAGAGE** : rejoue une solution GAGNANTE et interroge le test sur chacun de ses états — tous solubles par construction, donc **toute détection est un faux positif prouvé**. À passer AVANT de câbler quoi que ce soit dans `checkDefaite` |
 | `diverge`, `paires`, `trace`, `passages`, `congestion` | mou de `h`, interactions de paires, solution pas à pas, cartes de trajets |
 
 **Règles de mesure, non négociables :**
@@ -217,11 +218,14 @@ Séquence convenue, du plus sûr au plus risqué :
 1. **Goal-ordering multi-salle** (§6.2) — sûr, LOUD (un mauvais ordre fait échouer la
    macro visiblement, jamais une fausse solution : `ordreButs` guide, il n'est pas une
    borne). Coût nul sur les niveaux à une seule salle (ordre identique).
-2. **Mesurer le gain deadlock AVANT de coder** (§6.1) — sur le **niveau 9** (il finit, 56 s) :
-   simuler un cut parfait des morts (via le sous-solve de `mort`) et voir la chute d'états
-   **à poussées constantes**. Chiffre le plafond du chantier avant d'écrire le détecteur.
-3. **Guidage connectivité** (§6.1) — sûr, aide le 8 (le +37 de zone) et le démêlage. Un seul
-   calcul (zone joueur, déjà payé) qui sert aussi au corral. Pur tie-break → optimalité intacte.
+2. **❌ RÉFUTÉ le 2026-07-21 — le test par-but N'EST PAS SÛR** (§6.1). Câblé, mesuré, retiré :
+   le juge neuf `mesures/fp` (rejeu d'une solution GAGNANTE) lui trouve **106 faux positifs sur
+   le 17**. Le « 0 FP » de la veille était un artefact d'échantillonnage. Le couplage restait,
+   lui, inutilisable (52 % de FP). **Aucun élagage deadlock sûr n'est disponible à ce jour.**
+3. **🎯 PROCHAIN (plan de bataille 2026-07-21) — GUIDAGE PAR PORTES** (§6.1, méthode 4-tiers de
+   l'utilisateur). Ordonner les poussées par Δzone joueur : ouvre-porte d'abord … ne-fait-que-
+   fermer en dernier. Aide le 8 et le démêlage du 11. Un seul calcul (zone joueur, déjà payé),
+   sert aussi au corral. Pur tie-break → optimalité et canari intacts.
 4. **Corral rigoureux comme élagage** (§6.1) — le vrai levier de la masse `f<C*`, mais risqué :
    **cadrer le contrat AVANT de coder** (scellé + non-rouvrable + sous-doté). Gaté par le
    guidage : ne lancer le flood-fill corral que sur une poussée qui **ferme une porte** (Δ zone < 0).
@@ -234,6 +238,136 @@ En réserve, pas à trancher : mémoire (mur disparu), sous-optimal (pire sur gr
 > ⚠️ Terrain du faux positif : le projet s'y est fait avoir 3 fois (gel naïf, `h` qui
 > soustrait, caisses=murs). **Juge unique : le canari + solubilité des 32.** Discuter avant
 > de coder.
+
+#### ✅ Session du 2026-07-20 (suite 3) — mesure du gain deadlock (outil `mort`, branche `gain-deadlock`)
+
+**Le taux de deadlock, mesuré (`mort <niv> livraison`, oracle = sous-solve optimal borné) :**
+- **Niv 9 : 100 % des états profonds dépilés sont MORTS** (60/60, 120/120 selon l'échantillon),
+  à 10–11/14 caisses posées — la macro s'épuise dans un endgame déjà condamné.
+- **Le corral ne couvre que ~5 %** des morts du 9 (contre 93–100 % sur 1/2/11 au §5). **Donc le
+  corral (item B) n'est PAS le bon outil pour le 9.** Ses morts sont des poches de livraison /
+  gel, sans région scellée.
+
+**Test « LIVRAISON » prototypé** (`livraisonMorte()` dans `mesures/mort.cpp`) : un but VIDE dont
+aucune caisse ne peut être poussée jusqu'à lui (BFS avant de poussées, joueur qui marche jusqu'à
+l'appui ; caisses-sur-but = obstacles) rend l'état insoluble. **Relaxation optimiste ⇒ preuve,
+donc censé être sans faux positif.** Mesuré (capture parmi les morts / faux positifs parmi les
+solubles) :
+
+| niveau | capture | faux positifs |
+|---|---|---|
+| 7 | **96 %** | 0 |
+| 3 | 70 % | 0 |
+| 6 | 50 % | 0 |
+| 17 | 45 % | 0 |
+| **9 / 11** | **0 %** | 0 |
+| 0/1/2/5 | (peu de morts) | 0 (dont 109 solubles confirmés sur le 1) |
+
+- ~~**ZÉRO faux positif partout** → le test est **sûr pour `checkDefaite`**.~~ ❌ **FAUX, corrigé le
+  2026-07-21** (session ci-dessous) : mesuré par rejeu d'une solution gagnante (`mesures/fp`), le
+  même test fait **106 faux positifs sur le 17**. L'oracle par sous-solve borné de `mort` mentait —
+  **un échantillonnage ne prouve pas l'absence de faux positif ; un chemin gagnant, si.**
+- **MAIS 0 % sur 9 et 11** : leurs morts ne sont **pas** de type « but orphelin » (un but
+  qu'aucune caisse n'atteint). Ce sont des deadlocks de **CAPACITÉ** (les caisses atteignent
+  chacune un but, mais pas assez de buts **distincts** — condition de Hall) ou de **gel**.
+**Test « COUPLAGE » (Hall) essayé pour le 9/11** (`livraisonMorteCouplage()`) : appariement biparti
+caisses restantes → buts vides livrables (atteignabilité mono-caisse depuis l'état) ; pas de
+couplage saturant ⇒ mort. **Attrape le 9 à 100 %** (ses morts SONT de la capacité) — MAIS :
+
+| | 9 | 17 / 2 | 3 / 6 / 7 | **1** | 11 |
+|---|---|---|---|---|---|
+| capture | **100 %** | 100 % | 86–91 % | 25 % | **0 %** |
+| **faux positifs** | — | 0 | 0 | **52 % (76/147 !)** | — |
+
+- **❌ LE COUPLAGE EST INUTILISABLE : 52 % de faux positifs sur le 1.** L'argument de solidité
+  est FAUX — la livraison réelle est **séquentielle** (une caisse atteint son but *après* qu'une
+  autre s'est écartée). L'atteignabilité depuis l'état **figé** rate ces arêtes → « pas de
+  couplage » sur un état pourtant soluble. **Le couplage parfait sur l'atteignabilité instantanée
+  n'est PAS une relaxation valide.** À ne pas ressortir comme élagage. (Comme borne `h`
+  admissible, en revanche, le min-cost matching reste valide — c'est déjà `getHeuristique`.)
+- **Le 11 reste à 0 %** même en couplage : ni orphelin ni capacité → **interactions simultanées
+  caisse-caisse** (démêlage), le mur PSPACE du §4. Ininélageable sainement à bas coût.
+
+**CONCLUSION deadlock — RÉVISÉE le 2026-07-21 :**
+1. ~~Test par-but (orphelin) = le seul gain deadlock SÛR~~ → **RÉFUTÉ**, cf. session du 2026-07-21
+   ci-dessous. Le test invente des morts (BFS non joueur-aware + obstacles-caisses injustifiés).
+2. **Le 9 (capacité) et le 11 (interaction) ne se prunent PAS sainement** à ce coût. Pour eux, le
+   levier n'est pas l'élagage mais le **GUIDAGE** (§6.4a : dé-prioriser, jamais couper).
+3. **Nouveau** : plus aucun élagage deadlock n'est disponible. Le prochain levier reste le
+   **guidage par portes** (ci-dessous), qui ne coupe rien et ne peut donc pas mentir.
+
+#### ❌ Session du 2026-07-21 — le test par-but CÂBLÉ, MESURÉ, RÉFUTÉ (et le §6.1 de la veille avec)
+
+**Ce qui a été fait.** `Game::butNonLivrable()` (game.cpp) : le test « but orphelin » du prototype,
+en version chemin chaud (tampons réutilisés, flood-fill du joueur évité quand aucune direction
+n'ouvre sur du neuf). Câblé dans `checkDefaite`, puis dans le solveur. Interrupteur `LIVRAISON`
+(0 = coupé, **défaut**) pour comparer les régimes **sur le même binaire**.
+
+**Le juge qui a tout tranché — `mesures/fp.cpp` (NEUF, à garder).** On résout le niveau SANS le
+test, puis on rejoue la solution coup par coup en interrogeant le test sur **chaque état
+traversé**. Ces états sont solubles **par construction** — une solution y passe. Donc :
+
+> **toute détection sur un chemin gagnant est un faux positif PROUVÉ.**
+
+C'est ce que l'échantillonnage de `mort` ne pouvait pas voir : lui classait des états quelconques
+par sous-solve borné, avec un oracle faillible ; ici la solubilité est certaine.
+
+| variante du test | 1 | 2 | 3 | 5 | 6 | 7 | **17** |
+|---|---|---|---|---|---|---|---|
+| caisses posées = obstacles (le prototype) | 0 | 1 | 5 | 6 | 1 | 13 | **106** |
+| idem, restreint aux caisses **gelées** | 0 | **1** | 0 | 0 | 0 | 0 | **106** |
+| aucun obstacle-caisse (diagnostic) | 0 | 0 | 0 | 0 | 0 | 0 | **86** |
+| lecture de `distanceParBut` (§ ci-dessous) | 0 | 0 | 0 | 0 | 0 | 0 | **0** |
+
+**DEUX défauts indépendants, tous deux mesurés :**
+1. **Le BFS de livraison n'est PAS joueur-aware.** Il ne retient qu'**UNE** position de joueur par
+   case atteinte (`joueurApres[a] = c`), alors que la même case atteinte « par l'autre côté »
+   ouvre d'autres poussées. D'où 86 FP sur le 17 **même sans aucun obstacle-caisse**. C'est
+   exactement l'erreur que `distanceParBut` corrige depuis le §2.2 (indexation par RÉGION) — et
+   c'est la faille du prototype `mesures/mort.cpp`, donc **des chiffres « 0 FP » de la veille**.
+2. **Tenir les caisses posées pour des obstacles fixes est faux**, même restreint aux caisses
+   **GELÉES** (1 FP sur le 2). L'argument « le gel est permanent, donc c'est une preuve »
+   paraissait solide ; la mesure dit non. **Troisième fois que ce terrain piège le projet** (§6.1
+   avertissement) : gel naïf, `h` qui soustrait, caisses=murs — et maintenant gelées=murs.
+
+**La seule version SÛRE ne rapporte rien.** Sans obstacle-caisse, « telle caisse atteint-elle tel
+but ? » se **lit** dans `distanceParBut` (joueur-aware, déjà calculée) : O(buts × caisses), zéro
+FP — c'est le symétrique exact de `staticDeadlock` (celui-ci coupe quand une CAISSE n'atteint plus
+aucun but, celui-là quand un BUT n'est atteint par aucune caisse). Mesuré : **strictement neutre**
+sur 0-7 (mêmes états à l'unité). Logique — `staticDeadlock` couvre déjà cette information.
+
+**Ce que le test coupait quand il trichait** (ordre de grandeur du gain à espérer d'une version
+correcte) : A\* optimal, niveau 17 **1 082 674 → 717 214** états (−34 %) à 213 poussées ; niveau 6
+−13 % ; en macro, niveau 7 **210 849 → 133 056** (−37 %). **Il y a donc bien de la matière** — mais
+elle est dans l'obstacle-caisse, précisément la part qu'on ne sait pas justifier.
+
+**Piège d'architecture, à retenir** : `checkDefaite` est le **mauvais** point d'appel pour un test
+cher ou faillible. Marquer `perdu` sur un état **intermédiaire de goal macro** fait avorter la
+macro entière (`move()` refuse de jouer sur un état perdu) et le solveur retombe sur les poussées
+simples : niveaux **3 et 5 perdus** (résolus → timeout 70 s) alors que le test seul ne coûtait que
++10 %. Le bon point est le moment d'**enfiler** un enfant (fait, `solveurastar.cpp`).
+
+**État du code** : `butNonLivrable()` reste dans `game.cpp`, **coupé par défaut** et documenté
+(game.h) ; le solveur ne l'appelle que sous `LIVRAISON=5`. À supprimer si on ne reprend pas la
+piste — ou à reprendre par le BFS **(case, région joueur)**, seul moyen de garder l'obstacle-caisse
+sans inventer de morts. Le canari est intact avec le défaut (4/97/131/134/110/213, états inchangés).
+
+#### 🎯 PLAN DE BATAILLE (2026-07-21) — le GUIDAGE PAR PORTES pour le démêlage
+
+Méthode humaine de démêlage (redonnée par l'utilisateur, à coder comme **tie-break de poussée**,
+pas comme borne — donc **zéro faux positif** par construction). Ordre de préférence des poussées :
+1. celles qui **ouvrent une porte** (Δ zone joueur > 0 : connectent des régions) ;
+2. celles qui **font de la place sans ouvrir ni fermer** de porte (Δ zone ≈ 0) ;
+3. celles qui **ouvrent ET ferment** une porte ;
+4. celles qui **ne font que fermer** une porte (Δ zone < 0 : scellent un corral) — en dernier.
+
+- Une « porte » = de la **connectivité** : `getZoneJoueur()` (déjà payé) donne la zone atteignable ;
+  le Δzone d'une poussée classe directement dans les 4 tiers. C'est le §6.1 item A / item 3 de la
+  feuille de route, rendu concret. Pur guidage → optimalité et canari intacts (l'astar optimal ne
+  lit pas le tie-break ; il ne fait que réordonner l'exploration).
+- Juge : le 11 (démêlage, 12 M états, file qui stagne) et le 8 (le +37 de zone). Mesurer la chute
+  d'états à poussées constantes.
+- Lien avec le goal-ordering : même nature (tie-break macro sûr), même juge (canari intact).
 
 - [ ] **B — Corral rigoureux comme ÉLAGAGE** (le vrai levier des gros niveaux, régime `f<C*`).
   Prune seulement si la région est **scellée** ET **non-rouvrable** (aucune caisse-frontière

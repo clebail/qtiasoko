@@ -23,6 +23,7 @@ mkdir -p build/bench && cd build/bench && qmake ../../bench.pro && make
 |---|---|---|
 | `bench <niv> [poids]` | Combien d'états / de poussées, et combien de mémoire ? | Le **canari** : `4 / 97 / 131 / 134 / 213` (niveaux 0/1/2/3/17). Avec `INSTRUM_F`, l'**histogramme des `f` au dépilement**. |
 | `mou <niv> [n]` | Les états qu'A\* développe sont-ils du gaspillage ? | Échantillonne les états **réellement dépilés** (`DUMP_DEV`) et résout depuis chacun : sur un chemin optimal / hors chemin / **deadlock non détecté**. |
+| `fp <niv> [variante] [astar\|macro]` | **Un élagage invente-t-il des morts ?** | `LIVRAISON=0 ./fp 17 4` : résout SANS le test, rejoue la solution gagnante et interroge le test sur chaque état traversé. Ces états sont solubles **par construction** → **toute détection est un faux positif prouvé**. C'est le juge qui a réfuté le test « but orphelin » (§6.1, 2026-07-21) là où l'échantillonnage de `mort` le déclarait sûr. |
 | `diverge <niv>` | `h` désigne-t-elle le bon coup ? | Rang du bon enfant parmi les enfants classés par `h`, et mou de `h` le long du chemin optimal. |
 | `paires <niv>` | Le mou vient-il d'une interaction entre 2 caisses ? | Matrice des suppléments d'interaction, par paire de caisses. |
 | `trace <niv> [pas]` | À quoi ressemble la solution ? | La grille poussée par poussée, avec les poussées **non productives** (les manœuvres). |

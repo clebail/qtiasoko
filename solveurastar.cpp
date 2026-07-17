@@ -35,6 +35,13 @@ std::vector<std::pair<QByteArray,int>>& etatsDeveloppes() {
     static std::vector<std::pair<QByteArray,int>> v;
     return v;
 }
+// Plafond de dépilements, pour instrumenter un niveau qu'on NE SAIT PAS résoudre
+// (le 11 : `mou` ne peut rien y mesurer, il attend une solution qui n'arrive pas).
+// 0 = pas de plafond → comportement de `mou` strictement inchangé.
+int& limiteDepilements() {
+    static int n = 0;
+    return n;
+}
 #endif
 
 #ifdef INSTRUM_F
@@ -67,6 +74,10 @@ static void imprimeHistoF(const std::vector<qint64>& histoF, int cStar, qint64 t
 }
 #endif
 
+
+// LIVRAISON=5 : le test de livraison s'applique aux états ENFILÉS (cf. game.h).
+// Interrupteur de mesure, à retirer avec le verdict.
+static const bool livraisonSurEnfants = (qgetenv("LIVRAISON").toInt() == 5);
 
 void SolveurAStar::run() {
     std::vector<SElement> file;
@@ -204,6 +215,12 @@ void SolveurAStar::run() {
         // qu'une fraction. Échantillonner {f <= C*} au lieu de ceci fausse toute
         // mesure portant sur « ce que le solveur explore vraiment ».
         etatsDeveloppes().push_back({etat.getEtat(), cur.g});
+        if (limiteDepilements() && (int)etatsDeveloppes().size() >= limiteDepilements()) {
+            qDebug() << "SolveurAStar: PLAFOND d'instrumentation atteint apres"
+                     << compteur << "depilements — arret volontaire, ce n'est PAS un echec.";
+            emit aucuneSolution();
+            return;
+        }
 #endif
 
         if(etat.isGagne()) {
@@ -225,6 +242,12 @@ void SolveurAStar::run() {
         // poussée, pour que reconstruire() rejoue une macro à l'identique) et le
         // push_heap. Partagé entre poussées simples et goal macro.
         auto enfiler = [&](Game& e, int gE, const QVector<QPair<int,int>>& chaine) {
+            // Deadlock de LIVRAISON (§6.1) : un but vide qu'aucune caisse ne peut
+            // plus atteindre. Testé ICI et pas dans checkDefaite — sur un état
+            // intermédiaire de goal macro il ferait avorter la macro (mesuré :
+            // niveaux 3 et 5 perdus). Ici, la macro va au bout et c'est son
+            // RÉSULTAT qu'on juge.
+            if (livraisonSurEnfants && e.butNonLivrable(4)) return;
             e.getEtat(arene.reserve());
             Cle cle{arene.dernier()};
             if (interditRedeveloppement && ferme.count(cle)) { arene.annule(); return; }

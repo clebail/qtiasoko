@@ -147,6 +147,28 @@ public:
     // Renvoie le nombre de caisses posées sur un but (compté gratuitement pendant
     // le placement), pour la jauge de progression du diagnostic (§10).
     int appliqueEtat(const quint16* cle);
+    // Deadlock de LIVRAISON (§6.1) : vrai s'il reste un but VIDE qu'aucune caisse
+    // ne peut plus atteindre. 'variante' choisit la relaxation (cf. game.cpp) ;
+    // 0 = celle de la variable d'environnement LIVRAISON (défaut : test COUPÉ).
+    //
+    // ⚠️ DÉSACTIVÉ, ET POUR CAUSE (mesuré le 2026-07-21 avec mesures/fp.cpp, qui
+    // rejoue une solution GAGNANTE et interroge le test sur chacun de ses états —
+    // tous solubles par construction, donc toute détection est un faux positif
+    // PROUVÉ). Deux défauts indépendants :
+    //   1. le BFS de livraison n'est PAS joueur-aware — il ne retient qu'UNE
+    //      position de joueur par case atteinte, alors qu'une même case atteinte
+    //      « par l'autre côté » ouvre d'autres poussées. C'est la faille du
+    //      prototype mesures/mort.cpp, et elle rend 86 faux positifs sur le 17 ;
+    //   2. tenir les caisses posées pour des obstacles fixes est faux, même
+    //      restreint aux caisses GELÉES (1 faux positif sur le 2).
+    // Seule la variante 3, qui lit distanceParBut (joueur-aware, elle), est sûre —
+    // et elle ne capture rien de plus que staticDeadlock.
+    //
+    // PUBLIC parce que le point d'appel naturel, checkDefaite, est le mauvais :
+    // marquer 'perdu' sur un état INTERMÉDIAIRE de goal macro fait avorter la
+    // macro entière (move() refuse de jouer sur un état perdu) — niveaux 3 et 5
+    // perdus. Le solveur peut donc l'appeler sur les états qu'il ENFILE.
+    bool butNonLivrable(int variante = 0) const;
 private:
     int largeur = 0;
     int hauteur = 0;

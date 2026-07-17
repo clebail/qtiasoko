@@ -34,6 +34,18 @@
 
 std::vector<std::pair<QByteArray,int>>& etatsDeveloppes();
 
+// ⚠️ getEtat()->QByteArray écrit la clé en BIG-ENDIAN (game.cpp : cle[i]>>8 puis
+// &0xFF), alors que appliqueEtat(const quint16*) lit du NATIF. Passer les octets
+// bruts à appliqueEtat byte-swappe tous les index -> plateau VIDE (0 caisse), que
+// checkVictoire() prend pour un état GAGNÉ. Bug historique de cet outil : il rendait
+// « 100 % sur chemin, 0 deadlock » sur du vide. On décode le big-endian à la main.
+static std::vector<quint16> decodeCle(const QByteArray& b) {
+    std::vector<quint16> v(b.size() / 2);
+    for (int i = 0; i < (int)v.size(); i++)
+        v[i] = ((quint16)(unsigned char)b[2 * i] << 8) | (unsigned char)b[2 * i + 1];
+    return v;
+}
+
 // Résout DEPUIS 'etat' en A* optimal, en synchrone. Rend le nombre de poussées
 // optimal (h*), ou -1 s'il n'y a pas de solution (= deadlock).
 static int resoudreDepuis(const Game& etat) {
@@ -95,7 +107,7 @@ int main(int argc, char** argv) {
         const QByteArray& cle = dev[idx[k]].first;
         const int g = dev[idx[k]].second;
 
-        travail.appliqueEtat((const quint16*)cle.constData());
+        travail.appliqueEtat(decodeCle(cle).data());
         if (travail.isGagne()) { surChemin++; continue; }   // l'etat but lui-meme
 
         const int h = travail.getHeuristique();
