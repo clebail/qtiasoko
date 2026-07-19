@@ -213,6 +213,14 @@ private:
     bool bloqueeSurAxe(int idxCaisse, EDirection dirA, EDirection dirB, QVector<bool>& enCours) const;
     bool estCaisse(int idx) const;
     void calculDistancePoussee();
+
+// Distance de livraison d'une caisse (poussées) depuis les caisses de départ, les
+// buts marqués dans `bloque` faisant obstacle. -1 = inatteignable.
+QVector<int> distanceLivraison(const QVector<bool>& bloque) const;
+
+// Ordre de remplissage déduit de la PRÉCÉDENCE DE LIVRAISON (§6.2, 2026-07-20) :
+// glouton avant + garde anti-échouage. Rend une permutation des indices de buts.
+QVector<int> ordreParPrecedence() const;
 };
 
 Q_DECLARE_METATYPE(Game::EDirection)

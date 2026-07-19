@@ -691,6 +691,218 @@ bool Game::estCaisse(int idx) const {
     return cases[idx] == Level::tcCaisse || cases[idx] == Level::tcGoalCaisse;
 }
 
+// Distance de LIVRAISON : nombre minimal de poussées pour amener UNE caisse, depuis
+// sa case de départ, jusqu'à chaque case du plateau. `bloque` marque les buts déjà
+// rangés, qui font obstacle.
+//
+// BFS avant sur les poussées : une caisse en c peut aller en c+d si c+d est libre
+// (arrivée) ET le joueur MARCHE JUSQU'À c-d (case d'appui) — pas seulement qu'elle
+// soit libre. Corrigé le 2026-07-20 : la version précédente ne pointait qu'un point
+// libre, sans vérifier que le joueur peut physiquement s'y rendre ; elle laissait
+// passer des livraisons qui exigent de traverser une case déjà condamnée. Reste une
+// approximation à deux endroits : (a) les AUTRES caisses non livrées ne sont pas des
+// obstacles pour la marche (seule la caisse EN COURS de déplacement l'est) ; (b) le
+// joueur est supposé pouvoir rejoindre n'importe quelle caisse de départ. Les deux
+// vont dans le sens optimiste — passage encore, pas interdiction abusive.
+QVector<int> Game::distanceLivraison(const QVector<bool>& bloque) const {
+    QVector<int> dist(size, -1);
+    QVector<int> joueurApres(size, -1);   // case où se tient le joueur une fois la caisse arrivée ici
+    QList<int> file;
+
+    auto libreCase = [&](int c) -> bool { return cases[c] != Level::tcMur && !bloque[c]; };
+    auto libre = [&](int x, int y) -> bool {
+        if (x < 0 || x >= largeur || y < 0 || y >= hauteur) return false;
+        return libreCase(x + y * largeur);
+    };
+
+    // Le joueur atteint-il `cible` depuis `depart` en marchant sur du sol libre,
+    // sans traverser `caseCaisse` (la caisse qu'on est en train de déplacer y est) ?
+    auto joueurAtteint = [&](int depart, int cible, int caseCaisse) -> bool {
+        if (depart == cible) return true;
+        QVector<bool> vu(size, false);
+        QList<int> f;
+        f.append(depart);
+        vu[depart] = true;
+        while (!f.isEmpty()) {
+            const int c = f.takeFirst();
+            if (c == cible) return true;
+            const int cx = c % largeur, cy = c / largeur;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int nx = cx + directions[d].dx, ny = cy + directions[d].dy;
+                if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+                const int n = nx + ny * largeur;
+                if (vu[n] || n == caseCaisse || !libreCase(n)) continue;
+                vu[n] = true;
+                f.append(n);
+            }
+        }
+        return false;
+    };
+
+    const int depart = playerPoint.x() + playerPoint.y() * largeur;
+
+    // Sources : les cases où une caisse se trouve au chargement du niveau. Le joueur
+    // est supposé pouvoir rejoindre n'importe laquelle (relaxation (b) ci-dessus).
+    for (int c = 0; c < size; c++) {
+        if (bloque[c]) continue;
+        if (cases[c] == Level::tcCaisse || cases[c] == Level::tcGoalCaisse) {
+            dist[c] = 0;
+            joueurApres[c] = depart;
+            file.append(c);
+        }
+    }
+
+    while (!file.isEmpty()) {
+        const int c = file.takeFirst();
+        const int cx = c % largeur, cy = c / largeur;
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int ax = cx + directions[d].dx, ay = cy + directions[d].dy;   // arrivée
+            const int px = cx - directions[d].dx, py = cy - directions[d].dy;   // appui joueur
+            if (!libre(ax, ay) || !libre(px, py)) continue;
+            const int a = ax + ay * largeur;
+            if (dist[a] != -1) continue;
+            const int appui = px + py * largeur;
+            if (!joueurAtteint(joueurApres[c], appui, c)) continue;   // appui inatteignable à pied
+            dist[a] = dist[c] + 1;
+            joueurApres[a] = c;   // la poussée faite, le joueur est là où était la caisse
+            file.append(a);
+        }
+    }
+    return dist;
+}
+
+// Ordre de remplissage par PRÉCÉDENCE DE LIVRAISON (§6.2, session du 2026-07-20).
+//
+// Le fait mesuré : sur la salle du 11, l'ordre décide de tout (28 états contre 1,3 M
+// avec un mauvais ordre). Et la contrainte est DÉMONTRABLE, pas devinable : pour poser
+// une caisse sur un but il faut la pousser depuis une case voisine, le joueur deux
+// cases derrière. Si toutes les approches d'un but passent par un autre but, ce but-là
+// doit être rempli AVANT lui. Exemple de la salle : (5,11) n'est atteignable que depuis
+// (4,11) — au nord l'appui est un mur, à l'est un mur, au sud (5,12) est déjà posé.
+// Donc (5,11) strictement avant (4,11). Prouvé sans jouer.
+//
+// L'algorithme : glouton avant, avec GARDE ANTI-ÉCHOUAGE. À chaque pas on ne retient
+// que les buts qui (a) sont livrables maintenant, et (b) dont la pose ne rend AUCUN but
+// restant non-livrable. C'est cette garde qui met (4,11) en dernier toute seule : le
+// remplir coupe la seule descente vers les rangées 11-13, donc il échoue tout le monde.
+//
+// ⚠️ Le tie-break, lui, n'est PAS démontré — c'est la préférence qui départage les
+// ordres que la garde autorise, et c'est exactement là que la session du 2026-07-19
+// s'est trompée six fois. Celui retenu (CONTIGUITÉ DE RUN, cf. `contiguite` plus bas)
+// a été MESURÉ le 2026-07-20 : il fait 27 états sur 191 (bat l'oracle humain, 28) et
+// résout le 190, sans perdre aucun niveau réel (le seul coût est le niveau 7 — un bloc
+// plein — qui passe de 0,4 s à 7,5 s, très loin des 60 s). Juge : `bench 191 macro`.
+QVector<int> Game::ordreParPrecedence() const {
+    QVector<bool> bloque(size, false);
+    QVector<bool> pose(nbButs, false);
+    QVector<int>  ordre;
+
+    // cell -> indice de but (-1 si la case n'est pas un but), pour raisonner sur
+    // les RUNS de buts alignés (la contiguité du tie-break corridor).
+    QVector<int> butDe(size, -1);
+    for (int b = 0; b < nbButs; b++) butDe[goals[b]] = b;
+
+    auto libre = [&](int x, int y) -> bool {
+        if (x < 0 || x >= largeur || y < 0 || y >= hauteur) return false;
+        const int c = x + y * largeur;
+        return cases[c] != Level::tcMur && !bloque[c];
+    };
+
+    // "Dans un coin, ne gêne pas le perso" (mots de l'utilisateur) = degré du but
+    // dans le graphe des cases encore libres : peu de voisins libres = un coin, où
+    // se poser ne coupe aucun passage. Grand degré = un carrefour, à garder libre.
+    auto degre = [&](int b) -> int {
+        const int gx = goals[b] % largeur, gy = goals[b] / largeur;
+        int n = 0;
+        for (int d = 0; d < NB_DIRECTION; d++)
+            if (libre(gx + directions[d].dx, gy + directions[d].dy)) n++;
+        return n;
+    };
+
+    // CONTIGUITÉ DE RUN (le tie-break retenu). Diagnostic (bench 191 macro,
+    // oracle vs calculé) : l'ordre calculé ne diverge de l'ordre humain (28 états)
+    // qu'à DEUX endroits, tous deux des mélanges LOCAUX dans une file droite de
+    // buts alignés (la rangée y=13, la colonne x=1). Le principe qui recolle les
+    // deux : dans un run droit de buts, on REMPLIT EN CONTINU — on étend un segment
+    // déjà posé (ou on part d'un cul-de-sac mural), on ne saute pas une case.
+    //
+    // Pour le but b, on regarde les 4 directions. Une direction "étend un run" si le
+    // voisin OPPOSÉ (g - d) est un but ENCORE VIDE (il reste du run à remplir de ce
+    // côté) et le voisin (g + d) est soit un but DÉJÀ POSÉ (on prolonge un segment
+    // rempli), soit un mur (on démarre à un cul-de-sac). On sépare les deux : étendre
+    // un segment rempli prime sur démarrer à un mur (sinon les coins murés — (1,13) —
+    // gagnent sur la continuation d'un balayage déjà lancé — (4,13)).
+    auto contiguite = [&](int b) -> QPair<int,int> {   // {prolonge-rempli, part-du-mur}
+        const int gx = goals[b] % largeur, gy = goals[b] / largeur;
+        int prolonge = 0, mur = 0;
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int ox = gx - directions[d].dx, oy = gy - directions[d].dy;   // opposé
+            if (ox < 0 || ox >= largeur || oy < 0 || oy >= hauteur) continue;
+            const int opp = butDe[ox + oy * largeur];
+            if (opp < 0 || pose[opp]) continue;         // opposé pas un but vide -> pas un run à étendre
+            const int nx = gx + directions[d].dx, ny = gy + directions[d].dy;   // voisin
+            if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) { mur++; continue; }
+            const int n = nx + ny * largeur;
+            if (cases[n] == Level::tcMur) mur++;
+            else { const int nb = butDe[n]; if (nb >= 0 && pose[nb]) prolonge++; }
+        }
+        return {prolonge, mur};
+    };
+
+    for (int step = 0; step < nbButs; step++) {
+        const QVector<int> dist = distanceLivraison(bloque);
+
+        // (a) livrables maintenant
+        QVector<int> candidats;
+        for (int b = 0; b < nbButs; b++)
+            if (!pose[b] && dist[goals[b]] != -1) candidats.append(b);
+
+        // (b) garde anti-échouage : poser ce but laisse-t-il tous les autres livrables ?
+        QVector<int> surs;
+        for (int b : candidats) {
+            bloque[goals[b]] = true;
+            const QVector<int> apres = distanceLivraison(bloque);
+            bool ok = true;
+            for (int h = 0; h < nbButs && ok; h++)
+                if (!pose[h] && h != b && apres[goals[h]] == -1) ok = false;
+            bloque[goals[b]] = false;
+            if (ok) surs.append(b);
+        }
+        // Si la garde ne laisse rien passer, on la relâche plutôt que de rendre un ordre
+        // incomplet : `butActif()` doit toujours trouver un but, et un ordre imparfait
+        // ne fait que ralentir la macro (il ne peut pas produire de fausse solution).
+        if (surs.isEmpty()) surs = candidats;
+        if (surs.isEmpty()) break;
+
+        // TIE-BREAK = CONTIGUITÉ DE RUN (mesuré, cf. l'entête). Parmi les buts sûrs :
+        //  1. prolonger un segment déjà posé (garder les runs droits contigus) ;
+        //  2. sinon partir d'un cul-de-sac mural (amorcer un run) ;
+        //  3. sinon le plus encoigné (peu de voisins libres = ne coupe aucun passage) ;
+        //  4. sinon le plus proche de l'entrée.
+        int choisi = surs.first();
+        for (int b : surs) {
+            const int da = dist[goals[b]], dc = dist[goals[choisi]];
+            const int ga = degre(b),       gc = degre(choisi);
+            const auto ca = contiguite(b), cc = contiguite(choisi);
+            bool mieux;
+            if (ca.first  != cc.first)       mieux = (ca.first  > cc.first);
+            else if (ca.second != cc.second) mieux = (ca.second > cc.second);
+            else if (ga != gc)               mieux = (ga < gc);
+            else                             mieux = (da < dc);
+            if (mieux) choisi = b;
+        }
+
+        pose[choisi] = true;
+        bloque[goals[choisi]] = true;
+        ordre.append(choisi);
+    }
+
+    // Les buts jamais livrables (îlots, niveaux dégénérés) finissent la liste : l'ordre
+    // doit rester une PERMUTATION complète, sinon butActif() rend n'importe quoi.
+    for (int b = 0; b < nbButs; b++) if (!pose[b]) ordre.append(b);
+    return ordre;
+}
+
 void Game::calculDistancePoussee() {
     maxRegions = 0;
     regions   = QVector<qint16>(size * size, -1);
@@ -881,6 +1093,13 @@ void Game::calculDistancePoussee() {
     ordreButs.clear();
     for (int k = retrait.size() - 1; k >= 0; k--) ordreButs.append(retrait[k]);   // retrait inversé
     for (int b : reste) ordreButs.append(b);
+
+    // Ordre par PRÉCÉDENCE DE LIVRAISON + contiguité de run (§6.2, 2026-07-20) —
+    // remplace le rebours ci-dessus, qui ne testait la sortie qu'à UN pas et ratait
+    // les précédences. Le rebours reste comme fallback si la précédence ne rend pas
+    // une permutation complète (jamais observé, mais butActif() exige un ordre plein).
+    const QVector<int> parPrecedence = ordreParPrecedence();
+    if (parPrecedence.size() == nbButs) ordreButs = parPrecedence;
 }
 
 bool Game::remplissageOrdonne() const {

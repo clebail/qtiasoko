@@ -34,7 +34,22 @@ void WGame::freeSprites() {
 
 void WGame::setGame(const Game *g) {
     game = g;
+    // Le niveau peut changer de dimensions : updateGeometry() force le QScrollArea
+    // à relire minimumSizeHint() et à recalculer ses barres de défilement.
+    updateGeometry();
     update();
+}
+
+QSize WGame::sizeHint() const {
+    return minimumSizeHint();
+}
+
+QSize WGame::minimumSizeHint() const {
+    if (!game || !game->isLoaded())
+        return QSize(20 * SPRITE_WIDTH, 20 * SPRITE_HEIGHT);
+    // Sprites fixes + une case de marge tout autour (règles de numéros).
+    return QSize((game->getLargeur() + 2) * SPRITE_WIDTH,
+                 (game->getHauteur() + 2) * SPRITE_HEIGHT);
 }
 
 void WGame::setEtatsExplores(qint64 n) {
@@ -107,6 +122,27 @@ void WGame::paintEvent(QPaintEvent *) {
                     painter.setPen(QColor(255, 255, 255));
                     painter.drawText(r, Qt::AlignCenter, t);
                 }
+            }
+        }
+
+        // Règles de repérage (x = colonne, y = ligne), dans la marge autour du
+        // plateau, en cohérence avec la notation (x,y). Colonnes au-dessus, lignes
+        // à gauche ; dessinées hors du plateau pour ne masquer aucune case.
+        {
+            QFont fnum = painter.font();
+            fnum.setPointSize(9);
+            fnum.setBold(true);
+            painter.setFont(fnum);
+            painter.setPen(QColor(0xc0, 0x39, 0x2b));
+            for (int x = 0; x < largeur; x++) {
+                const QRect r(margX + x * SPRITE_WIDTH, margY - SPRITE_HEIGHT,
+                              SPRITE_WIDTH, SPRITE_HEIGHT);
+                painter.drawText(r, Qt::AlignCenter, QString::number(x));
+            }
+            for (int y = 0; y < hauteur; y++) {
+                const QRect r(margX - SPRITE_WIDTH, margY + y * SPRITE_HEIGHT,
+                              SPRITE_WIDTH, SPRITE_HEIGHT);
+                painter.drawText(r, Qt::AlignCenter, QString::number(y));
             }
         }
 

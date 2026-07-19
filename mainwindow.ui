@@ -51,7 +51,11 @@
         </widget>
        </item>
        <item>
-        <widget class="QComboBox" name="cbNiveau"/>
+        <widget class="QComboBox" name="cbNiveau">
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
+         </property>
+        </widget>
        </item>
        <item>
         <spacer name="horizontalSpacer">
@@ -74,10 +78,17 @@
         </widget>
        </item>
        <item>
-        <widget class="QComboBox" name="cbSolveur"/>
+        <widget class="QComboBox" name="cbSolveur">
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
+         </property>
+        </widget>
        </item>
        <item>
         <widget class="QPushButton" name="pbResoudre">
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
+         </property>
          <property name="text">
           <string>Résoudre</string>
          </property>
@@ -87,6 +98,9 @@
         <widget class="QPushButton" name="pbRevoir">
          <property name="enabled">
           <bool>false</bool>
+         </property>
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
          </property>
          <property name="text">
           <string>Revoir</string>
@@ -113,6 +127,9 @@
       <layout class="QHBoxLayout" name="horizontalLayout_2">
        <item>
         <widget class="QCheckBox" name="cbNotePassages">
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
+         </property>
          <property name="text">
           <string>Noter les passages de caisses</string>
          </property>
@@ -122,6 +139,9 @@
         <widget class="QCheckBox" name="cbEtatMax">
          <property name="enabled">
           <bool>false</bool>
+         </property>
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
          </property>
          <property name="text">
           <string>Voir le max de caisses posées</string>
@@ -146,6 +166,9 @@
          <property name="enabled">
           <bool>false</bool>
          </property>
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
+         </property>
          <property name="text">
           <string>Export passages</string>
          </property>
@@ -153,6 +176,9 @@
        </item>
        <item>
         <widget class="QPushButton" name="pbExportXsb">
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
+         </property>
          <property name="text">
           <string>Export .xsb</string>
          </property>
@@ -162,7 +188,36 @@
      </widget>
     </item>
     <item>
-     <widget class="WGame" name="wGame" native="true"/>
+     <widget class="QScrollArea" name="scrollPlateau">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::NoFocus</enum>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::NoFrame</enum>
+      </property>
+      <property name="widgetResizable">
+       <bool>true</bool>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <widget class="WGame" name="wGame">
+       <property name="geometry">
+        <rect>
+         <x>0</x>
+         <y>0</y>
+         <width>640</width>
+         <height>480</height>
+        </rect>
+       </property>
+      </widget>
+     </widget>
     </item>
    </layout>
   </widget>

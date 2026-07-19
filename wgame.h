@@ -24,8 +24,15 @@ public:
     static QString formaterMillier(qint64 n);
     void showPassage(bool show);
     void setDuree(double duree);
+    // Taille naturelle du plateau (sprites fixes 32 px) + une bande d'une case tout
+    // autour pour les règles de numéros x/y. minimumSizeHint est la clé : le
+    // QScrollArea (widgetResizable) agrandit le widget pour remplir la vue quand
+    // elle est plus grande, mais jamais sous ce minimum → barres de défilement dès
+    // que le niveau dépasse en hauteur OU en largeur. Aucun zoom.
+    QSize sizeHint() const override;
+    QSize minimumSizeHint() const override;
 protected:
-    virtual void paintEvent(QPaintEvent *);
+    virtual void paintEvent(QPaintEvent *) override;
 private:
     const Game *game = nullptr;
     qint64 etatsExplores = 0;

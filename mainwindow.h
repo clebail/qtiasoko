@@ -57,6 +57,13 @@ private:
 
     void setControlesActifs(bool actifs);
 
+    // Remet cbEtatMax au repos (décochée, désactivée, libellé sans compteur).
+    void resetEtatMax();
+
+    // Libellé de cbEtatMax tel que déclaré dans mainwindow.ui, capté au démarrage :
+    // unique source du texte, pour qu'un renommage dans Designer suffise.
+    QString texteEtatMax;
+
     Game game;
     // État où le solveur a rangé le plus de caisses (diagnostic §10). Mémorisé
     // pour rester valide tant que WGame le pointe.

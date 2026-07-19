@@ -1,3 +1,5 @@
+#include <cmath>
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
@@ -11,14 +13,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setupUi(this);
     installEventFilter(this);
 
-    // Sinon le combo/bouton gardent le focus clavier après un clic, et les
-    // flèches ne remontent plus jusqu'à l'eventFilter pour faire jouer le joueur.
-    cbNiveau->setFocusPolicy(Qt::NoFocus);
-    cbSolveur->setFocusPolicy(Qt::NoFocus);
-    pbResoudre->setFocusPolicy(Qt::NoFocus);
-    pbRevoir->setFocusPolicy(Qt::NoFocus);
-    cbNotePassages->setFocusPolicy(Qt::NoFocus);
-    pbExport->setFocusPolicy(Qt::NoFocus);
+    // Libellé de repos de cbEtatMax, capté depuis le .ui : c'est la seule copie du
+    // texte, resetEtatMax() y revient après l'avoir suffixé du compteur (n/total).
+    texteEtatMax = cbEtatMax->text();
 
     for (const Solveur::SType& t : Solveur::types()) {
         cbSolveur->addItem(t.libelle, static_cast<int>(t.type));
@@ -75,10 +72,7 @@ void MainWindow::onNiveauChange(int index) {
     pbRevoir->setEnabled(false);
 
     // Nouveau niveau : l'état-max du précédent n'a plus de sens.
-    maxRangeesVu = 0;
-    cbEtatMax->setChecked(false);
-    cbEtatMax->setEnabled(false);
-    cbEtatMax->setText("Voir le max de caisses posées");
+    resetEtatMax();
 
     initPassages();
 
@@ -107,10 +101,12 @@ bool MainWindow::joue(Game::EDirection dir) {
 
     if (!game.deplace(dir)) return false;
 
-    if (game.getNbDepCaisse() > caisses) {
+    const QPoint apres = game.getPlayerPoint();
+    const bool poussee = game.getNbDepCaisse() > caisses;
+
+    if (poussee) {
         // Le joueur a avancé d'une case ; la caisse qu'il vient de pousser est
         // juste devant lui, dans le même sens.
-        const QPoint apres = game.getPlayerPoint();
         const QPoint delta = apres - avant;
         const QPoint caisse = apres + delta;
 
@@ -118,6 +114,20 @@ bool MainWindow::joue(Game::EDirection dir) {
         if (idx >= 0 && idx < passages.size()) passages[idx]++;
 
         wGame->setPassages(passages);
+
+        // Trace brute des mouvements (§6.2, session du 2026-07-20) : rejoue le
+        // niveau 11/190/191/192 à la main devant cette sortie, puis copie la
+        // console — ça donne le trajet RÉEL entre deux poses, pas juste l'ordre
+        // final. Déjà perdu une fois sur un checkout, donc qDebug plutôt qu'un
+        // export : rien à retirer avant de commit.
+        const bool posee = game.getCase(idx) == Level::tcGoalCaisse;
+        qDebug().noquote() << QString("[mouv] joueur (%1,%2)->(%3,%4) POUSSE caisse ->(%5,%6)%7")
+                                  .arg(avant.x()).arg(avant.y()).arg(apres.x()).arg(apres.y())
+                                  .arg(caisse.x()).arg(caisse.y())
+                                  .arg(posee ? " [POSE]" : "");
+    } else {
+        qDebug().noquote() << QString("[mouv] joueur (%1,%2)->(%3,%4)")
+                                  .arg(avant.x()).arg(avant.y()).arg(apres.x()).arg(apres.y());
     }
 
     return true;
@@ -132,6 +142,16 @@ void MainWindow::setControlesActifs(bool actifs) {
     pbResoudre->setEnabled(actifs);
 }
 
+// Remet la case état-max à zéro : décochée, désactivée, libellé sans compteur.
+// L'état-max appartient à UNE résolution d'UN niveau — changer l'un ou l'autre le
+// périme, et gameMax pointerait sur un plateau qui n'a plus rien à voir.
+void MainWindow::resetEtatMax() {
+    maxRangeesVu = 0;
+    cbEtatMax->setChecked(false);
+    cbEtatMax->setEnabled(false);
+    cbEtatMax->setText(texteEtatMax);
+}
+
 void MainWindow::onIALance() {
     if (solveur) return;   // résolution déjà en cours
 
@@ -139,10 +159,7 @@ void MainWindow::onIALance() {
     wGame->setDuree(0.0);
 
     // Nouvelle résolution : on repart d'un état-max vierge.
-    maxRangeesVu = 0;
-    cbEtatMax->setChecked(false);
-    cbEtatMax->setEnabled(false);
-    cbEtatMax->setText("Voir le max de caisses posées");
+    resetEtatMax();
 
     const auto type = static_cast<Solveur::EType>(cbSolveur->currentData().toInt());
     solveur = Solveur::creer(type, game, this);
@@ -169,7 +186,7 @@ void MainWindow::onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsE
     const std::chrono::duration<double> diff = end - begin;
 
     wGame->setEtatsExplores(etatsExplores);
-    wGame->setDuree(ceil(diff.count()));
+    wGame->setDuree(std::ceil(diff.count()));
 
     const QMessageBox::StandardButton reponse = QMessageBox::question(
         this, "Solveur",
@@ -362,8 +379,8 @@ void MainWindow::onNouveauMax(Game etatMax, int nbRangees) {
     gameMax = etatMax;
     maxRangeesVu = nbRangees;
     cbEtatMax->setEnabled(true);
-    cbEtatMax->setText(QString("Voir le max de caisses posées (%1/%2)")
-                           .arg(nbRangees).arg(gameMax.getNbButs()));
+    cbEtatMax->setText(QString("%1 (%2/%3)")
+                           .arg(texteEtatMax).arg(nbRangees).arg(gameMax.getNbButs()));
     // Si l'utilisateur regarde déjà l'état-max, le rafraîchir en direct.
     if (cbEtatMax->isChecked())
         wGame->update();
