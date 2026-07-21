@@ -132,6 +132,16 @@ void SolveurAStar::run() {
     int maxRangees = 0;  // plus grand nombre de caisses rangées atteint (jauge de blocage)
 
     while(file.size()) {
+        // Arrêt demandé depuis l'UI : on sort AVANT de dépiler, de sorte que le
+        // compteur affiché soit bien le nombre d'états réellement développés.
+        // Tout meurt avec la pile de run() (arène, file, tables) — rien à
+        // libérer à la main.
+        if (arretDemande()) {
+            qDebug() << "SolveurAStar: arret demande apres" << compteur << "etats explores.";
+            emit rechercheArretee(compteur);
+            return;
+        }
+
         // pop_heap n'enlève rien : il amène le meilleur élément en DERNIÈRE
         // position et réordonne le reste. C'est pop_back() qui le retire — et
         // entre les deux, on peut le VOLER (std::move) au lieu de le copier.

@@ -17,6 +17,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Libellé de repos de cbEtatMax, capté depuis le .ui : c'est la seule copie du
     // texte, resetEtatMax() y revient après l'avoir suffixé du compteur (n/total).
     texteEtatMax = cbEtatMax->text();
+    texteResoudre = pbResoudre->text();
 
     for (const Solveur::SType& t : Solveur::types()) {
         cbSolveur->addItem(t.libelle, static_cast<int>(t.type));
@@ -68,6 +69,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 }
 
 MainWindow::~MainWindow() {
+    // Le solveur est un QThread enfant de la fenêtre : le laisser tourner
+    // pendant que QObject détruit ses enfants fait avorter le programme
+    // (« QThread: Destroyed while thread is still running »). On lui demande
+    // l'arrêt et on attend qu'il sorte de sa boucle — quelques microsecondes,
+    // le temps du dépilement en cours.
+    if (solveur) {
+        solveur->demanderArret();
+        solveur->wait();
+    }
 }
 
 void MainWindow::onNiveauChange(int index) {
@@ -181,7 +191,18 @@ bool MainWindow::joue(Game::EDirection dir) {
 void MainWindow::setControlesActifs(bool actifs) {
     cbNiveau->setEnabled(actifs);
     cbSolveur->setEnabled(actifs);
-    pbResoudre->setEnabled(actifs);
+    majBoutonResoudre();
+}
+
+// Le bouton de résolution est un BASCULE : il lance, puis il arrête. Son état ne
+// se déduit donc pas de setControlesActifs() — d'où cet unique point de décision,
+// pris sur l'état réel plutôt que sur ce que croit savoir l'appelant.
+void MainWindow::majBoutonResoudre() {
+    const bool enCours = (solveur != nullptr);
+    pbResoudre->setText(enCours ? "Arrêter" : texteResoudre);
+    // Pendant le rejeu d'une solution il n'y a ni recherche à lancer ni
+    // recherche à arrêter.
+    pbResoudre->setEnabled(enCours || !timerRejeu.isActive());
 }
 
 // Remet la case état-max à zéro : décochée, désactivée, libellé sans compteur.
@@ -195,7 +216,16 @@ void MainWindow::resetEtatMax() {
 }
 
 void MainWindow::onIALance() {
-    if (solveur) return;   // résolution déjà en cours
+    // Second clic pendant une recherche : on bascule en arrêt. Le thread ne
+    // s'arrête pas dans l'instant — il finit le dépilement en cours puis rend la
+    // main par rechercheArretee(). D'ici là le bouton est neutralisé, pour qu'un
+    // troisième clic ne relance pas une résolution par-dessus.
+    if (solveur) {
+        solveur->demanderArret();
+        pbResoudre->setEnabled(false);
+        pbResoudre->setText("Arrêt…");
+        return;
+    }
 
     setControlesActifs(false);
     wGame->setDuree(0.0);
@@ -207,10 +237,12 @@ void MainWindow::onIALance() {
     solveur = Solveur::creer(type, game, this);
     connect(solveur, &Solveur::solutionTrouvee, this, &MainWindow::onSolutionTrouvee);
     connect(solveur, &Solveur::aucuneSolution, this, &MainWindow::onAucuneSolution);
+    connect(solveur, &Solveur::rechercheArretee, this, &MainWindow::onArretRecherche);
     connect(solveur, &Solveur::nouveauMaxCaisses, this, &MainWindow::onNouveauMax);
     connect(solveur, &QThread::finished, solveur, &QObject::deleteLater);
     solveur->start();
     majSpinner();
+    majBoutonResoudre();   // 'solveur' existe seulement maintenant : le bouton passe en « Arrêter »
 
     begin = chrono::high_resolution_clock::now();
 }
@@ -218,6 +250,7 @@ void MainWindow::onIALance() {
 void MainWindow::onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsExplores) {
     solveur = nullptr;
     majSpinner();
+    majBoutonResoudre();   // plus rien à arrêter, y compris derrière la boîte de dialogue
 
     // 'game' n'a pas encore bougé (le solveur travaillait sur sa propre copie) :
     // c'est le point de départ à conserver pour pouvoir revisionner plus tard.
@@ -241,6 +274,7 @@ void MainWindow::onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsE
     if (reponse == QMessageBox::Yes) {
         coupsRestants = chemin;
         timerRejeu.start();   // laisse les contrôles désactivés le temps du rejeu
+        majBoutonResoudre();  // ... le bouton de résolution compris
     } else {
         setControlesActifs(true);
     }
@@ -252,6 +286,21 @@ void MainWindow::onAucuneSolution() {
     setControlesActifs(true);
     wGame->setEtatsExplores(0);
     QMessageBox::information(this, "Solveur", "Aucune solution trouvée pour ce niveau.");
+}
+
+// Arrêt à la demande : pas de boîte de dialogue — l'utilisateur vient de cliquer
+// pour reprendre la main, la lui redemander serait absurde. On garde en revanche
+// les états explorés, la durée et l'état-max atteint : c'est précisément le
+// diagnostic pour lequel on interrompt une recherche qui n'aboutit pas.
+void MainWindow::onArretRecherche(qint64 etatsExplores) {
+    solveur = nullptr;
+    majSpinner();
+    setControlesActifs(true);
+
+    const std::chrono::duration<double> diff = std::chrono::high_resolution_clock::now() - begin;
+    wGame->setEtatsExplores(etatsExplores);
+    wGame->setDuree(std::ceil(diff.count()));
+    wGame->update();
 }
 
 void MainWindow::onRevoir() {

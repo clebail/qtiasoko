@@ -27,6 +27,12 @@ void SolveurBFS::run() {
 
     int maxRangees = 0;
     while (file.size()) {
+        if (arretDemande()) {
+            qDebug() << "SolveurBFS: arret demande apres" << compteur << "etats explores.";
+            emit rechercheArretee(compteur);
+            return;
+        }
+
         auto [g, idx] = file.dequeue();
         compteur++;
         if (compteur % 1000 == 0) {

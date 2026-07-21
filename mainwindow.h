@@ -24,6 +24,8 @@ private slots:
     void onIALance();
     void onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsExplores);
     void onAucuneSolution();
+    // La recherche a été interrompue par un second clic sur le bouton.
+    void onArretRecherche(qint64 etatsExplores);
     void onRevoir();
     void rejouerCoup();
     void onExportPassages();
@@ -69,6 +71,16 @@ private:
     static constexpr int RoleNumero = Qt::UserRole + 1;
 
     void setControlesActifs(bool actifs);
+
+    // Recale le bouton de résolution (libellé + activation) sur l'état réel.
+    // Il est le seul contrôle à ne PAS suivre setControlesActifs() : pendant une
+    // résolution tout est verrouillé, mais lui doit rester cliquable — c'est le
+    // seul moyen de rendre la main.
+    void majBoutonResoudre();
+
+    // Libellé de repos de pbResoudre, capté depuis mainwindow.ui : le bouton
+    // bascule en « Arrêter » pendant la recherche et doit pouvoir y revenir.
+    QString texteResoudre;
 
     // Remet cbEtatMax au repos (décochée, désactivée, libellé sans compteur).
     void resetEtatMax();

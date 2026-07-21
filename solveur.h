@@ -1,6 +1,7 @@
 #ifndef SOLVEUR_H
 #define SOLVEUR_H
 
+#include <QAtomicInt>
 #include <QThread>
 #include <QVector>
 #include "game.h"
@@ -40,9 +41,19 @@ public:
 
     explicit Solveur(const Game& etatDepart, QObject* parent = nullptr);
 
+    // Demande l'arrêt de la recherche, depuis le thread GUI. COOPÉRATIF : on ne
+    // tue pas le thread (il tient des conteneurs de plusieurs centaines de Mo,
+    // un terminate() les fuirait et laisserait l'arène à moitié écrite), on pose
+    // un drapeau que la boucle de run() consulte à chaque dépilement. Le thread
+    // sort alors de lui-même, en émettant rechercheArretee().
+    void demanderArret() { arret.storeRelaxed(1); }
+
 signals:
     void solutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsExplores);
     void aucuneSolution();
+    // La recherche s'est interrompue sur demande (cf. demanderArret()), sans
+    // conclure. Distinct d'aucuneSolution() : rien n'est prouvé sur le niveau.
+    void rechercheArretee(qint64 etatsExplores);
     // Émis quand la recherche bat son record de caisses rangées (§10, diagnostic) :
     // porte une copie de l'état atteint et le nombre de caisses posées. L'UI peut
     // l'afficher pour voir OÙ le solveur se coince (ex. niveau 4 plafonné à 17/20).
@@ -50,6 +61,11 @@ signals:
 
 protected:
     void run() override = 0;
+
+    // À consulter en tête de la boucle d'exploration. Lecture 'relaxed' : le
+    // drapeau n'ordonne aucune autre donnée entre les deux threads, on ne veut
+    // pas payer une barrière mémoire par état dépilé.
+    bool arretDemande() const { return arret.loadRelaxed() != 0; }
 
     // Un noeud par état enfilé : 'parent' pointe vers son index dans 'noeuds'
     // (-1 pour la racine), et (idxCaisse, dir) est la POUSSÉE qui y mène depuis
@@ -85,6 +101,9 @@ protected:
     QVector<Noeud> noeuds;
 
     QList<Game::EDirection> reconstruire(int idx);
+
+private:
+    QAtomicInt arret{0};   // posé par le thread GUI, lu par le thread solveur
 };
 
 #endif // SOLVEUR_H
