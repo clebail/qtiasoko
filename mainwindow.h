@@ -33,7 +33,20 @@ private slots:
     void onNouveauMax(Game etatMax, int nbRangees);
     // Bascule l'affichage entre le plateau courant et l'état-max mémorisé.
     void onToggleEtatMax(int state);
+    // Fait suivre la vue au perso pendant qu'il se déplace.
+    void onJoueurDeplace(QPoint centre);
 private:
+    // Recale la vue sur le perso sans qu'il ait à bouger (ouverture d'un niveau,
+    // retour au départ avant un rejeu). Différé d'un tour de boucle : au moment
+    // où on l'appelle, le QScrollArea n'a pas encore redimensionné WGame pour le
+    // nouveau plateau, et le centre calculé serait celui de l'ancien.
+    void centrerSurJoueur();
+
+    // Arme ou lève le voile d'attente. Un seul endroit qui en décide : il dépend
+    // de DEUX choses (un solveur tourne, et l'utilisateur ne regarde pas
+    // l'état-max), et les quatre appelants oublieraient l'une ou l'autre.
+    void majSpinner();
+
     // Joue un coup et compte le passage de caisse s'il y en a un. Unique point
     // d'entrée : le clavier (humain) et le rejeu (solution) passent tous deux par
     // ici, sinon le compteur ne verrait que la moitié des poussées.

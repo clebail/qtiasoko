@@ -22,11 +22,6 @@ public:
         int dx, dy;
     }SDirection;
 
-    typedef struct _SPlayerDirection {
-        SDirection direction;
-        int playerDirection;
-    }SPlayerDirection;
-
     Game();
     Game(const Level& level, int numNiveau = 1);
     Game(const Game& other);
@@ -64,7 +59,6 @@ public:
     int getLargeur() const { return largeur; }
     int getHauteur() const { return hauteur; }
     QPoint getPlayerPoint() const { return playerPoint; }
-    int getPlayerDirection() const { return playerDirection; }
     Level::ETypeCase getCase(int idx) const { return cases[idx]; }
     // Zone atteignable par le joueur sans pousser de caisse (flood-fill sur
     // les cases libres). Coûteuse à calculer : à réutiliser via les surcharges
@@ -158,7 +152,6 @@ private:
     int hauteur = 0;
     int size = 0;
     QPoint playerPoint;
-    int playerDirection = 0;
     Level::ETypeCase *cases = nullptr;
     int nbDep = 0;
     int nbDepCaisse = 0;

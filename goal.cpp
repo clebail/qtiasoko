@@ -7,7 +7,6 @@ int Goal::getNbImage() const {
     return 1;
 }
 
-QPoint Goal::getOrigine(int) const {
-    return QPoint(0, SPRITE_HEIGHT);
+QRect Goal::getRect(int) const {
+    return QRect(128, 384, 32, 32);   // EndPoint_Blue.png
 }
-

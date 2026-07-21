@@ -4,7 +4,6 @@
 #include <utility>
 #include "game.h"
 
-static const Game::SPlayerDirection playerDirections[NB_DIRECTION] = {{{0, -1}, 0}, {{1, 0}, 2}, {{0, 1}, 0}, {{-1, 0}, 1}};
 static const Game::SDirection directions[NB_DIRECTION] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
 
 // L'opposé de directions[], sous ses deux lectures — c'est la même table, et la
@@ -49,7 +48,7 @@ Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
 
 Game::Game(const Game& other)
     : largeur(other.largeur), hauteur(other.hauteur), size(other.size),
-      playerPoint(other.playerPoint), playerDirection(other.playerDirection),
+      playerPoint(other.playerPoint),
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
       nbCaisses(other.nbCaisses),
     gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes),
@@ -71,7 +70,6 @@ Game& Game::operator=(const Game& other) {
     hauteur = other.hauteur;
     size = other.size;
     playerPoint = other.playerPoint;
-    playerDirection = other.playerDirection;
     nbDep = other.nbDep;
     nbDepCaisse = other.nbDepCaisse;
     numNiveau = other.numNiveau;
@@ -101,7 +99,7 @@ Game& Game::operator=(const Game& other) {
 
 Game::Game(Game&& other) noexcept
     : largeur(other.largeur), hauteur(other.hauteur), size(other.size),
-      playerPoint(other.playerPoint), playerDirection(other.playerDirection),
+      playerPoint(other.playerPoint),
       cases(other.cases),
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
       nbCaisses(other.nbCaisses),
@@ -122,7 +120,6 @@ Game& Game::operator=(Game&& other) noexcept {
     hauteur = other.hauteur;
     size = other.size;
     playerPoint = other.playerPoint;
-    playerDirection = other.playerDirection;
     nbDep = other.nbDep;
     nbDepCaisse = other.nbDepCaisse;
     numNiveau = other.numNiveau;
@@ -267,8 +264,8 @@ bool Game::dynamicDeadlock(int idxCaisse) const {
 
 bool Game::move(EDirection dir) {
     if (gagne || perdu) return false;
-    SPlayerDirection pDirection = playerDirections[(int)dir];
-    QPoint playerPointNew(playerPoint.x() + pDirection.direction.dx, playerPoint.y() + pDirection.direction.dy);
+    const SDirection d = directions[(int)dir];
+    QPoint playerPointNew(playerPoint.x() + d.dx, playerPoint.y() + d.dy);
 
     // Pas de test de bornes : la bordure du niveau est toujours en murs, le
     // joueur est donc toujours intérieur et playerPointNew reste dans la grille.
@@ -279,17 +276,15 @@ bool Game::move(EDirection dir) {
     if (isLibre(idxNew)) {
         cases[idxNew] = cases[idxNew] == Level::tcGoal ? Level::tcGoalPlayer : Level::tcPlayer;
         cases[idx]    = cases[idx]    == Level::tcPlayer ? Level::tcNone : Level::tcGoal;
-        playerPoint     = playerPointNew;
-        playerDirection = pDirection.playerDirection;
+        playerPoint   = playerPointNew;
         nbDep++;
         return true;
     }
 
     // Poussée de caisse
     if (cases[idxNew] == Level::tcCaisse || cases[idxNew] == Level::tcGoalCaisse)
-        if(moveCaisse(cases, playerPoint, playerPointNew, pDirection.direction)) {
+        if(moveCaisse(cases, playerPoint, playerPointNew, d)) {
             playerPoint = playerPointNew;
-            playerDirection = pDirection.playerDirection;
             nbDep++;
             nbDepCaisse++;
             checkVictoire();

@@ -7,6 +7,6 @@ int GoalCaisse::getNbImage() const {
     return 1;
 }
 
-QPoint GoalCaisse::getOrigine(int) const {
-    return QPoint(SPRITE_WIDTH, SPRITE_HEIGHT);
+QRect GoalCaisse::getRect(int) const {
+    return QRect(192, 192, 64, 64);   // Crate_Blue.png
 }

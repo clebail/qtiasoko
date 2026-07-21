@@ -7,7 +7,6 @@ int Caisse::getNbImage() const {
     return 1;
 }
 
-QPoint Caisse::getOrigine(int) const {
-    return QPoint(SPRITE_WIDTH, 0);
+QRect Caisse::getRect(int) const {
+    return QRect(128, 320, 64, 64);   // Crate_Red.png
 }
-

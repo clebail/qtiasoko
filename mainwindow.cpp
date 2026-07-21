@@ -5,6 +5,7 @@
 #include <QFileDialog>
 #include <QKeyEvent>
 #include <QMessageBox>
+#include <QScrollBar>
 #include <QTextStream>
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -50,6 +51,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(&timerRejeu, &QTimer::timeout, this, &MainWindow::rejouerCoup);
     timerRejeu.setInterval(150);
 
+    connect(wGame, &WGame::joueurDeplace, this, &MainWindow::onJoueurDeplace);
+
+    // Les stats sont peintes au coin de la partie VISIBLE du plateau (cf.
+    // WGame::paintEvent) : un défilement les déplace, il faut donc repeindre. Qt
+    // ne redessine sinon que la bande découverte, et le texte resterait en double.
+    connect(scrollPlateau->horizontalScrollBar(), &QScrollBar::valueChanged, wGame, QOverload<>::of(&QWidget::update));
+    connect(scrollPlateau->verticalScrollBar(),   &QScrollBar::valueChanged, wGame, QOverload<>::of(&QWidget::update));
+
     // Game transporté par signal queued (thread solveur -> UI) pour l'état-max.
     qRegisterMetaType<Game>("Game");
 
@@ -81,6 +90,35 @@ void MainWindow::onNiveauChange(int index) {
     wGame->setDuree(0);
     wGame->setPassages(passages);
     wGame->update();
+
+    centrerSurJoueur();
+}
+
+void MainWindow::onJoueurDeplace(QPoint centre) {
+    // Marge d'une case et demie : la vue ne bouge que lorsque le perso approche
+    // d'un bord, au lieu de défiler en permanence sous lui.
+    scrollPlateau->ensureVisible(centre.x(), centre.y(),
+                                 SPRITE_WIDTH * 3 / 2, SPRITE_HEIGHT * 3 / 2);
+}
+
+void MainWindow::majSpinner() {
+    // L'état-max est fait pour suivre une résolution en cours : le voile qui
+    // masque le plateau irait contre son seul usage.
+    wGame->setResolution(solveur != nullptr && !cbEtatMax->isChecked());
+}
+
+void MainWindow::centrerSurJoueur() {
+    // Après le tour de boucle en cours : WGame vient de changer de plateau, le
+    // QScrollArea ne l'a pas encore redimensionné et centreJoueur() rendrait une
+    // position calculée sur l'ancienne géométrie.
+    QTimer::singleShot(0, this, [this]() {
+        const QPoint c = wGame->centreJoueur();
+        // Une demi-vue de marge : à l'ouverture on veut le perso au milieu, pas
+        // collé au bord comme le fait la marge serrée du suivi.
+        scrollPlateau->ensureVisible(c.x(), c.y(),
+                                     scrollPlateau->viewport()->width()  / 2,
+                                     scrollPlateau->viewport()->height() / 2);
+    });
 }
 
 void MainWindow::initPassages() {
@@ -130,6 +168,10 @@ bool MainWindow::joue(Game::EDirection dir) {
                                   .arg(avant.x()).arg(avant.y()).arg(apres.x()).arg(apres.y());
     }
 
+    // 'game' est déjà à l'arrivée : l'affichage seul retarde, le temps que le
+    // perso (et la caisse) glissent depuis la case d'où ils partent.
+    wGame->animerCoup(dir, avant, poussee);
+
     return true;
 }
 
@@ -168,12 +210,14 @@ void MainWindow::onIALance() {
     connect(solveur, &Solveur::nouveauMaxCaisses, this, &MainWindow::onNouveauMax);
     connect(solveur, &QThread::finished, solveur, &QObject::deleteLater);
     solveur->start();
+    majSpinner();
 
     begin = chrono::high_resolution_clock::now();
 }
 
 void MainWindow::onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsExplores) {
     solveur = nullptr;
+    majSpinner();
 
     // 'game' n'a pas encore bougé (le solveur travaillait sur sa propre copie) :
     // c'est le point de départ à conserver pour pouvoir revisionner plus tard.
@@ -204,6 +248,7 @@ void MainWindow::onSolutionTrouvee(QList<Game::EDirection> chemin, qint64 etatsE
 
 void MainWindow::onAucuneSolution() {
     solveur = nullptr;
+    majSpinner();
     setControlesActifs(true);
     wGame->setEtatsExplores(0);
     QMessageBox::information(this, "Solveur", "Aucune solution trouvée pour ce niveau.");
@@ -225,6 +270,7 @@ void MainWindow::onRevoir() {
 
     setControlesActifs(false);
     pbRevoir->setEnabled(false);
+    centrerSurJoueur();
 
     timerRejeu.start();
 }
@@ -393,5 +439,6 @@ void MainWindow::onToggleEtatMax(int state) {
     } else {
         wGame->setGame(&game);
     }
+    majSpinner();
     wGame->update();
 }
