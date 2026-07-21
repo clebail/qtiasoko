@@ -53,6 +53,7 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `mou <niv> [n]` | les états dépilés sont-ils du gaspillage ? (sur chemin / hors chemin / **deadlock**) |
 | `mort <niv> …` | **(neuf, 2026-07-17)** taux de deadlocks non détectés sur un niveau qu'on NE sait PAS résoudre |
 | `fp <niv> [variante]` | **(neuf, 2026-07-21) LE JUGE D'UN ÉLAGAGE** : rejoue une solution GAGNANTE et interroge le test sur chacun de ses états — tous solubles par construction, donc **toute détection est un faux positif prouvé**. À passer AVANT de câbler quoi que ce soit dans `checkDefaite` |
+| `macro <niv> [s]` | **(neuf, 2026-07-21)** POURQUOI la goal macro échoue : tentatives/succès, cause de l'échec, **à quel pas** il survient, et la part d'échecs survenus après un choix arbitraire de descente. Tourne à budget de temps → marche sur les niveaux jamais résolus |
 | `diverge`, `paires`, `trace`, `passages`, `congestion` | mou de `h`, interactions de paires, solution pas à pas, cartes de trajets |
 
 **Règles de mesure, non négociables :**
@@ -83,6 +84,7 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | **Move ctor `noexcept` + tas de poignées** | conteneur level2 567 → 27 ms | le tas ne porte que `{f,g,idx,cle}`, pas un `Game` ; sans `noexcept`, `std::vector` recopie profondément à chaque doublement |
 | **`SElement` allégé + `appliqueEtat`** | mémoire ÷2 à ÷3 (niveau 1 : 518 → 160 Mo) | la file ne porte que la clé ; le `Game` est reconstruit au dépilement sur un objet réutilisé |
 | **Clé en arène (`cle.h`)** | mémoire ×1,3 à ×1,4 | toutes les clés d'un niveau font `N+1` shorts (N constant) → rangées bout à bout, la file/les tables ne portent qu'un offset 32 bits ; zéro `malloc`/en-tête `QArrayData` par clé |
+| **Chemin chaud du flood-fill** (zone passée + pré-test avant copie + tampons réutilisés) | **×1,20 à ×1,53** en temps (niv 11 ×1,53, 7 ×1,50, 5 et 17 ×1,44, 8 ×1,20), **à espace d'états constant** | `getZoneJoueur` est le point le plus appelé du solveur (~10 fois par état). Trois causes : il était refait à l'identique au 1ᵉʳ pas de chaque macro (×5 caisses/état), une tentative sur deux mourait au pas 0 **après** une copie complète de `Game`, et chaque appel allouait un `QVector<bool>` **et** une `QList<short>`. Cf. §6.3 |
 | **Adressage ouvert (`TableG`) + `Noeud` 8 o + arène par blocs** | mémoire **×1,4 à ×2,0** (niveau 17 ×2,04, niveau 3 ×1,66) | `meilleurG` en table ouverte (8 o/cellule, sondage linéaire) au lieu d'`unordered_map` (~40 o d'infra) ; arène en blocs de 65536 jamais réalloués → aucun pic de doublement, pointeurs valides à vie |
 
 ### 2.2 Réduction du NOMBRE d'états — le vrai levier
@@ -722,6 +724,74 @@ et le démêlage** — item 3 (connectivité) puis 4 (corral) / 5 (repli anytime
   l'échec (un cas lent n'émet jamais « aucune solution »). Borne surtout le temps des cas
   lents (8, 9).
 
+#### ✅ Session du 2026-07-21 (suite 2) — le COÛT PAR ÉTAT de la goal macro (outil `macro`)
+
+**L'hypothèse de départ, RÉFUTÉE — ne pas la reprendre.** `macroVersBut` descend le champ
+`distanceParBut` en prenant à chaque pas la **première** direction décroissante dans l'ordre de
+l'énumération, et n'y revient jamais. On pouvait croire qu'elle échouait souvent en s'étant peinte
+dans un coin, alors qu'une autre descente de **même coût** passait. Mesuré : les échecs survenus
+après un tel choix arbitraire sont **1,8 % (niv 11), 2,5 % (8), 5,2 % (7), 3,8 % (17)** — c'est la
+borne HAUTE de ce qu'un backtracking récupérerait. Et seuls **1 à 4 % des pas** offrent ≥ 2
+descentes. **La descente n'a presque jamais le choix** : changer de sens de poussée oblige le
+joueur à faire le tour, et le champ joueur-aware élimine d'office la plupart des variantes
+géométriques. Backtracker sur les forks ne rapporterait rien.
+
+**Ce que la mesure a révélé à la place — la macro est une machine à échouer :**
+
+| | 11 | 8 | 7 | 17 |
+|---|---|---|---|---|
+| tentatives de macro **par état développé** | **5,3** | 5,2 | 4,4 | 3,2 |
+| taux de **succès** | **0,12 %** | 0,15 % | 4,2 % | 0,07 % |
+| échouent au **pas 0** (la caisse ne bouge même pas) | **48,5 %** | 12,2 % | 46,1 % | 22,1 % |
+
+Chaque tentative coûtait une **copie complète de `Game`** (chez l'appelant) **et** un
+`getZoneJoueur()` — flood-fill de tout le plateau + allocation. Soit ~8,8 M flood-fills en 60 s sur
+le 11, ~10,6 par état développé.
+
+**Les deux correctifs, mesurés contre un binaire `HEAD` reconstruit (états identiques 9/9) :**
+1. **La zone du 1ᵉʳ pas vient de l'appelant** (`macroVersBut(..., const QVector<bool>* zoneInitiale)`).
+   Au pas 0 le plateau n'a pas bougé : le flood-fill refait **à l'identique** celui que le solveur
+   vient de faire pour `getCaissesDeplacable`, ×5 caisses candidates. **50 % des flood-fills
+   supprimés** (36 % sur le 8, dont les chaînes sont plus longues). ⚠️ Invalider la zone dès
+   qu'une caisse bouge (`zoneCourante = nullptr`) — seul endroit où une erreur donnerait une zone
+   périmée, donc silencieusement fausse.
+2. **`macroPeutDemarrer()` : écarter AVANT de copier.** Le 1ᵉʳ pas, sans rien modifier ni copier.
+   ⚠️ **Le risque n'est pas la perf, c'est le filtre trop zélé** — écarter une caisse que la macro
+   savait avancer supprimerait des enfants en silence. Neutralisé en promouvant la condition de
+   descente en méthode UNIQUE (`avanceVersBut`), partagée par la boucle et le pré-test : elles ne
+   *peuvent* pas diverger. Plus un garde pour « caisse déjà sur le but » (macro triviale à `true`,
+   qu'un pré-test naïf refuserait).
+
+3. **Tampons de flood-fill réutilisés** — surcharge `getZoneJoueur(QVector<bool>&)` : à taille déjà
+   bonne, `fill()` est un memset sans allocation. Et la file du parcours passe de `QList<short>`
+   (un malloc par appel) à un `QVarLengthArray<short, 512>` **sur la pile**. Tampons hissés hors
+   des boucles chez les trois appelants chauds : la boucle de `macroVersBut`, la boucle d'états du
+   solveur, et **l'enfilage des enfants** (`getEtat(cle)` refaisait le flood-fill dans un QVector
+   neuf, un par enfant). ⚠️ Le tampon doit être détenu en propre — une copie qui traîne fait
+   détacher le `fill()`, ce qui annule le bénéfice (sans nuire à la correction).
+
+| gain cumulé | 2 | 5 | 7 | 17 | **11** | 8 |
+|---|---|---|---|---|---|---|
+| point 1 seul | ×1,11 | ×1,12 | ×1,11 | ×1,07 | ×1,10 | ×1,07 |
+| points 1 + 2 | ×1,13 | ×1,17 | ×1,17 | ×1,09 | ×1,29 | ×1,06 |
+| **points 1 + 2 + 3** | **×1,43** | **×1,44** | **×1,50** | **×1,44** | **×1,53** | **×1,20** |
+
+- **Le point 3 est le plus gros des trois, et c'était une SURPRISE** — il avait été annoncé comme
+  le moins prometteur (« les allocateurs modernes sont bons sur ce profil »). Il vaut à lui seul
+  ~×1,25 à ×1,35. **Le coût d'allocation d'un conteneur Qt dans une boucle à ~10 appels par état
+  n'est pas négligeable, il est DOMINANT.** À se rappeler pour tout futur chemin chaud — et à
+  mesurer plutôt qu'à pronostiquer.
+- **Le point 2 est CONDITIONNEL à la forme du niveau** : ×1,29 sur le 11 (48,5 % d'échecs au pas 0)
+  et **rien** sur le 8 (12,2 % seulement, et le pré-test refait le balayage pour les 88 % qui
+  passent — les deux effets s'annulent). Un gain moyen sur l'ensemble aurait masqué les deux faits.
+- ⚠️ **PIÈGE DE MESURE, à ne pas refaire** : un **seul** tirage de 60 s donnait ×1,02 sur le 8, et
+  j'ai failli conclure « le 8 ne profite pas ». En triple, c'est ×1,07 avec trois valeurs serrées.
+  **Un tirage unique de 60 s ne suffit pas** — meilleur de 3, toujours (le min approche le cas non
+  perturbé mieux que la moyenne).
+- Piste non retenue : faire rendre à `macroPeutDemarrer` la direction trouvée, pour que
+  `macroVersBut` ne rebalaye pas le 1ᵉʳ pas. Alourdit l'API pour un gain visible seulement sur les
+  niveaux à chaînes longues — à ne faire que sur mesure préalable.
+
 ### 6.4 🧠 Le RÉSEAU DE NEURONES — comme GUIDE, JAMAIS comme coupeur
 
 **Le fantasme, à garder tel quel.** Un RN pour orienter la recherche. Le risque fatal est le
@@ -769,7 +839,12 @@ Hachage 128 bits, blocs pour `noeuds`/file ouverte, beam pour borner la mémoire
   téléportée), `checkDefaite` (`casesMortes` + gel + `dynamicDeadlock`), `calculDistancePoussee`
   (`distanceParBut` joueur-aware, `distancePoussee` ; `ordreButs` via `ordreParPrecedence` =
   précédence de livraison + **contiguité de run**, `distanceLivraison` en support ; rebours en
-  fallback), `getHeuristique` (couplage hongrois + score de guidage), `macroVersBut` / `butActif`.
+  fallback), `getHeuristique` (couplage hongrois + score de guidage), `macroVersBut` / `butActif`
+  / `macroPeutDemarrer` (pré-test) / `avanceVersBut` (la condition de descente, exemplaire unique).
+  ⚠️ **Tout est calculé au CHARGEMENT** (`calculDistancePoussee` + `calculCaseMorte` dans le ctor
+  `Game(Level)`) et jamais recalculé : le solveur part d'une copie de `depart` pour hériter des
+  tables en COW. Ce qui n'est PAS précalculé, c'est la macro elle-même — son *trajet* se lit dans
+  `distanceParBut`, mais sa *faisabilité* dépend de l'état, donc elle est rejouée à chaque état.
 - **`solveurastar.cpp`** — A\* (`poids`, `macro`). `SElement` (clé seule), `TableG`/`Arene`,
   régime d'engagement de la macro, re-développement en optimal / fermeture en pondéré.
 - **`cle.h`** — `Arene` (blocs), `Cle` (offset 4 o), `TableG` (adressage ouvert).

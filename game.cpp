@@ -559,45 +559,53 @@ short Game::getMinIdx(const QVector<bool>& zone) const {
     return result;
 }
 
-QVector<bool> Game::getZoneJoueur() const {
-    QList<short> file;
-    QVector<bool> visite(size, false);
+void Game::getZoneJoueur(QVector<bool>& visite) const {
+    // fill(v, n) ne réalloue que si la taille diffère : sur un tampon réutilisé
+    // d'un appel à l'autre, c'est un simple memset. C'est tout l'intérêt de cette
+    // surcharge — le flood-fill est le point le plus chaud du solveur (~10 appels
+    // par état développé avant les correctifs du §6.3), et la version qui rend un
+    // QVector allouait un tableau neuf à chaque fois.
+    visite.fill(false, size);
+
+    // File du parcours : au plus une entrée par case, donc dimensionnable au pire
+    // cas d'emblée. En QVarLengthArray, elle tient sur la PILE pour tous les
+    // plateaux usuels (size <= 512) — là où QList<short> faisait un malloc par appel.
+    QVarLengthArray<short, 512> file(size);
+    int tete = 0, fin = 0;
     short idx = playerPoint.x() + playerPoint.y() * largeur;
 
-    file.append(idx);
+    file[fin++] = idx;
     visite[idx] = true;
 
-    while(file.size()) {
+    while(tete < fin) {
         short vHaut, vDroite, vBas, vGauche;
 
-        idx = file.takeFirst();
+        idx = file[tete++];
 
         vHaut = idx - largeur;
         if(vHaut >= 0 && isLibre(vHaut) && !visite[vHaut]) {
-            file.append(vHaut);
+            file[fin++] = vHaut;
             visite[vHaut] = true;
         }
 
         vDroite = idx + 1;
         if((idx % largeur) != largeur -1  && isLibre(vDroite) && !visite[vDroite]) {
-            file.append(vDroite);
+            file[fin++] = vDroite;
             visite[vDroite] = true;
         }
 
         vBas = idx + largeur;
         if(vBas < largeur * hauteur && isLibre(vBas) && !visite[vBas]) {
-            file.append(vBas);
+            file[fin++] = vBas;
             visite[vBas] = true;
         }
 
         vGauche = idx - 1;
         if(idx % largeur != 0 && isLibre(vGauche) && !visite[vGauche]) {
-            file.append(vGauche);
+            file[fin++] = vGauche;
             visite[vGauche] = true;
         }
     }
-
-    return visite;
 }
 
 bool Game::isLibre(const QPoint& p) const {
@@ -1322,40 +1330,143 @@ int Game::butActif() const {
     return -1;
 }
 
-bool Game::macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees) {
+int Game::avanceVersBut(int c, int d, int dCur, const int* dpb,
+                        const QVector<bool>& zone) const {
+    const int cx = c % largeur, cy = c / largeur;
+    const int devx = cx + directions[d].dx, devy = cy + directions[d].dy;   // case caisse après
+    const int appx = cx - directions[d].dx, appy = cy - directions[d].dy;   // appui joueur
+    if (devx < 0 || devx >= largeur || devy < 0 || devy >= hauteur) return -1;
+    if (appx < 0 || appx >= largeur || appy < 0 || appy >= hauteur) return -1;
+    const int devant = devx + devy * largeur;
+    const int appui  = appx + appy * largeur;
+    if (!isLibre(devant)) return -1;         // arrivée occupée (mur / autre caisse)
+    if (!zone[appui]) return -1;             // joueur ne peut pas se placer derrière
+    const int rApres = regions[c * size + devant];
+    if (rApres < 0) return -1;
+    return (dpb[devant * maxRegions + rApres] == dCur - 1) ? devant : -1;
+}
+
+bool Game::macroPeutDemarrer(int idxCaisse, int indexBut, const QVector<bool>& zone) const {
+    // Le PREMIER pas de macroVersBut, sans rien copier ni modifier. Si c'est non,
+    // la macro échouerait au pas 0 — mesuré (mesures/macro) : 48,5 % des tentatives
+    // du niveau 11, chacune payant jusqu'ici une copie complète de Game pour rien.
+    //
+    // La condition est partagée avec la boucle (avanceVersBut) : elle ne peut pas
+    // en diverger. Ne JAMAIS la réécrire ici — ce serait un filtre qui écarte des
+    // macros réellement jouables, donc une perte silencieuse d'enfants.
+    if (idxCaisse == goals[indexBut]) return true;   // déjà sur le but : macro triviale
+    const int* dpb = distanceParBut.constData() + (qsizetype)indexBut * size * maxRegions;
+    const int joueurIdx = playerPoint.x() + playerPoint.y() * largeur;
+    const int rAvant = regions[joueurIdx * size + idxCaisse];
+    if (rAvant < 0) return false;
+    const int dCur = dpb[idxCaisse * maxRegions + rAvant];
+    if (dCur <= 0) return false;
+    for (int d = 0; d < NB_DIRECTION; d++)
+        if (avanceVersBut(idxCaisse, d, dCur, dpb, zone) >= 0) return true;
+    return false;
+}
+
+bool Game::macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees,
+                        const QVector<bool>* zoneInitiale) {
     const int caseBut = goals[indexBut];
     const int* dpb = distanceParBut.constData() + (qsizetype)indexBut * size * maxRegions;
 
+#ifdef INSTRUM_MACRO
+    StatsMacro& st = statsMacro();
+    st.tentatives++;
+    int forks = 0;
+    // Compte l'échec 'quoi' au pas 'pas', avec la distance restante 'reste'.
+    auto echec = [&](qint64& quoi, int pas, int reste) {
+        quoi++;
+        if (forks) st.echecAvecFork++;
+        if ((size_t)pas >= st.histoEchecPas.size()) st.histoEchecPas.resize(pas + 1, 0);
+        st.histoEchecPas[pas]++;
+        st.resteAuBlocage += reste;
+        st.forksTotal += forks;
+        st.pasTotal += pas;
+    };
+#endif
+
+    // La zone du joueur, recalculée UNIQUEMENT quand elle est périmée. Au premier
+    // pas, le plateau n'a pas encore bougé : c'est exactement la zone que
+    // l'appelant vient de calculer pour cet état, et qu'il nous passe (il en a
+    // besoin de son côté pour getCaissesDeplacable). Comme il essaie une macro
+    // par caisse candidate — ~5 par état développé —, la recalculer ici faisait
+    // la MOITIÉ des flood-fills du solveur (mesuré : 4,36 M sur 8,8 M au niveau
+    // 11, cf. mesures/macro). 'zoneCourante' à nullptr = à recalculer.
+    QVector<bool> zoneLocale;
+    const QVector<bool>* zoneCourante = zoneInitiale;
+
     int c = idxCaisse;
     for (int garde = 0; c != caseBut && garde <= 2 * size; garde++) {
-        const QVector<bool> zone = getZoneJoueur();
+        if (!zoneCourante) {
+            getZoneJoueur(zoneLocale);   // tampon réutilisé d'un pas à l'autre
+            zoneCourante = &zoneLocale;
+        }
+        const QVector<bool>& zone = *zoneCourante;
         const int joueurIdx = playerPoint.x() + playerPoint.y() * largeur;
         const int rAvant = regions[joueurIdx * size + c];
-        if (rAvant < 0) return false;
+        if (rAvant < 0) {
+#ifdef INSTRUM_MACRO
+            echec(st.echecRegion, garde, 0);
+#endif
+            return false;
+        }
         const int dCur = dpb[c * maxRegions + rAvant];
-        if (dCur <= 0) return false;                 // -1 (inatteignable) ou déjà arrivé
+        if (dCur <= 0) {                             // -1 (inatteignable) ou déjà arrivé
+#ifdef INSTRUM_MACRO
+            echec(st.echecDistance, garde, 0);
+#endif
+            return false;
+        }
 
-        const int cx = c % largeur, cy = c / largeur;
+        auto avanceVers = [&](int d) { return avanceVersBut(c, d, dCur, dpb, zone); };
+
+#ifdef INSTRUM_MACRO
+        // Combien de descentes optimales s'offraient ICI ? Plus d'une = la boucle
+        // ci-dessous fait un choix ARBITRAIRE (première dans l'ordre de l'énum),
+        // sur lequel elle ne reviendra jamais.
+        int nbCand = 0;
+        for (int d = 0; d < NB_DIRECTION; d++) if (avanceVers(d) >= 0) nbCand++;
+        if (nbCand > 1) forks++;
+#endif
+
         bool avance = false;
         for (int d = 0; d < NB_DIRECTION && !avance; d++) {
-            const int devx = cx + directions[d].dx, devy = cy + directions[d].dy;   // case caisse après
-            const int appx = cx - directions[d].dx, appy = cy - directions[d].dy;   // appui joueur
-            if (devx < 0 || devx >= largeur || devy < 0 || devy >= hauteur) continue;
-            if (appx < 0 || appx >= largeur || appy < 0 || appy >= hauteur) continue;
-            const int devant = devx + devy * largeur;
-            const int appui  = appx + appy * largeur;
-            if (!isLibre(devant)) continue;          // arrivée occupée (mur / autre caisse)
-            if (!zone[appui]) continue;              // joueur ne peut pas se placer derrière
-            const int rApres = regions[c * size + devant];
-            if (rApres < 0) continue;
-            if (dpb[devant * maxRegions + rApres] == dCur - 1) {   // cette poussée avance vers le but
-                if (!pousse(c, (Game::EDirection)d)) return false;
-                poussees.append({c, d});
-                c = devant;
-                avance = true;
+            const int devant = avanceVers(d);
+            if (devant < 0) continue;
+            if (!pousse(c, (Game::EDirection)d)) {
+#ifdef INSTRUM_MACRO
+                echec(st.echecPousse, garde, dCur);
+#endif
+                return false;
             }
+            poussees.append({c, d});
+            c = devant;
+            avance = true;
+            zoneCourante = nullptr;   // la caisse a bougé : la zone est PÉRIMÉE
         }
-        if (!avance) return false;                   // aucune poussée ne fait avancer : bloqué
+        if (!avance) {                               // aucune poussée ne fait avancer : bloqué
+#ifdef INSTRUM_MACRO
+            echec(st.echecBloque, garde, dCur);
+#endif
+            return false;
+        }
     }
+#ifdef INSTRUM_MACRO
+    if (c == caseBut) {
+        st.succes++;
+        if (forks) st.succesAvecFork++;
+        st.forksTotal += forks;
+        st.pasTotal += poussees.size();
+        if (poussees.size() >= (int)st.histoSuccesLong.size())
+            st.histoSuccesLong.resize(poussees.size() + 1, 0);
+        st.histoSuccesLong[poussees.size()]++;
+    }
+#endif
     return c == caseBut;
 }
+
+#ifdef INSTRUM_MACRO
+StatsMacro& statsMacro() { static StatsMacro s; return s; }
+#endif

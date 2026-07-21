@@ -142,6 +142,12 @@ void SolveurAStar::run() {
     int fileAvant = 0;   // taille de la file au dernier affichage (tendance)
     int maxRangees = 0;  // plus grand nombre de caisses rangées atteint (jauge de blocage)
 
+    // Tampons de flood-fill, hissés HORS de la boucle : réutilisés d'un état à
+    // l'autre, ils ne réallouent plus (cf. getZoneJoueur(QVector<bool>&)). Ne
+    // JAMAIS en garder une copie ailleurs, sinon le fill() détache et réalloue.
+    QVector<bool> zone;        // zone de l'état développé
+    QVector<bool> zoneEnfant;  // zone de l'enfant qu'on enfile
+
     while(file.size()) {
         // Arrêt demandé depuis l'UI : on sort AVANT de dépiler, de sorte que le
         // compteur affiché soit bien le nombre d'états réellement développés.
@@ -248,7 +254,10 @@ void SolveurAStar::run() {
             // niveaux 3 et 5 perdus). Ici, la macro va au bout et c'est son
             // RÉSULTAT qu'on juge.
             if (livraisonSurEnfants && e.butNonLivrable(4)) return;
-            e.getEtat(arene.reserve());
+            // getEtat(cle) referait le flood-fill en interne, dans un QVector
+            // neuf — un par enfant enfilé. Le tampon évite l'allocation.
+            e.getZoneJoueur(zoneEnfant);
+            e.getEtat(arene.reserve(), zoneEnfant);
             Cle cle{arene.dernier()};
             if (interditRedeveloppement && ferme.count(cle)) { arene.annule(); return; }
             TableG::Slot* slot = meilleurG.cherche(cle);
@@ -271,7 +280,7 @@ void SolveurAStar::run() {
             std::push_heap(file.begin(), file.end(), compare);
         };
 
-        QVector<bool> zone = etat.getZoneJoueur();
+        etat.getZoneJoueur(zone);
         QVector<quint8> caisses = etat.getCaissesDeplacable(zone);
 
         // GOAL MACRO (§10.5) — régime d'ENGAGEMENT : si le but actif (le plus
@@ -287,9 +296,15 @@ void SolveurAStar::run() {
             if (but >= 0) {
                 for (int i = 0; i < caisses.size(); i++) {
                     if (caisses[i] == 0) continue;   // pas de caisse poussable ici
+                    // Écarter AVANT de copier : près d'une tentative sur deux
+                    // n'avance même pas d'un pas (48,5 % au niveau 11), et la
+                    // copie du plateau était payée pour rien.
+                    if (!etat.macroPeutDemarrer(i, but, zone)) continue;
                     Game e(etat);
                     QVector<QPair<int,int>> poussees;
-                    if (e.macroVersBut(i, but, poussees) && !e.isPerdu()) {
+                    // 'zone' est celle d'etat, et e en est une copie non encore
+                    // modifiée : elle vaut donc pour le premier pas de la macro.
+                    if (e.macroVersBut(i, but, poussees, &zone) && !e.isPerdu()) {
                         enfiler(e, cur.g + poussees.size(), poussees);
                         macrosOk++;
                     }

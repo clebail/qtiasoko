@@ -12,6 +12,34 @@
 #define NB_COIN_TO_CHECK            2
 #define NB_MUR_TO_CHECK             2
 
+#ifdef INSTRUM_MACRO
+#include <vector>
+// Instrumentation hors-ligne de la GOAL MACRO (harnais mesures/macro). Ne compile
+// que dans les harnais : le code produit ne définit jamais INSTRUM_MACRO.
+//
+// Question posée : quand macroVersBut() échoue, est-ce parce que la caisse est
+// VRAIMENT bloquée, ou parce que la descente a pris arbitrairement l'une des
+// plusieurs descentes optimales possibles et s'est peinte dans un coin ? La
+// boucle prend la première direction décroissante dans l'ordre de l'énumération
+// et ne revient jamais dessus — 'forks' compte les pas où une ALTERNATIVE de même
+// coût existait, donc les points où un backtracking aurait eu de quoi mordre.
+struct StatsMacro {
+    qint64 tentatives = 0, succes = 0;
+    qint64 echecRegion = 0;     // le joueur n'est plus dans une région valide
+    qint64 echecDistance = 0;   // but inatteignable depuis cette caisse (d < 0)
+    qint64 echecBloque = 0;     // aucune poussée n'avance  <- LE CAS INTÉRESSANT
+    qint64 echecPousse = 0;     // pousse() a refusé (deadlock au passage)
+    qint64 echecAvecFork = 0;   // échec ALORS QU'un choix arbitraire avait eu lieu
+    qint64 succesAvecFork = 0;
+    qint64 forksTotal = 0;      // nombre de pas offrant >= 2 descentes optimales
+    qint64 pasTotal = 0;        // pas réellement joués (succès + échecs)
+    qint64 resteAuBlocage = 0;  // somme des distances restantes au moment du blocage
+    std::vector<qint64> histoEchecPas;    // à quel pas l'échec survient
+    std::vector<qint64> histoSuccesLong;  // longueur des chaînes réussies
+};
+StatsMacro& statsMacro();
+#endif
+
 class Game {
     // Accès aux membres privés pour les tests unitaires (tests/tst_getetat.cpp).
     friend class TestGetEtat;
@@ -65,7 +93,14 @@ public:
     // ci-dessous quand plusieurs requêtes portent sur le même état (le
     // solveur appelle typiquement getEtat() ET getCaissesDeplacable() par
     // état exploré).
-    QVector<bool> getZoneJoueur() const;
+    QVector<bool> getZoneJoueur() const { QVector<bool> v; getZoneJoueur(v); return v; }
+    // Même chose dans un tampon FOURNI, réutilisable d'un appel à l'autre : à
+    // taille déjà bonne, plus aucune allocation (ni le QVector rendu, ni la file
+    // du parcours). C'est la forme du chemin chaud — le flood-fill est le point
+    // le plus appelé du solveur. ⚠️ Le tampon doit être détenu en propre : si une
+    // copie du QVector traîne ailleurs, le fill() initial détache et réalloue,
+    // ce qui annule tout le bénéfice (sans nuire à la correction).
+    void getZoneJoueur(QVector<bool>& visite) const;
     // Longueur de la clé d'état, en shorts : les N caisses + la case canonique du
     // joueur. CONSTANTE sur toute une résolution — aucune caisse n'apparaît ni ne
     // disparaît —, ce qui permet au solveur de ranger toutes ses clés bout à bout
@@ -117,7 +152,19 @@ public:
     // pour la reconstruction. Rend true si le but est atteint ; false si la caisse
     // se bloque en route (l'état est alors partiellement modifié — l'appelant
     // travaille sur une copie jetable).
-    bool macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees);
+    // 'zoneInitiale' (optionnel) : la zone du joueur pour l'état COURANT, quand
+    // l'appelant l'a déjà sous la main. Elle n'est valable que pour le premier
+    // pas — dès qu'une caisse bouge, la macro la recalcule elle-même. Le solveur
+    // essaie une macro par caisse candidate (~5 par état) et dispose déjà de
+    // cette zone : sans ce paramètre, la moitié des flood-fills du solveur sont
+    // des recalculs à l'identique.
+    bool macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees,
+                      const QVector<bool>* zoneInitiale = nullptr);
+    // Filtre bon marché : la macro pourrait-elle faire AU MOINS UN pas ? Répond
+    // sans copier le Game ni rien modifier — c'est le premier pas de
+    // macroVersBut, dont il partage la condition exacte (avanceVersBut). Un
+    // 'false' garantit que macroVersBut échouerait au pas 0.
+    bool macroPeutDemarrer(int idxCaisse, int indexBut, const QVector<bool>& zone) const;
     int getHeuristique() const { return getHeuristique(nullptr); }
     // Surcharge : calcule aussi le SCORE DE GUIDAGE (§10.2) via l'appariement du
     // couplage. Ordre lexicographique des distances-restantes par but (priorité =
@@ -227,6 +274,13 @@ private:
     bool caisseGelee(int idxCaisse, QVector<bool>& enCours) const;
     bool bloqueeSurAxe(int idxCaisse, EDirection dirA, EDirection dirB, QVector<bool>& enCours) const;
     bool estCaisse(int idx) const;
+    // Une poussée de la caisse en 'c' vers 'd' la fait-elle AVANCER vers le but
+    // (distance dCur -> dCur-1), le joueur pouvant se mettre à l'appui ? Rend la
+    // case d'arrivée, ou -1. 'dpb' = la tranche de distanceParBut du but visé.
+    // Exemplaire UNIQUE de la condition de descente : macroVersBut et
+    // macroPeutDemarrer s'en servent tous les deux (cf. game.cpp).
+    int avanceVersBut(int c, int d, int dCur, const int* dpb,
+                      const QVector<bool>& zone) const;
     void calculDistancePoussee();
 
 // Distance de livraison d'une caisse (poussées) depuis les caisses de départ, les
