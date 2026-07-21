@@ -26,6 +26,10 @@
 | 9  | 1 340 763 | 237 | 56 s |
 | 17 | 202 185 | 213 | 5 s |
 
+- ⚠️ **Ce tableau est en régime MACRO, et il a vieilli** (cf. la règle du §1 : ne jamais comparer
+  à un chiffre écrit). Re-mesuré le 2026-07-21 : macro 6 = 821 (pas 784), macro 7 = 210 849 (pas
+  71 337), macro 17 = 202 053. Et en A\* **optimal** les temps n'ont rien à voir — 3 et 5
+  dépassent 200 s, 7 coûte 10 057 191 états pour 88 poussées. Seules les **poussées** font foi.
 - **Le CANARI** — poussées optimales, qui ne doivent JAMAIS bouger :
   **4 / 97 / 131 / 134 / 110 / 213** (niveaux 0 / 1 / 2 / 3 / 6 / 17). C'est le juge de toute
   modif : une `h` qui surestime ou un deadlock faux positif ne dégrade pas la solution, il
@@ -57,6 +61,10 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
   pendant que le code bouge.
 - **`ps rss` ment sur macOS** (le compresseur sort les pages de la RSS). Utiliser
   `/usr/bin/time -l` (« peak memory footprint ») ou `footprint -p PID`.
+- **La jauge de progression part sur `stderr`, et un pipe l'avale.** `bench <niv> 2>&1 | tail`
+  après un `timeout` ne rend RIEN — rediriger vers un fichier (`2>jauge.txt`). C'est la seule
+  façon de mesurer un niveau qu'on ne résout pas (8, 11) : `rangees N (max M)`, dépilements,
+  et la tendance de la file.
 - **`getEtat()->QByteArray` est en BIG-ENDIAN**, `appliqueEtat(quint16*)` lit du **NATIF**.
   Passer les octets bruts à `appliqueEtat` reconstruit un plateau **vide** (0 caisse), que
   `checkVictoire()` prend pour un état gagné. Tout harnais qui relit une clé DUMP_DEV doit
@@ -222,11 +230,13 @@ Séquence convenue, du plus sûr au plus risqué :
    le juge neuf `mesures/fp` (rejeu d'une solution GAGNANTE) lui trouve **106 faux positifs sur
    le 17**. Le « 0 FP » de la veille était un artefact d'échantillonnage. Le couplage restait,
    lui, inutilisable (52 % de FP). **Aucun élagage deadlock sûr n'est disponible à ce jour.**
-3. **🎯 PROCHAIN (plan de bataille 2026-07-21) — GUIDAGE PAR PORTES** (§6.1, méthode 4-tiers de
-   l'utilisateur). Ordonner les poussées par Δzone joueur : ouvre-porte d'abord … ne-fait-que-
-   fermer en dernier. Aide le 8 et le démêlage du 11. Un seul calcul (zone joueur, déjà payé),
-   sert aussi au corral. Pur tie-break → optimalité et canari intacts.
-4. **Corral rigoureux comme élagage** (§6.1) — le vrai levier de la masse `f<C*`, mais risqué :
+3. **❌ RÉFUTÉ le 2026-07-21 — le guidage par portes ne paie pas** (§6.1). Codé, mesuré, reverté.
+   Sûr comme prévu (canari intact partout), mais **le gain suit exactement la masse `f=C*`** :
+   ÷3,1 sur le 1 (100 % à `f=C*`), −0,06 % sur le 17 (6,7 %), 6 états sur 590 066 au niveau 2
+   (0,3 %). **Zéro sur les cibles 8 et 11**, et la variante forte **fait perdre le 190**.
+   Conséquence pour la suite : **plus aucun tie-break ne reste à tenter**. Le §3 est une borne,
+   pas une indication — seul un ÉLAGAGE prouvé attaque encore les gros niveaux.
+4. **🎯 PROCHAIN — Corral rigoureux comme élagage** (§6.1) — le vrai levier de la masse `f<C*`, mais risqué :
    **cadrer le contrat AVANT de coder** (scellé + non-rouvrable + sous-doté). Gaté par le
    guidage : ne lancer le flood-fill corral que sur une poussée qui **ferme une porte** (Δ zone < 0).
 5. **Repli anytime de la macro** (§6.3) — en réserve, borne le temps des cas lents (8, 9).
@@ -352,32 +362,80 @@ simples : niveaux **3 et 5 perdus** (résolus → timeout 70 s) alors que le tes
 piste — ou à reprendre par le BFS **(case, région joueur)**, seul moyen de garder l'obstacle-caisse
 sans inventer de morts. Le canari est intact avec le défaut (4/97/131/134/110/213, états inchangés).
 
-#### 🎯 PLAN DE BATAILLE (2026-07-21) — le GUIDAGE PAR PORTES pour le démêlage
+#### ❌ Session du 2026-07-21 (suite) — GUIDAGE PAR PORTES codé, mesuré, RÉFUTÉ, reverté
 
-Méthode humaine de démêlage (redonnée par l'utilisateur, à coder comme **tie-break de poussée**,
-pas comme borne — donc **zéro faux positif** par construction). Ordre de préférence des poussées :
-1. celles qui **ouvrent une porte** (Δ zone joueur > 0 : connectent des régions) ;
-2. celles qui **font de la place sans ouvrir ni fermer** de porte (Δ zone ≈ 0) ;
-3. celles qui **ouvrent ET ferment** une porte ;
-4. celles qui **ne font que fermer** une porte (Δ zone < 0 : scellent un corral) — en dernier.
+Méthode humaine de démêlage, codée comme **tie-break de poussée** (pas comme borne — donc zéro
+faux positif par construction). Ordre de préférence : 1. **ouvre une porte** ; 2. **fait de la
+place** sans ouvrir ni fermer ; 3. **ouvre ET ferme** ; 4. **ne fait que fermer** (scelle un
+corral), en dernier. Une « porte » = de la connectivité, lue dans `getZoneJoueur()`.
 
-- Une « porte » = de la **connectivité** : `getZoneJoueur()` (déjà payé) donne la zone atteignable ;
-  le Δzone d'une poussée classe directement dans les 4 tiers. C'est le §6.1 item A / item 3 de la
-  feuille de route, rendu concret. Pur guidage → optimalité et canari intacts (l'astar optimal ne
-  lit pas le tie-break ; il ne fait que réordonner l'exploration).
-- Juge : le 11 (démêlage, 12 M états, file qui stagne) et le 8 (le +37 de zone). Mesurer la chute
-  d'états à poussées constantes.
-- Lien avec le goal-ordering : même nature (tie-break macro sûr), même juge (canari intact).
+**Deux points d'implémentation qui, eux, étaient justes** (à réutiliser si la piste ressort) :
+- **Le coût est nul.** `enfiler` appelait déjà `e.getEtat(arene.reserve())`, qui fait DE TOUTE
+  FAÇON le flood-fill de la zone de l'enfant (il canonise la position du joueur dans la clé) et
+  la jetait. Il suffit de la matérialiser et de passer la surcharge `getEtat(cle, zone)`.
+- **⚠️ La NORMALISATION est le piège.** Une seule caisse bouge (y compris sur toute une chaîne de
+  goal macro), de la case A vers la case B. **A est TOUJOURS gagnée** (la caisse la libère, le
+  joueur s'y tient) et **B souvent perdue**. Sans exclure A et B du comptage, une poussée
+  parfaitement neutre affiche +1/−1 et les 4 tiers ne veulent plus rien dire. En les excluant,
+  « neutre » redevient exactement 0 gagnée / 0 perdue.
+
+**Mesuré** (interrupteur `PORTES` sur le même binaire : 0 coupé, 1 = tier en bits de poids FORT
+devant le score de rangement, 2 = en bits de poids FAIBLE). Neutralité de `PORTES=0` vérifiée
+**binaire contre binaire** (worktree sur `HEAD`) : 14/14 identiques.
+
+| | 1 | 2 | 6 | 17 |
+|---|---|---|---|---|
+| A\* optimal, `PORTES=0` | 5 369 | 590 066 | 542 032 | 1 082 674 |
+| A\* optimal, `PORTES=1` | **1 716** (÷3,1) | 590 060 | 518 445 (−4,3 %) | 1 082 009 (−0,06 %) |
+| part de `f = C*` (§3) | **100 %** | 0,3 % | — | 6,7 % |
+
+> **LE GAIN SUIT LA MASSE `f = C*`, LIGNE POUR LIGNE.** Ce n'est pas une déception, c'est le §3
+> qui se vérifie : A\* doit développer TOUT état de `f < C*`, quel que soit l'ordre. **Un
+> tie-break ne peut structurellement rien gagner là.** Le niveau 1 gagne parce qu'il est
+> intégralement à `f = C*` ; les gros niveaux ne gagnent rien parce qu'ils n'y sont pas.
+
+**Sur les cibles, ZÉRO** (macro, budget 120 s égal) : le 11 plafonne à **4/14 dans les trois
+régimes** (~1,69 M dépilements à ±1,5 %), le 8 à **10/18 dans les trois** (~1,68 M). L'hypothèse
+qui justifiait la piste — « en macro la recherche est tronquée, donc l'ordre décide *quand* la
+solution tombe » — est **fausse** : la file MONTE (+458 à +1084 par millier d'états), le solveur
+n'est nulle part près d'un but, et réordonner des ex æquo ne l'en rapproche pas. **Le démêlage
+n'est pas un problème d'ordre de visite.**
+
+**Et la variante forte COÛTE un niveau résolu** : macro 190 **2 748 386 états → TIMEOUT 400 s**,
+191 **27 → 81**. Un signal grossier à 2 bits placé DEVANT le score de rangement écrase le
+goal-ordering — c'est-à-dire exactement ce qui avait résolu ces deux niveaux. Ailleurs le gain
+macro est marginal (2 : 433→397 ; 17 : 202 053→199 724 ; 7 : −0,2 %).
+
+**La variante faible est quasi INERTE** : identique à `PORTES=0` sur 13 niveaux sur 14 (seule
+exception : 190, 2 748 386 → 2 841 092). Le score lexicographique existant ordonne déjà si
+finement qu'un départage de rang inférieur n'a presque jamais d'ex æquo à trancher.
+
+- **Canari intact partout, dans les trois régimes** (4/97/131/110/213) — la promesse « pur ordre
+  de visite » a tenu. C'est la seule chose que ce chantier a démontrée.
+- **Confondant vérifié avant de conclure** : packer 2 bits de tier oblige à réserver `61/n` bits
+  au lieu de `63/n` pour le score lexicographique. La largeur ne change réellement que pour
+  `n = 21` ou `n = 31` buts — **aucun niveau mesuré**, donc l'effet observé vient bien des portes
+  et de rien d'autre. (Piège à connaître si la piste ressort : ce fork rend l'encodage par défaut
+  dépendant d'une variable d'environnement.)
+- **Reverté** (`game.cpp`/`game.h`/`solveurastar.cpp` rendus à `HEAD`). Rien dans le diff n'avait
+  de valeur autonome, et un deuxième interrupteur mort dans le chemin chaud après
+  `butNonLivrable()` n'en valait pas le prix. Les 6 lignes utiles au corral (la condition
+  « cette poussée ferme une porte » = `perdues > 0`) sont re-dérivables d'ici en dix minutes.
+
+**CONCLUSION, et elle oriente toute la suite : le stock de tie-breaks est ÉPUISÉ.** Guidage
+lexicographique, goal-ordering, portes — les trois sont faits, et le §3 dit pourquoi le troisième
+ne pouvait pas payer là où on l'espérait. **Il ne reste que l'élagage prouvé** (item 4, corral)
+pour attaquer la masse `f < C*` des gros niveaux.
 
 - [ ] **B — Corral rigoureux comme ÉLAGAGE** (le vrai levier des gros niveaux, régime `f<C*`).
   Prune seulement si la région est **scellée** ET **non-rouvrable** (aucune caisse-frontière
   poussable vers l'extérieur — induction PI-corral) ET **sous-dotée en buts atteignables**.
   Prouvablement mort, zéro faux positif. C'est le seul qui attaque la masse `f<C*` que le
   guidage ne peut pas toucher.
-- [ ] **A — Guidage corral-aware** (sûr, immédiat). Ranger les poussées par **corral-créé
-  croissant** (ouvre-porte d'abord, ne-ferme-rien, ferme-un-peu, ne-fait-que-fermer — l'ordre
-  manuel de l'utilisateur). Pur tie-break → optimalité intacte. N'aide que le régime `f=C*`
-  (niveau 1, démêlage).
+- [x] ~~**A — Guidage corral-aware**~~ — **❌ FAIT ET RÉFUTÉ le 2026-07-21** (c'est le guidage par
+  portes ci-dessus : ranger les poussées par corral-créé croissant). La réserve écrite ici,
+  « n'aide que le régime `f=C*` », était **exacte** — et c'est précisément ce qui l'a tué.
+  Ne pas le reprendre sous un autre nom.
 - [ ] **Morts peu profondes** : ~30 % des deadlocks sont prouvables par un sous-solve de
   < 500–2000 états (mesuré sur le 11). Une **mini-recherche bornée** qui ne déclare mort que si
   elle **épuise** l'espace sous un petit budget est une **preuve** (pas une heuristique) → sûre.
