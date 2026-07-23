@@ -89,6 +89,7 @@ void MainWindow::onNiveauChange(int index) {
     lvl.load(cbNiveau->itemData(index).toString());
     game = Game(lvl, cbNiveau->itemData(index, RoleNumero).toInt());
 
+    historique.clear();   // nouvel état de départ : l'undo ne doit pas franchir le chargement
     derniereSolutionCoups.clear();
     pbRevoir->setEnabled(false);
 
@@ -159,7 +160,14 @@ bool MainWindow::joue(Game::EDirection dir) {
     const QPoint avant  = game.getPlayerPoint();
     const int    caisses = game.getNbDepCaisse();
 
+    // Undo : on mémorise l'état AVANT un coup HUMAIN (pas le rejeu auto d'une
+    // solution, qui repart de son propre départ). La copie est COW, donc légère.
+    const bool humain = !timerRejeu.isActive();
+    CoupHist snap;
+    if (humain) { snap.etat = game; snap.passages = passages; }
+
     if (!game.deplace(dir)) return false;
+    if (humain) historique.append(std::move(snap));
 
     const QPoint apres = game.getPlayerPoint();
     const bool poussee = game.getNbDepCaisse() > caisses;
@@ -196,6 +204,26 @@ bool MainWindow::joue(Game::EDirection dir) {
     majChampButActif(game);
 
     return true;
+}
+
+// Défait le dernier coup HUMAIN : on dépile l'état d'avant et on l'affiche tel
+// quel (saut direct, l'animation en cours est coupée). Sans effet pendant un
+// rejeu ou si l'historique est vide.
+void MainWindow::annuleCoup() {
+    if (timerRejeu.isActive() || historique.isEmpty()) return;
+
+    CoupHist prec = historique.takeLast();
+    game     = std::move(prec.etat);       // move-assign en place : &game inchangé, WGame le pointe toujours
+    passages = std::move(prec.passages);
+
+    wGame->arreteAnimation();
+    wGame->setEtatsExplores(0);
+    wGame->setPassages(passages);
+    majChampButActif(game);
+    wGame->update();
+    centrerSurJoueur();
+
+    qDebug().noquote() << "[undo] retour arriere";
 }
 
 // Contrôles verrouillés pendant qu'un solveur tourne ou qu'une solution se
@@ -320,6 +348,7 @@ void MainWindow::onRevoir() {
     if (timerRejeu.isActive() || derniereSolutionCoups.isEmpty()) return;
 
     game = derniereSolutionDepart;
+    historique.clear();   // on repart du départ de la solution : l'undo humain d'avant n'a plus de sens
     coupsRestants = derniereSolutionCoups;
 
     // On repart du départ : le compteur aussi (1 sous chaque caisse), sinon deux
@@ -425,6 +454,9 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
         }
 
         QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+
+        if (keyEvent->key() == Qt::Key_Backspace) { annuleCoup(); return true; }
+
         bool moved = false;
 
         switch (keyEvent->key()) {

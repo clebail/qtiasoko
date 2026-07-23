@@ -53,7 +53,7 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
   `/usr/bin/time -l` (« peak memory footprint ») ou `footprint -p PID`.
 - **La jauge de progression part sur `stderr`, et un pipe l'avale.** `bench <niv> 2>&1 | tail`
   après un `timeout` ne rend RIEN — rediriger vers un fichier (`2>jauge.txt`). C'est la seule
-  façon de mesurer un niveau qu'on ne résout pas (8, 11) : `rangees N (max M)`, dépilements,
+  façon de mesurer un niveau qu'on ne résout pas (11, 12) : `rangees N (max M)`, dépilements,
   et la tendance de la file.
 - **`getEtat()->QByteArray` est en BIG-ENDIAN**, `appliqueEtat(quint16*)` lit du **NATIF**.
   Passer les octets bruts à `appliqueEtat` reconstruit un plateau **vide** (0 caisse), que
@@ -234,7 +234,8 @@ Séquence convenue, du plus sûr au plus risqué :
 6. **✅ FAIT le 2026-07-23 — backtracking sur les forks de la macro, promu en défaut** (§6.3) :
    `Game::macroVersButBacktrack` remplace `macroVersBut` dans le solveur sans condition. Canari
    intact, gain net sur 5 (÷1,85) et 9 (passe de « ne termine pas » à ~150 s). Neutre sur les
-   cibles 8/11/12 (toujours non résolues). Reste ouvert : réutiliser la zone du 1ᵉʳ pas (perf,
+   cibles 11/12 (toujours non résolues) ; **le 8 tombe depuis, sans modif de code, laissé tourner
+   sans budget — cf. §6.3**. Reste ouvert : réutiliser la zone du 1ᵉʳ pas (perf,
    cf. §6.3) et le secours de recherche borné gaté par `resteAuBlocage` pour les vrais détours
    non-monotones (aucun cas confirmé à ce jour).
 
@@ -919,9 +920,10 @@ complets obtenus (chiffres : [scores.md](scores.md)) :
   `BACKTRACK_MACRO=1`, il se résout en ~150 s / 1 364 579 états. Faute d'avoir laissé le défaut
   tourner jusqu'au bout, pas de ratio exact — mais l'écart qualitatif (termine / ne termine pas
   dans un temps comparable) est le signal le plus net de toute cette session.
-- **Niveaux 4 et 7 : neutres.** Niveaux 8/11/12 (cibles non résolues) : toujours plats — aucun
-  solve complet obtenu dans un sens ou l'autre, le signal par-tentative reste le seul disponible
-  et il ne bouge pas.
+- **Niveaux 4 et 7 : neutres.** Niveaux 8/11/12 (cibles alors non résolues) : toujours plats **au
+  budget testé** — aucun solve complet obtenu dans un sens ou l'autre, le signal par-tentative
+  reste le seul disponible et il ne bouge pas. ⚠️ **Périmé pour le 8** : laissé tourner sans
+  budget, il se résout (cf. suite ci-dessous). Restent 11 et 12.
 
 **Décision : promu en défaut.** Gain réel et gratuit (canari intact, coût nul quand pas de fork)
 sur des niveaux déjà résolus, jamais négatif au-delà du bruit de mesure (7 : +0,04 %) — suffisant
@@ -929,6 +931,24 @@ pour l'activer sans attendre un effet sur les cibles, qui restent à zéro de to
 **Reste ouvert** : `macroVersButBacktrack` ne réutilise pas encore la zone du 1ᵉʳ pas fournie par
 l'appelant (contrairement à l'ancien `macroVersBut`, cf. §6.3 « coût par état » plus haut) — perte
 de perf connue, non corrigée, sans doute quelques % à regagner.
+
+#### ✅ Session du 2026-07-23 (suite) — LE 8 TOMBE, sans aucune modif de code
+
+**Sans plus de modification** (code de `d7eeef5` identique à `f5ceb0e` — seul `scores.md`
+diffère), le 8 **se résout** laissé tourner **sans budget** : **11 721 760 états, 238 poussées**
+([scores.md](scores.md)). La file montait encore (+519 par millier) quand un but a été touché ;
+la jauge affichait `rangees 0 (max 12)/18` juste avant — le nœud gagnant a complété 12→18 entre
+deux impressions (`checkVictoire` fiable, 238 poussées = 18 caisses posées).
+
+- **Même leçon que le 9 (§6.3), et c'est la TROISIÈME fois** (4, 9, maintenant 8) : « ne termine
+  pas dans le budget » ne veut pas dire « mort », il veut dire **lent**. Le verdict de la suite
+  ci-dessus (« toujours plat sur 8 ») était un artefact de budget (arrêté à 20 s). **Un solve
+  incomplet ne prouve rien sur la solubilité — seul un solve mené au bout tranche.**
+- **Il ne reste que 11 et 12** comme cibles non résolues. Le trio 8/11/12 est un duo.
+- **Canari intact par construction** : même binaire que la table backtrack, aucune modif.
+- **238 poussées est sans référence** (premier solve du 8) — c'est la solution du macro, pas un
+  optimum prouvé. Pour borner l'écart : `passages 8` donne les trajets solos (§3,
+  `C* = Σ trajets solos + congestion`).
 
 ### 6.4 🧠 Le RÉSEAU DE NEURONES — comme GUIDE, JAMAIS comme coupeur
 

@@ -1051,6 +1051,17 @@ QVector<int> Game::ordreParPrecedence() const {
         return {prolonge, mur};
     };
 
+    // LIVRABILITÉ DURCIE (§6.2, salle à deux bouches du 12). La garde ci-dessous ne
+    // regarde que la reachability (dist != -1) — elle laisse filer la précédence
+    // (15,y)<(13,y) parce que la « danse de coin » garde (15,y) livrable après avoir
+    // bloqué (13,y). Mais cette livraison de secours est plus LONGUE. Signal gratuit,
+    // déjà calculé par la garde : si poser b ALLONGE la livraison d'un autre but h
+    // (apres > dist, au lieu de simplement rester ≥ 0), c'est que b est un appui de h
+    // → h doit passer avant b. On PÉNALISE b d'autant de buts qu'il détourne, et le
+    // tie-break préfère poser d'abord ceux qui ne détournent personne.
+    //   LIVR_DURE=0 (défaut) coupé ; 1 = pénalité en tête ; 2 = après la contiguité.
+    const int livrDure = qEnvironmentVariableIntValue("LIVR_DURE");
+
     for (int step = 0; step < nbButs; step++) {
         const QVector<int> dist = distanceLivraison(bloque);
 
@@ -1060,13 +1071,55 @@ QVector<int> Game::ordreParPrecedence() const {
             if (!pose[b] && dist[goals[b]] != -1) candidats.append(b);
 
         // (b) garde anti-échouage : poser ce but laisse-t-il tous les autres livrables ?
+        //     + pénalité de détour (livrabilité durcie, cf. entête de la boucle).
         QVector<int> surs;
+        QVector<int> penalite(nbButs, 0);
         for (int b : candidats) {
             bloque[goals[b]] = true;
             const QVector<int> apres = distanceLivraison(bloque);
             bool ok = true;
-            for (int h = 0; h < nbButs && ok; h++)
-                if (!pose[h] && h != b && apres[goals[h]] == -1) ok = false;
+            int  pen = 0;
+            for (int h = 0; h < nbButs; h++) {
+                if (pose[h] || h == b) continue;
+                if (apres[goals[h]] == -1)               ok = false;   // rendu inaccessible
+                else if (apres[goals[h]] > dist[goals[h]]) pen++;      // livrable mais DÉTOURNÉ
+            }
+
+            // LIVR_DURE=3 : reachability JOUEUR ancrée à sa vraie position (pas le
+            // modèle relâché de distanceLivraison). Poser b (obstacle) déconnecte-t-il
+            // l'appui d'un but restant de la zone où le perso peut MARCHER ? Un couloir
+            // rempli qui mure le perso hors d'une bouche est puni lourdement. (Ne voit
+            // que les murs + buts posés, PAS les caisses d'acheminement : borne haute.)
+            if (livrDure == 3) {
+                QVector<bool> vu(size, false);
+                QList<int> f;
+                const int dep = playerPoint.x() + playerPoint.y() * largeur;
+                if (cases[dep] != Level::tcMur && !bloque[dep]) { f.append(dep); vu[dep] = true; }
+                while (!f.isEmpty()) {
+                    const int c = f.takeFirst();
+                    const int cx = c % largeur, cy = c / largeur;
+                    for (int d = 0; d < NB_DIRECTION; d++) {
+                        const int nx = cx + directions[d].dx, ny = cy + directions[d].dy;
+                        if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+                        const int n = nx + ny * largeur;
+                        if (vu[n] || cases[n] == Level::tcMur || bloque[n]) continue;
+                        vu[n] = true; f.append(n);
+                    }
+                }
+                for (int h = 0; h < nbButs; h++) {
+                    if (pose[h] || h == b) continue;
+                    const int gx = goals[h] % largeur, gy = goals[h] / largeur;
+                    bool joignable = false;
+                    for (int d = 0; d < NB_DIRECTION && !joignable; d++) {
+                        const int ax = gx + directions[d].dx, ay = gy + directions[d].dy;
+                        if (ax < 0 || ax >= largeur || ay < 0 || ay >= hauteur) continue;
+                        if (vu[ax + ay * largeur]) joignable = true;
+                    }
+                    if (!joignable) pen += 1000;   // appui déconnecté du joueur
+                }
+            }
+
+            penalite[b] = pen;
             bloque[goals[b]] = false;
             if (ok) surs.append(b);
         }
@@ -1086,11 +1139,14 @@ QVector<int> Game::ordreParPrecedence() const {
             const int da = dist[goals[b]], dc = dist[goals[choisi]];
             const int ga = degre(b),       gc = degre(choisi);
             const auto ca = contiguite(b), cc = contiguite(choisi);
+            const int pa = penalite[b],    pc = penalite[choisi];
             bool mieux;
-            if (ca.first  != cc.first)       mieux = (ca.first  > cc.first);
-            else if (ca.second != cc.second) mieux = (ca.second > cc.second);
-            else if (ga != gc)               mieux = (ga < gc);
-            else                             mieux = (da < dc);
+            if ((livrDure == 1 || livrDure == 3) && pa != pc) mieux = (pa < pc);  // durci : ne pas stranguler un appui
+            else if (ca.first  != cc.first)     mieux = (ca.first  > cc.first);
+            else if (ca.second != cc.second)    mieux = (ca.second > cc.second);
+            else if (livrDure == 2 && pa != pc) mieux = (pa < pc);
+            else if (ga != gc)                  mieux = (ga < gc);
+            else                                mieux = (da < dc);
             if (mieux) choisi = b;
         }
 

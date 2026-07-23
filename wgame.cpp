@@ -160,6 +160,13 @@ void WGame::animerCoup(Game::EDirection dir, QPoint depart, bool poussee) {
     update();
 }
 
+void WGame::arreteAnimation() {
+    timerAnim.stop();
+    animEnCours   = false;
+    animCaisseIdx = -1;
+    update();
+}
+
 void WGame::avanceAnimation() {
     if (chronoAnim.elapsed() >= dureeAnimation) {
         timerAnim.stop();

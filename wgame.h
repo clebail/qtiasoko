@@ -52,6 +52,10 @@ public:
     // le plateau est de toute façon à jour, seule l'image saute.
     void animerCoup(Game::EDirection dir, QPoint depart, bool poussee);
 
+    // Coupe net un glissement en cours (undo : on saute directement à l'état
+    // restauré, sans laisser l'animation redessiner une position périmée).
+    void arreteAnimation();
+
     // Durée d'un glissement. Le rejeu automatique enchaîne un coup toutes les
     // 150 ms : rester en dessous, sinon chaque animation est tronquée par la
     // suivante et le perso paraît se téléporter.

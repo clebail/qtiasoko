@@ -36,5 +36,6 @@ un nouveau tableau.
 | 5 | 38 594 | 143 | A* macro + backtrack | 2026-07-23 | f5ceb0e |
 | 6 | 821 | 110 | A* macro + backtrack | 2026-07-23 | f5ceb0e |
 | 7 | 210 925 | 90 | A* macro + backtrack | 2026-07-23 | f5ceb0e |
+| **8** | **11 721 760** | **238** | **A\* macro + backtrack** | **2026-07-23** | **d7eeef5** |
 | **9** | **1 364 579** | **237** | **A\* macro + backtrack** | **2026-07-23** | **f5ceb0e** |
 | 17 | 202 053 | 213 | A* macro + backtrack | 2026-07-23 | f5ceb0e |

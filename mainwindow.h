@@ -59,6 +59,10 @@ private:
     // ici, sinon le compteur ne verrait que la moitié des poussées.
     bool joue(Game::EDirection dir);
 
+    // Défait le dernier coup joué À LA MAIN (touche Retour arrière) : restaure
+    // l'état et les compteurs de passage empilés avant ce coup.
+    void annuleCoup();
+
     // Remet le compteur à l'état de DÉPART : 1 sous chaque caisse, 0 ailleurs.
     // Une caisse OCCUPE déjà sa case initiale — partir de 0 ferait afficher 0 sous
     // une caisse qui ne bouge jamais, comme si elle n'existait pas.
@@ -103,6 +107,14 @@ private:
     QString texteEtatMax;
 
     Game game;
+
+    // Historique des coups joués À LA MAIN, pour l'undo (Retour arrière). On empile
+    // une COPIE de 'game' (COW : les tables statiques sont partagées, seul l'état de
+    // jeu diffère) + les compteurs de passage, AVANT chaque coup humain. Le rejeu
+    // automatique (timerRejeu) n'y touche pas ; vidé au (re)chargement du niveau.
+    struct CoupHist { Game etat; QVector<int> passages; };
+    QVector<CoupHist> historique;
+
     // État où le solveur a rangé le plus de caisses (diagnostic §10). Mémorisé
     // pour rester valide tant que WGame le pointe.
     Game gameMax;
