@@ -116,6 +116,17 @@ void WGame::setPassages(const QVector<int>& p) {
     update();
 }
 
+void WGame::setChampButActif(const QVector<int>& champ, int caseBut) {
+    champButActif = champ;
+    caseButActif = caseBut;
+    update();
+}
+
+void WGame::setArbreMacro(const QVector<bool>& visite) {
+    arbreMacro = visite;
+    update();
+}
+
 QString WGame::formaterMillier(qint64 n) {
     QString s = QString::number(n);
     for (int i = s.length() - 3; i > 0; i -= 3) {
@@ -238,6 +249,15 @@ void WGame::paintEvent(QPaintEvent *event) {
                 but.dessine(painter, coin);
             }
 
+            // Arbre de macro (Game::arbreMacro) : toutes les cases visitées
+            // par AU MOINS UNE branche, en aplat translucide — pas de
+            // nombres, juste « ce chemin marche aussi », par-dessus le sol
+            // et la caisse/le but pour rester visible sur les deux.
+            if (idx < arbreMacro.size() && arbreMacro[idx]) {
+                painter.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
+                                  QColor(0x21, 0x96, 0xf3, 110));
+            }
+
             // Compteur de passages, par-dessus la case. Les murs n'en ont
             // jamais.
             if (show && idx < passages.size() && passages[idx] > 0 && c != Level::tcMur) {
@@ -259,6 +279,42 @@ void WGame::paintEvent(QPaintEvent *event) {
 
                 painter.setPen(QColor(255, 255, 255));
                 painter.drawText(r, Qt::AlignCenter, t);
+            }
+
+            // Champ de distances vers le but actif : le gradient que descend
+            // la goal macro (Game::champDistanceButActif). En bas de case, un
+            // autre coin que les passages, pour rester lisible si les deux
+            // sont cochés en même temps. -1 (inatteignable depuis là) n'est
+            // pas dessiné : ça reviendrait à marquer la quasi-totalité du
+            // plateau hors de la région du joueur.
+            if (showChamp && idx < champButActif.size() && champButActif[idx] >= 0 && c != Level::tcMur) {
+                const QRectF r(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT));
+
+                QFont f = painter.font();
+                f.setPointSize(11 * SPRITE_WIDTH / 32);
+                f.setBold(true);
+                painter.setFont(f);
+
+                const QString t = QString::number(champButActif[idx]);
+                painter.setPen(QColor(0, 0, 0, 200));
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                        if (dx || dy)
+                            painter.drawText(r.translated(dx, dy), Qt::AlignBottom | Qt::AlignHCenter, t);
+
+                painter.setPen(QColor(0x4f, 0xc3, 0xf7));   // bleu clair, distinct du blanc des passages
+                painter.drawText(r, Qt::AlignBottom | Qt::AlignHCenter, t);
+            }
+
+            // Surligne le but ACTIF : sans lui, le champ de distances ci-dessus
+            // n'a pas de référence (vers QUEL but on compte).
+            if (showChamp && idx == caseButActif) {
+                const QRectF r(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT));
+                QPen pen(QColor(0xff, 0x6f, 0x00));
+                pen.setWidth(3);
+                painter.setPen(pen);
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRect(r.adjusted(1.5, 1.5, -1.5, -1.5));
             }
         }
     }
@@ -408,8 +464,30 @@ void WGame::mouseMoveEvent(QMouseEvent *event) {
     QWidget::mouseMoveEvent(event);
 }
 
+void WGame::mousePressEvent(QMouseEvent *event) {
+    if (game && game->isLoaded() && event->button() == Qt::LeftButton) {
+        // Inverse de coinCase() : mêmes marges, la case est le quotient entier
+        // (pas le point) — un clic n'importe où sur une tuile doit désigner
+        // cette case entière.
+        const qreal margX = (width()  - game->getLargeur() * SPRITE_WIDTH)  / 2.0;
+        const qreal margY = (height() - game->getHauteur() * SPRITE_HEIGHT) / 2.0;
+        const int cx = static_cast<int>(std::floor((event->pos().x() - margX) / SPRITE_WIDTH));
+        const int cy = static_cast<int>(std::floor((event->pos().y() - margY) / SPRITE_HEIGHT));
+
+        if (cx >= 0 && cx < game->getLargeur() && cy >= 0 && cy < game->getHauteur())
+            emit caseCliquee(cx + cy * game->getLargeur());
+    }
+
+    QWidget::mousePressEvent(event);
+}
+
 void WGame::showPassage(bool show) {
     this->show = show;
+    update();
+}
+
+void WGame::showChampButActif(bool show) {
+    showChamp = show;
     update();
 }
 

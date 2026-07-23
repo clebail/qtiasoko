@@ -32,6 +32,20 @@ public:
     void showPassage(bool show);
     void setDuree(double duree);
 
+    // Champ de distances vers le but ACTIF (Game::champDistanceButActif) : le
+    // gradient que descend la goal macro. 'caseBut' (index plat, -1 = aucun
+    // but actif) est surligné pour montrer QUEL but ce champ vise — sans lui
+    // les nombres n'ont pas de référence. Vide/-1 = rien à afficher (état
+    // gagné, ou champ non recalculé).
+    void setChampButActif(const QVector<int>& champ, int caseBut);
+    void showChampButActif(bool show);
+
+    // Toutes les cases visitées par AU MOINS UNE branche de l'arbre de
+    // macro d'une caisse (Game::arbreMacro) : surlignage plat, une seule
+    // couleur — pas un gradient de nombres, juste « ce chemin-ci marche
+    // aussi ». Vide efface l'overlay.
+    void setArbreMacro(const QVector<bool>& visite);
+
     // Fait glisser le perso — et la caisse qu'il pousse — de 'depart' vers la
     // case où 'game' le montre DÉJÀ : à appeler après le coup, seul l'affichage
     // retarde. Un coup joué pendant un glissement le remplace, sans rattrapage :
@@ -68,11 +82,19 @@ signals:
     // vue : en 64 px le plateau dépasse largement la fenêtre.
     void joueurDeplace(QPoint centre);
 
+    // Case cliquée (index plat), pour le diagnostic « chemin de macro » : un
+    // clic sur une caisse doit pouvoir déclencher l'affichage de son trajet
+    // complet vers le but actif. WGame ne sait pas lire le plateau pour filtrer
+    // (juste convertir une position écran en case) : à MainWindow de décider
+    // si c'est une caisse jouable.
+    void caseCliquee(int idx);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     // Arme l'infobulle qui déplie les abréviations, mais seulement au-dessus du
     // panneau de stats : ailleurs le plateau doit rester muet.
     void mouseMoveEvent(QMouseEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
 
 private:
     const Game *game = nullptr;
@@ -80,6 +102,11 @@ private:
     QVector<int> passages;
     bool show = false;
     double duree = 0;
+
+    QVector<int> champButActif;
+    int caseButActif = -1;
+    bool showChamp = false;
+    QVector<bool> arbreMacro;
 
     // Cases atteignables par le joueur en ignorant les caisses : l'intérieur du
     // plateau. Un .xsb écrit un espace aussi bien pour un sol praticable que pour

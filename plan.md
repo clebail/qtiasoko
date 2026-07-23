@@ -6,33 +6,16 @@
 
 ---
 
-## 0. État réel — la carte des 33 (2026-07-17)
+## 0. État réel — la carte des 33
 
-**10 niveaux sur 33 résolus**, plafond 60 s, un seul processus à la fois, mémoire par
-`/usr/bin/time -l` (jamais `ps rss`, cf. pièges).
+**Les chiffres (états/poussées/commit) sont dans [scores.md](scores.md) — seul ce fichier fait
+foi.** Ne plus reporter de tableau états/poussées ici : un nombre copié dans ce document vieillit
+en silence pendant que le code bouge (c'est exactement ce qui a fait passer inaperçue la
+régression du niveau 9, cf. §6.3 — corrigé par la règle du §1).
 
-| | niveaux | |
-|---|---|---|
-| ✅ résolus | 0, 1, 2, 3, 4, 5, 6, 7, 9, 17 | **10 / 33** |
-| ❌ > 60 s | 8, 10 à 16, 18 à 32 | **23 / 33** |
-
-| niveau | états | poussées | temps |
-|---|---|---|---|
-| 0 / 1 / 2 / 3 | 4 / 14 / 435 / 509 | 4 / 97 / 131 / 134 | < 1 s |
-| 4  | 3 687 580 | 355 | > 60 s (aboutit, long) |
-| 5  | 71 339 | 143 | 2,2 s |
-| 6  | 784 | 110 | < 1 s |
-| 7  | 71 337 | 90 | 1,3 s |
-| 9  | 1 340 763 | 237 | 56 s |
-| 17 | 202 185 | 213 | 5 s |
-
-- ⚠️ **Ce tableau est en régime MACRO, et il a vieilli** (cf. la règle du §1 : ne jamais comparer
-  à un chiffre écrit). Re-mesuré le 2026-07-21 : macro 6 = 821 (pas 784), macro 7 = 210 849 (pas
-  71 337), macro 17 = 202 053. Et en A\* **optimal** les temps n'ont rien à voir — 3 et 5
-  dépassent 200 s, 7 coûte 10 057 191 états pour 88 poussées. Seules les **poussées** font foi.
-- **Le CANARI** — poussées optimales, qui ne doivent JAMAIS bouger :
-  **4 / 97 / 131 / 134 / 110 / 213** (niveaux 0 / 1 / 2 / 3 / 6 / 17). C'est le juge de toute
-  modif : une `h` qui surestime ou un deadlock faux positif ne dégrade pas la solution, il
+- **Le CANARI** — les poussées optimales des niveaux résolus les plus simples, qui ne doivent
+  JAMAIS bouger d'une modif à l'autre (valeurs à jour : [scores.md](scores.md)). C'est le juge de
+  toute modif : une `h` qui surestime ou un deadlock faux positif ne dégrade pas la solution, il
   fait **manquer l'optimum sans aucun signal**.
 - **Le mur mémoire n'existe plus** : pic 599 Mo sur tout le tour (contre 20,7 Go qui tuaient
   le 2 avant la macro). **Ce qui reste est un mur de TEMPS.** Tous les chantiers mémoire
@@ -60,6 +43,12 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 - **Comparer un binaire à un AUTRE binaire** (ancien reconstruit depuis `HEAD` via
   `git worktree`), **jamais à un chiffre écrit** dans ce document : il vieillit en silence
   pendant que le code bouge.
+- **Noter le commit à côté de CHAQUE chiffre mesuré.** Un chiffre sans commit ne se distingue pas
+  d'un chiffre jamais vérifié. Les scores (états/poussées par niveau) vivent dans
+  [scores.md](scores.md), un tableau par nouvelle progression, commit en clair sur chaque ligne.
+  **En cas de rebase** (hash introuvable, `git cat-file -e <hash>` échoue) → le chiffre est
+  présumé périmé, on relance la mesure et on ajoute un nouveau tableau, on ne corrige jamais une
+  ligne à la main.
 - **`ps rss` ment sur macOS** (le compresseur sort les pages de la RSS). Utiliser
   `/usr/bin/time -l` (« peak memory footprint ») ou `footprint -p PID`.
 - **La jauge de progression part sur `stderr`, et un pipe l'avale.** `bench <niv> 2>&1 | tail`
@@ -242,6 +231,12 @@ Séquence convenue, du plus sûr au plus risqué :
    **cadrer le contrat AVANT de coder** (scellé + non-rouvrable + sous-doté). Gaté par le
    guidage : ne lancer le flood-fill corral que sur une poussée qui **ferme une porte** (Δ zone < 0).
 5. **Repli anytime de la macro** (§6.3) — en réserve, borne le temps des cas lents (8, 9).
+6. **✅ FAIT le 2026-07-23 — backtracking sur les forks de la macro, promu en défaut** (§6.3) :
+   `Game::macroVersButBacktrack` remplace `macroVersBut` dans le solveur sans condition. Canari
+   intact, gain net sur 5 (÷1,85) et 9 (passe de « ne termine pas » à ~150 s). Neutre sur les
+   cibles 8/11/12 (toujours non résolues). Reste ouvert : réutiliser la zone du 1ᵉʳ pas (perf,
+   cf. §6.3) et le secours de recherche borné gaté par `resteAuBlocage` pour les vrais détours
+   non-monotones (aucun cas confirmé à ce jour).
 
 En réserve, pas à trancher : mémoire (mur disparu), sous-optimal (pire sur gros), RN (§6.4).
 
@@ -791,6 +786,149 @@ le 11, ~10,6 par état développé.
 - Piste non retenue : faire rendre à `macroPeutDemarrer` la direction trouvée, pour que
   `macroVersBut` ne rebalaye pas le 1ᵉʳ pas. Alourdit l'API pour un gain visible seulement sur les
   niveaux à chaînes longues — à ne faire que sur mesure préalable.
+
+#### ⏸️ Session du 2026-07-23 — pourquoi la macro échoue si souvent : `echecBloque`, pas les forks
+
+**Point de départ — outil UI neuf (non commité) pour VOIR le champ que suit la macro.**
+`Game::champDistanceButActif()` et `Game::cheminMacro(idxCaisse)` (`game.h`/`game.cpp`) exposent le
+champ `distanceParBut` du but actif tel que `avanceVersBut` le lit réellement (pas une lecture
+indépendante par case — cf. piège ci-dessous). Câblés dans `WGame`/`MainWindow` : case cochable
+« Champ distance but actif », et un **clic sur une caisse** rejoue son `macroVersBut` complet sur
+une COPIE et affiche le trajet réel jusqu'au blocage. ⚠️ Première version fausse, corrigée en
+cours de session : lire `regions[joueurRéel][cell]` pour CHAQUE case indépendamment n'est pas la
+même chose que ce que fait `avanceVersBut` (`regions[c][devant]`, la caisse comme référence, pas
+le joueur figé) — un voisin pouvait afficher une distance qu'aucune poussée légale n'atteint. Corrigé
+en ne s'appuyant plus que sur `avanceVersBut` lui-même (jamais de calcul dupliqué). État du code :
+`game.cpp`/`game.h`/`wgame.cpp`/`wgame.h`/`mainwindow.cpp`/`mainwindow.h`/`mainwindow.ui`, non
+commité.
+
+**Cas d'école, niveau 11** (`plateau_niveau11.xsb`, export de l'état après 5 buts posés) : la
+caisse en (10,3) descend `19→18→17→16→15` jusqu'à (7,4) et s'y bloque. Vérifié à la main (tests
+`/tmp/.../testmacro*.cpp`, jetables) : à (7,3), Bas ET Gauche faisaient tous deux baisser la
+distance (un vrai fork) ; Bas est testé en premier dans l'énum (`Haut, Droite, Bas, Gauche`) et
+gagne, mais mène à un cul-de-sac (appui pris par une autre caisse réelle en (8,4)). **Ce n'est pas
+l'ordre des buts** (théorème déjà validé, §6.2, chantier fermé) — reproduit par l'utilisateur à la
+main en le respectant scrupuleusement, même résultat.
+
+⚠️ **CORRIGÉ ensuite dans la même session — la première conclusion (« il aurait fallu un vrai
+détour non-monotone ») était FAUSSE.** En forçant Gauche à (7,3), la macro avance encore 12
+poussées... puis se rebloque à (3,12), et un premier test (avec un bug de méthode : `pousse()` brut
+ne vérifie pas l'appui, contrairement à `avanceVersBut`) a fait croire à un second cul-de-sac réel
+(mur + caisse immobile). **Faux** : il y avait un DEUXIÈME fork non exploré, à (3,11) (Bas ET
+Gauche baissent tous deux la distance), masqué par le même biais d'énumération. Revérifié
+proprement (zone réelle + appui, comme `avanceVersBut`) : forcer Gauche à (3,11) puis laisser
+`macroVersBut` reprendre seul réussit **intégralement, en 19 poussées — l'optimum exact**
+(`(3,11)→(2,11)→(2,12)→(1,12)→(1,13)`). **Aucun détour n'était nécessaire : deux forks en cascade,
+tous les deux récupérables.** Piège à retenir : corriger UN fork trouvé ne suffit pas à conclure —
+il peut y en avoir un autre plus loin sur le même chemin.
+
+**Généralisé avec l'outil existant `mesures/macro`** (créé le 2026-07-21, walk `INSTRUM_MACRO` déjà
+en place) sur 18 niveaux — 9 résolus + 9 cibles (mesuré à `c54d7d7`, avant les ajouts de cette
+session — `macroVersBut` intact à ce point), ⚠️ **un seul tirage de 15 s par niveau, PAS le
+« meilleur de 3 » que ce document impose pourtant (§6.3 ci-dessus) — à retraiter avant de trancher
+quoi que ce soit dessus.**
+
+| niveau | tentatives | échecs | dont `echecBloque` | dont **fork avant blocage** | reste moyen au blocage |
+|---|---|---|---|---|---|
+| 1 | 28 | 67,9 % | ~tous | 0,0 % | 16,2 |
+| 2 | 1 324 | 87,2 % | ~tous | 3,5 % | 12,5 |
+| 3 | 1 125 | 86,8 % | ~tous | 5,8 % | 12,0 |
+| 5 | 228 648 | 83,0 % | ~tous | 14,9 % | 10,8 |
+| 6 | 2 847 | 94,7 % | ~tous | 10,6 % | 9,6 |
+| 7 | 519 482 | 92,5 % | ~tous | 9,7 % | 4,8 |
+| **9** | 623 271 | 94,8 % | ~tous | **50,7 %** | 10,1 |
+| 17 | 500 729 | 99,9 % | ~tous | 4,8 % | 30,7 |
+| 8 | 723 626 | 100,0 % | ~tous | 2,0 % | 12,5 |
+| 10 | 223 853 | 100,0 % | ~tous | 12,1 % | 20,5 |
+| 11 | 526 273 | 99,9 % | ~tous | 3,1 % | 14,9 |
+| 12 | 703 860 | 96,8 % | ~tous | 20,4 % | 10,1 |
+| 13 | 645 264 | 73,6 % | ~tous | 5,6 % | 9,0 |
+| 14 | 576 121 | 96,8 % | ~tous | 5,2 % | 12,5 |
+| 15 | 556 700 | 91,3 % | ~tous | 5,4 % | 6,1 |
+| 16 | 673 076 | 99,8 % | ~tous | 8,8 % | 15,7 |
+| 18 | 675 348 | 90,5 % | ~tous | 1,2 % | 8,4 |
+
+(niveau 0 omis, échantillon trop petit — 7 tentatives)
+
+**Deux constats :**
+1. **`echecBloque` (aucune direction ne fait baisser la distance) N'EST PAS le cas rare qu'on
+   pensait — c'est LE mode d'échec, sur les 17 niveaux mesurés sans exception** (`echecPousse`,
+   `echecDistance`, `echecRegion` restent négligeables partout). Et `reste moyen au blocage` (5 à
+   31 poussées) dit que ce ne sont pas des quasi-réussites : la macro meurt souvent en plein
+   milieu du trajet, pas à 1 coup du but.
+2. **`echecAvecFork`** (la part déjà mesurée le 2026-07-21, « ce qu'un backtracking récupérerait »)
+   reste dans la fourchette basse déjà documentée (1-20 %) sur la plupart des niveaux — confirme
+   que backtracker sur les forks ne paierait toujours pas en général. **Sauf le niveau 9, à 50,7 %,
+   un vrai outlier** — à isoler, piste distincte (réordonner le test statique des 4 directions,
+   coût nul, pas du backtracking).
+
+⚠️ **Piste « zone d'embut » : nuancée après coup, pas codée.** L'idée de départ : détecter
+automatiquement la salle de buts (composantes biconnexes / points d'articulation, cf. §6.2 —
+« Tarjan… non retenue » pour le tie-break d'ordre, mais candidat naturel ici) pour scoper un
+secours de recherche. **D'abord écartée sur un « à partir du niveau 12 il n'y a plus de salle »
+trop catégorique, puis corrigée par l'utilisateur** : la plupart des niveaux EN ONT une, seuls
+quelques-uns n'en ont pas. Reste non codée — sans objet une fois la piste ci-dessous choisie, qui
+ne dépend pas de la géométrie.
+
+**🎯 PISTE RETENUE — mémoriser les forks, backtracker au lieu d'abandonner.** Proposée par
+l'utilisateur après le cas d'école ci-dessus (deux forks en cascade, tous deux récupérables) :
+à chaque pas où `avanceVersBut` trouve **plus d'une** direction qui avance, la descente actuelle
+en retient une (la première de l'énum) et **oublie les autres pour toujours**. Au lieu de ça :
+les empiler, et si la chaîne meurt (`echecBloque`), dépiler jusqu'au dernier fork et reprendre
+avec la direction suivante.
+- **Bon marché par construction** : une seule caisse bouge pendant tout `macroVersBut` — un fork
+  n'a besoin de mémoriser qu'une copie de `Game` à cet instant (COW sur les tables statiques,
+  coût comparable à ce que le solveur paie déjà par candidate) + la direction non essayée, pas un
+  arbre de recherche. Et les forks sont rares (1-20 % des pas, sauf le 9) : peu de branches à
+  rouvrir en pratique.
+- **Couvre exactement `echecAvecFork`, mais VRAIMENT** (pas la borne haute) : le chiffre déjà
+  mesuré ne dit que « un fork a été croisé quelque part », sans vérifier que l'autre branche mène
+  au but — potentiellement après PLUSIEURS forks en cascade, ce qu'un simple retry-une-fois ne
+  capture pas (c'est exactement l'erreur faite dans le cas d'école ci-dessus).
+- **Ne couvre toujours pas** un vrai détour non-monotone (aucune direction ne baisse jamais la
+  distance nulle part sur le chemin) — mais aucun cas confirmé de ce genre n'a encore été trouvé ;
+  celui qu'on croyait tel s'est révélé être un second fork non exploré.
+
+**✅ IMPLÉMENTÉ, MESURÉ, PROMU EN DÉFAUT le 2026-07-23 —
+`Game::macroVersButBacktrack`** : isolée (ne touche pas `macroVersBut`, toujours utilisée telle
+quelle par les outils de diagnostic UI — `cheminMacro`/`champDistanceButActif`/`arbreMacro`, qui
+ont justement besoin de la descente gloutonne SANS retour en arrière pour montrer le problème).
+Câblée sans condition dans `solveurastar.cpp` (interrupteur `BACKTRACK_MACRO` retiré après
+verdict, comme `ORDRE_TB`/`ORACLE_HUMAIN` en leur temps). **Un bug de premier jet corrigé
+avant toute mesure valable** : la première version travaillait sur une copie locale et ne
+recopiait jamais le résultat dans `*this` — l'appelant récupérait un état inchangé, silencieusement
+dupliqué du parent, rejeté par la dédup (cassait même le niveau 1, canari en échec immédiat).
+Corrigé (`*this = std::move(etat)` avant chaque `return`).
+
+**Canari intact** une fois corrigé, avant ET après la promotion (chiffres : [scores.md](scores.md)).
+
+Le taux de succès de la macro par tentative (mesuré niveau par niveau, 20 s, tirage unique — pas
+un score, un diagnostic interne à `mesures/macro`) grimpe fort sur les niveaux à beaucoup de
+forks, mais reste plat sur les cibles 8/11/12. Ça n'a pas suffi à conclure : le proxy
+« taux de succès par tentative » ne prédit pas bien la performance globale (cf. verdict
+ci-dessous) — seul un solve complet, comparé binaire à binaire, tranche. Les états/poussées de
+chaque solve complet sont dans [scores.md](scores.md), pas ici.
+
+**✅ VERDICT RÉVISÉ — un vrai gain sur certains résolus, toujours plat sur les cibles.** Le premier
+verdict (« ne paie nulle part ») reposait sur une comparaison tronquée : les deux régimes avaient
+été arrêtés à budget de temps égal (20 s) sans qu'aucun des deux n'ait fini. Une fois les solves
+complets obtenus (chiffres : [scores.md](scores.md)) :
+- **Niveau 5 : gain net** (÷1,85 en états, canari intact).
+- **Niveau 9 : bascule qualitative, pas juste un gain.** En défaut, aucun binaire testé ne le
+  termine dans un budget raisonnable (25 M+ états et ça continue, en direct dans l'app). Avec
+  `BACKTRACK_MACRO=1`, il se résout en ~150 s / 1 364 579 états. Faute d'avoir laissé le défaut
+  tourner jusqu'au bout, pas de ratio exact — mais l'écart qualitatif (termine / ne termine pas
+  dans un temps comparable) est le signal le plus net de toute cette session.
+- **Niveaux 4 et 7 : neutres.** Niveaux 8/11/12 (cibles non résolues) : toujours plats — aucun
+  solve complet obtenu dans un sens ou l'autre, le signal par-tentative reste le seul disponible
+  et il ne bouge pas.
+
+**Décision : promu en défaut.** Gain réel et gratuit (canari intact, coût nul quand pas de fork)
+sur des niveaux déjà résolus, jamais négatif au-delà du bruit de mesure (7 : +0,04 %) — suffisant
+pour l'activer sans attendre un effet sur les cibles, qui restent à zéro de toute façon.
+**Reste ouvert** : `macroVersButBacktrack` ne réutilise pas encore la zone du 1ᵉʳ pas fournie par
+l'appelant (contrairement à l'ancien `macroVersBut`, cf. §6.3 « coût par état » plus haut) — perte
+de perf connue, non corrigée, sans doute quelques % à regagner.
 
 ### 6.4 🧠 Le RÉSEAU DE NEURONES — comme GUIDE, JAMAIS comme coupeur
 

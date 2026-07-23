@@ -48,11 +48,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(pbExport, &QPushButton::clicked, this, &MainWindow::onExportPassages);
     connect(pbExportXsb, &QPushButton::clicked, this, &MainWindow::onExportXsb);
     connect(cbNotePassages, &QCheckBox::stateChanged, this, &MainWindow::onShowPassagesCaisse);
+    connect(cbDistanceButActif, &QCheckBox::stateChanged, this, &MainWindow::onShowChampButActif);
     connect(cbEtatMax, &QCheckBox::stateChanged, this, &MainWindow::onToggleEtatMax);
     connect(&timerRejeu, &QTimer::timeout, this, &MainWindow::rejouerCoup);
     timerRejeu.setInterval(150);
 
     connect(wGame, &WGame::joueurDeplace, this, &MainWindow::onJoueurDeplace);
+    connect(wGame, &WGame::caseCliquee, this, &MainWindow::onCaseCliquee);
 
     // Les stats sont peintes au coin de la partie VISIBLE du plateau (cf.
     // WGame::paintEvent) : un défilement les déplace, il faut donc repeindre. Qt
@@ -99,9 +101,19 @@ void MainWindow::onNiveauChange(int index) {
     wGame->setEtatsExplores(0);
     wGame->setDuree(0);
     wGame->setPassages(passages);
+    majChampButActif(game);
     wGame->update();
 
     centrerSurJoueur();
+}
+
+void MainWindow::majChampButActif(const Game& g) {
+    const int b = g.butActif();
+    wGame->setChampButActif(g.champDistanceButActif(), b >= 0 ? g.getCaseBut(b) : -1);
+    // L'arbre d'un clic précédent ne vaut que pour L'ÉTAT où il a été
+    // calculé : périmé dès qu'un coup est joué, donc effacé à chaque
+    // rafraîchissement du champ par défaut, pas seulement sur un nouveau clic.
+    wGame->setArbreMacro({});
 }
 
 void MainWindow::onJoueurDeplace(QPoint centre) {
@@ -181,6 +193,7 @@ bool MainWindow::joue(Game::EDirection dir) {
     // 'game' est déjà à l'arrivée : l'affichage seul retarde, le temps que le
     // perso (et la caisse) glissent depuis la case d'où ils partent.
     wGame->animerCoup(dir, avant, poussee);
+    majChampButActif(game);
 
     return true;
 }
@@ -316,6 +329,7 @@ void MainWindow::onRevoir() {
     wGame->setGame(&game);
     wGame->setEtatsExplores(derniereSolutionEtats);
     wGame->setPassages(passages);
+    majChampButActif(game);
 
     setControlesActifs(false);
     pbRevoir->setEnabled(false);
@@ -470,6 +484,37 @@ void MainWindow::onShowPassagesCaisse() {
     pbExport->setEnabled(cbNotePassages->isChecked());
 }
 
+void MainWindow::onShowChampButActif() {
+    // Le champ n'est pas tenu à jour en continu (contrairement à 'passages',
+    // rafraîchi à chaque coup) : le recalculer ICI rattrape le cas où il a
+    // périmé pendant que la case était décochée.
+    majChampButActif(cbEtatMax->isChecked() ? gameMax : game);
+    wGame->showChampButActif(cbDistanceButActif->isChecked());
+}
+
+void MainWindow::onCaseCliquee(int idx) {
+    const Game& g = cbEtatMax->isChecked() ? gameMax : game;
+    if (g.getCase(idx) != Level::tcCaisse && g.getCase(idx) != Level::tcGoalCaisse) return;
+
+    const QVector<int> chemin = g.cheminMacro(idx);
+    if (chemin.isEmpty()) return;   // aucun but actif (état gagné) : rien à montrer
+
+    // setChecked() déclenche onShowChampButActif (champ PAR DÉFAUT) si la case
+    // n'était pas déjà cochée : le pousser AVANT de poser 'chemin', pour que ce
+    // soit bien lui qui reste affiché ensuite, pas le champ par défaut qui
+    // vient de l'écraser.
+    if (!cbDistanceButActif->isChecked())
+        cbDistanceButActif->setChecked(true);
+
+    const int b = g.butActif();
+    wGame->setChampButActif(chemin, b >= 0 ? g.getCaseBut(b) : -1);
+    wGame->showChampButActif(true);
+
+    // Toutes les branches de l'arbre de fork, pas juste celle qui gagne —
+    // matérialise « les autres chemins qui marchent aussi », en aplat bleu.
+    wGame->setArbreMacro(g.arbreMacro(idx));
+}
+
 void MainWindow::onNouveauMax(Game etatMax, int nbRangees) {
     gameMax = etatMax;
     maxRangeesVu = nbRangees;
@@ -477,16 +522,20 @@ void MainWindow::onNouveauMax(Game etatMax, int nbRangees) {
     cbEtatMax->setText(QString("%1 (%2/%3)")
                            .arg(texteEtatMax).arg(nbRangees).arg(gameMax.getNbButs()));
     // Si l'utilisateur regarde déjà l'état-max, le rafraîchir en direct.
-    if (cbEtatMax->isChecked())
+    if (cbEtatMax->isChecked()) {
+        majChampButActif(gameMax);
         wGame->update();
+    }
 }
 
 void MainWindow::onToggleEtatMax(int state) {
     if (state == Qt::Checked) {
         timerRejeu.stop();               // fige l'affichage sur l'état-max
         wGame->setGame(&gameMax);
+        majChampButActif(gameMax);
     } else {
         wGame->setGame(&game);
+        majChampButActif(game);
     }
     majSpinner();
     wGame->update();

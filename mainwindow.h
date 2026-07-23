@@ -31,6 +31,11 @@ private slots:
     void onExportPassages();
     void onExportXsb();
     void onShowPassagesCaisse();
+    void onShowChampButActif();
+    // Clic sur une caisse (WGame::caseCliquee) : montre son trajet de macro
+    // COMPLET vers le but actif, au lieu du champ par défaut (toutes les
+    // caisses, un pas). Sans effet sur une autre case (mur, sol, joueur...).
+    void onCaseCliquee(int idx);
     // Reçoit du solveur l'état où un nouveau record de caisses posées est atteint.
     void onNouveauMax(Game etatMax, int nbRangees);
     // Bascule l'affichage entre le plateau courant et l'état-max mémorisé.
@@ -58,6 +63,14 @@ private:
     // Une caisse OCCUPE déjà sa case initiale — partir de 0 ferait afficher 0 sous
     // une caisse qui ne bouge jamais, comme si elle n'existait pas.
     void initPassages();
+
+    // Recalcule le champ de distances vers le but actif de 'g' et le pousse à
+    // wGame. À rappeler à chaque fois que le plateau AFFICHÉ change d'état
+    // (coup joué, changement de niveau, bascule état-max) — contrairement à
+    // 'passages', ce champ n'est pas cumulatif, il ne vaut que pour l'état
+    // courant. Sans effet si la checkbox est décochée (juste un peu de calcul
+    // perdu, jamais faux) : plus simple que de dupliquer la garde partout.
+    void majChampButActif(const Game& g);
 
     // passages[case] = nombre de fois qu'une caisse a été poussée SUR cette case
     // depuis le chargement du niveau. CUMULÉ : une caisse qui repasse au même

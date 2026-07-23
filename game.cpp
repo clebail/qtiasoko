@@ -1346,6 +1346,116 @@ int Game::avanceVersBut(int c, int d, int dCur, const int* dpb,
     return (dpb[devant * maxRegions + rApres] == dCur - 1) ? devant : -1;
 }
 
+QVector<int> Game::champDistanceButActif() const {
+    const int b = butActif();
+    if (b < 0) return {};
+
+    QVector<int> champ(size, -1);
+    const int joueurIdx = playerPoint.x() + playerPoint.y() * largeur;
+    const int* dpb = distanceParBut.constData() + (qsizetype)b * size * maxRegions;
+    const QVector<bool> zone = getZoneJoueur();
+
+    // Une caisse à la fois — comme macroPeutDemarrer/macroVersBut le feraient
+    // pour chaque candidate. dCur se lit avec la position RÉELLE du joueur
+    // (c'est bien elle, avant toute poussée) ; les voisins, eux, passent par
+    // avanceVersBut — seule source de vérité sur ce qui est un coup légal.
+    for (int cell = 0; cell < size; cell++) {
+        if (cases[cell] != Level::tcCaisse && cases[cell] != Level::tcGoalCaisse) continue;
+
+        const int rAvant = regions[joueurIdx * size + cell];
+        if (rAvant < 0) continue;
+        const int dCur = dpb[cell * maxRegions + rAvant];
+        if (dCur < 0) continue;
+        champ[cell] = dCur;
+        if (dCur == 0) continue;   // déjà sur le but : rien à avancer (garde de macroPeutDemarrer)
+
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int devant = avanceVersBut(cell, d, dCur, dpb, zone);
+            if (devant >= 0) champ[devant] = dCur - 1;
+        }
+    }
+    return champ;
+}
+
+QVector<int> Game::cheminMacro(int idxCaisse) const {
+    if (cases[idxCaisse] != Level::tcCaisse && cases[idxCaisse] != Level::tcGoalCaisse) return {};
+    const int b = butActif();
+    if (b < 0) return {};
+
+    const int* dpb = distanceParBut.constData() + (qsizetype)b * size * maxRegions;
+    const int joueurIdx = playerPoint.x() + playerPoint.y() * largeur;
+    const int rAvant = regions[joueurIdx * size + idxCaisse];
+    if (rAvant < 0) return {};
+    const int dCur = dpb[idxCaisse * maxRegions + rAvant];
+    if (dCur < 0) return {};
+
+    QVector<int> champ(size, -1);
+    champ[idxCaisse] = dCur;
+
+    // Copie jetable : macroVersBut POUSSE réellement la caisse (pousse(),
+    // checkDefaite compris) — *this doit rester intact, c'est un simple clic
+    // de diagnostic, pas un coup joué.
+    Game copie(*this);
+    QVector<QPair<int, int>> poussees;
+    copie.macroVersBut(idxCaisse, b, poussees);
+
+    // Chaque élément de 'poussees' est (case AVANT le coup, direction) : la
+    // case d'arrivée s'en déduit par translation, comme dans macroVersBut
+    // lui-même. La distance décroît d'exactement 1 par construction — c'est
+    // un trajet réellement joué, pas une lecture indépendante par case.
+    int d = dCur;
+    for (const auto& p : poussees) {
+        const int c   = p.first;
+        const int dir = p.second;
+        const int devant = c + directions[dir].dx + directions[dir].dy * largeur;
+        d--;
+        champ[devant] = d;
+    }
+    return champ;
+}
+
+QVector<bool> Game::arbreMacro(int idxCaisse, qint64 budgetNoeuds) const {
+    QVector<bool> visite(size, false);
+    if (cases[idxCaisse] != Level::tcCaisse && cases[idxCaisse] != Level::tcGoalCaisse) return visite;
+    const int b = butActif();
+    if (b < 0) return visite;
+    const int caseBut = goals[b];
+    const int* dpb = distanceParBut.constData() + (qsizetype)b * size * maxRegions;
+
+    visite[idxCaisse] = true;
+
+    // Pile de branches à explorer : (état à cet instant, case de la caisse).
+    // Comme macroVersButBacktrack, mais on ne s'arrête PAS au premier succès
+    // — on empile TOUTES les directions qui avancent, pas seulement celles
+    // en réserve, pour matérialiser la totalité de l'arbre.
+    struct Noeud { Game etat; int caisse; };
+    QVector<Noeud> pile;
+    pile.append({Game(*this), idxCaisse});
+
+    qint64 budget = budgetNoeuds;
+    while (!pile.isEmpty() && budget-- > 0) {
+        Noeud n = pile.takeLast();
+        if (n.caisse == caseBut) continue;
+
+        QVector<bool> zone = n.etat.getZoneJoueur();
+        const int joueurIdx = n.etat.playerPoint.x() + n.etat.playerPoint.y() * largeur;
+        const int rAvant = n.etat.regions[joueurIdx * size + n.caisse];
+        if (rAvant < 0) continue;
+        const int dCur = dpb[n.caisse * maxRegions + rAvant];
+        if (dCur <= 0) continue;
+
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int devant = n.etat.avanceVersBut(n.caisse, d, dCur, dpb, zone);
+            if (devant < 0) continue;
+            Game suite(n.etat);
+            if (!suite.pousse(n.caisse, (Game::EDirection)d) || suite.isPerdu()) continue;
+            visite[devant] = true;
+            pile.append({std::move(suite), devant});
+        }
+    }
+    return visite;
+}
+
 bool Game::macroPeutDemarrer(int idxCaisse, int indexBut, const QVector<bool>& zone) const {
     // Le PREMIER pas de macroVersBut, sans rien copier ni modifier. Si c'est non,
     // la macro échouerait au pas 0 — mesuré (mesures/macro) : 48,5 % des tentatives
@@ -1465,6 +1575,115 @@ bool Game::macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& po
     }
 #endif
     return c == caseBut;
+}
+
+bool Game::macroVersButBacktrack(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees,
+                                  qint64* essaisOut, qint64 budgetBranches) {
+    if (cases[idxCaisse] != Level::tcCaisse && cases[idxCaisse] != Level::tcGoalCaisse) {
+        if (essaisOut) *essaisOut = 0;
+        return false;
+    }
+    const int caseBut = goals[indexBut];
+    const int* dpb = distanceParBut.constData() + (qsizetype)indexBut * size * maxRegions;
+
+    // Un fork mémorisé : l'état du plateau À CET INSTANT (une seule caisse a
+    // bougé depuis le départ, les tables statiques restent partagées COW —
+    // la copie reste bon marché), la case de la caisse, la direction NON
+    // essayée, et le chemin joué jusque-là. Rejouer depuis un fork = repartir
+    // de cette copie plutôt que de tenter un « undo » manuel (plus sûr : on
+    // ne réinvente pas la logique de move()/checkDefaite).
+    struct Fork { Game etat; int caisse; int direction; QVector<QPair<int,int>> chemin; };
+    QVector<Fork> pile;
+
+    Game etat(*this);
+    int c = idxCaisse;
+    QVector<QPair<int,int>> chemin;
+    qint64 essais = 1;
+
+    // Joue la direction 'd' (déjà connue valide par avanceVersBut) sur
+    // 'etat' : peut encore échouer via pousse() (checkDefaite au passage,
+    // comme echecPousse dans macroVersBut) — dans ce cas la branche est
+    // morte, on ne le découvre parfois qu'ici.
+    auto joue = [&](int d) -> bool {
+        const int devant = c + directions[d].dx + directions[d].dy * largeur;
+        if (!etat.pousse(c, (Game::EDirection)d)) return false;
+        chemin.append({c, d});
+        c = devant;
+        return true;
+    };
+
+    bool bloque = false;
+    for (;;) {
+        if (!bloque) {
+            while (c != caseBut) {
+                QVector<bool> zone = etat.getZoneJoueur();
+                const int joueurIdx = etat.playerPoint.x() + etat.playerPoint.y() * largeur;
+                const int rAvant = etat.regions[joueurIdx * size + c];
+                if (rAvant < 0) { bloque = true; break; }
+                const int dCur = dpb[c * maxRegions + rAvant];
+                if (dCur <= 0) { bloque = true; break; }
+
+                QVarLengthArray<int, NB_DIRECTION> candidats;
+                for (int d = 0; d < NB_DIRECTION; d++)
+                    if (etat.avanceVersBut(c, d, dCur, dpb, zone) >= 0) candidats.append(d);
+                if (candidats.isEmpty()) { bloque = true; break; }
+
+                // Empile les branches non retenues AVANT de jouer la
+                // première : dans l'ordre inverse, pour dépiler dans l'ordre
+                // de l'énum si plusieurs sont un jour ouvertes.
+                for (int i = candidats.size() - 1; i >= 1; i--)
+                    pile.append({etat, c, candidats[i], chemin});
+
+                if (!joue(candidats[0])) { bloque = true; break; }
+            }
+        }
+
+        if (!bloque && c == caseBut) {
+            poussees = chemin;
+            // macroVersBut mute *this DIRECTEMENT (pousse() est appelé sur
+            // l'objet lui-même) : l'appelant (solveurastar.cpp) récupère le
+            // résultat en relisant 'e' après coup, pas via une valeur de
+            // retour. Ici tout le travail se fait sur la copie locale 'etat'
+            // (nécessaire pour pouvoir revenir en arrière) — il FAUT la
+            // recopier dans *this avant de rendre la main, sinon l'appelant
+            // voit un état inchangé (silencieusement dupliqué du parent,
+            // rejeté par la dédup : c'est exactement le bug qui a cassé le
+            // canari au premier essai — cf. plan.md).
+            *this = std::move(etat);
+            if (essaisOut) *essaisOut = essais;
+#ifdef INSTRUM_MACRO
+            StatsMacro& st = statsMacro();
+            st.btTentatives++;
+            st.btSucces++;
+            if (essais > 1) st.btSuccesApresBacktrack++;
+            st.btEssaisTotal += essais;
+            if (essais > st.btEssaisMax) st.btEssaisMax = essais;
+#endif
+            return true;
+        }
+
+        if (pile.isEmpty() || essais >= budgetBranches) {
+            // Échec : *this finit « partiellement modifié », comme
+            // macroVersBut (contrat documenté en game.h) — l'appelant traite
+            // toujours 'e' comme une copie jetable dans ce cas.
+            *this = std::move(etat);
+            if (essaisOut) *essaisOut = essais;
+#ifdef INSTRUM_MACRO
+            StatsMacro& st = statsMacro();
+            st.btTentatives++;
+            st.btEssaisTotal += essais;
+            if (essais > st.btEssaisMax) st.btEssaisMax = essais;
+#endif
+            return false;
+        }
+
+        Fork f = pile.takeLast();
+        etat = f.etat;
+        c = f.caisse;
+        chemin = f.chemin;
+        essais++;
+        bloque = !joue(f.direction);
+    }
 }
 
 #ifdef INSTRUM_MACRO

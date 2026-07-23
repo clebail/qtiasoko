@@ -79,6 +79,7 @@ static void imprimeHistoF(const std::vector<qint64>& histoF, int cStar, qint64 t
 // Interrupteur de mesure, à retirer avec le verdict.
 static const bool livraisonSurEnfants = (qgetenv("LIVRAISON").toInt() == 5);
 
+
 void SolveurAStar::run() {
     std::vector<SElement> file;
     qint64 compteur = 0;
@@ -302,9 +303,14 @@ void SolveurAStar::run() {
                     if (!etat.macroPeutDemarrer(i, but, zone)) continue;
                     Game e(etat);
                     QVector<QPair<int,int>> poussees;
-                    // 'zone' est celle d'etat, et e en est une copie non encore
-                    // modifiée : elle vaut donc pour le premier pas de la macro.
-                    if (e.macroVersBut(i, but, poussees, &zone) && !e.isPerdu()) {
+                    // Backtracke sur les forks (game.h) au lieu de s'arrêter à la
+                    // première descente arbitraire — promu par défaut le 2026-07-23
+                    // (§6.3) : canari intact, gain net sur 5/9 (le 9 ne finissait
+                    // même pas sans), coût nul en l'absence de fork. 'zone' n'est
+                    // PAS réutilisée ici (contrairement à l'ancien macroVersBut) :
+                    // le prototype recalcule son propre premier flood-fill — perte
+                    // de perf connue, pas encore corrigée (cf. plan.md §6.3).
+                    if (e.macroVersButBacktrack(i, but, poussees) && !e.isPerdu()) {
                         enfiler(e, cur.g + poussees.size(), poussees);
                         macrosOk++;
                     }

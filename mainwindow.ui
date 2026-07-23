@@ -136,6 +136,16 @@
         </widget>
        </item>
        <item>
+        <widget class="QCheckBox" name="cbDistanceButActif">
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
+         </property>
+         <property name="text">
+          <string>Champ distance but actif</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QCheckBox" name="cbEtatMax">
          <property name="enabled">
           <bool>false</bool>

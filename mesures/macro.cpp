@@ -70,6 +70,18 @@ static void imprime(int niveau) {
     for (size_t i = 0; i < s.histoSuccesLong.size(); i++)
         if (s.histoSuccesLong[i])
             printf("     %3zu poussees : %10lld\n", i, (long long)s.histoSuccesLong[i]);
+
+    if (s.btTentatives) {
+        printf("\n  -- BACKTRACK_MACRO (prototype 2026-07-23) --\n");
+        printf("  tentatives      %10lld\n", (long long)s.btTentatives);
+        printf("  succes          %10lld  (%.1f %%)\n",
+               (long long)s.btSucces, 100.0 * s.btSucces / s.btTentatives);
+        printf("     dont RECUPERES par backtracking (essais > 1) %10lld  (%.1f %% des succes)\n",
+               (long long)s.btSuccesApresBacktrack,
+               s.btSucces ? 100.0 * s.btSuccesApresBacktrack / s.btSucces : 0.0);
+        printf("  essais moyens / tentative   %.2f\n", (double)s.btEssaisTotal / s.btTentatives);
+        printf("  essais max sur une tentative %10lld\n", (long long)s.btEssaisMax);
+    }
     fflush(stdout);
 }
 

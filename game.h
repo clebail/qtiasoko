@@ -36,6 +36,16 @@ struct StatsMacro {
     qint64 resteAuBlocage = 0;  // somme des distances restantes au moment du blocage
     std::vector<qint64> histoEchecPas;    // à quel pas l'échec survient
     std::vector<qint64> histoSuccesLong;  // longueur des chaînes réussies
+
+    // Prototype du 2026-07-23 (§6.3, « mémoriser les forks ») —
+    // macroVersButBacktrack : combien de BRANCHES (essais) une tentative a
+    // réellement coûté, et combien de succès n'existaient QUE grâce au
+    // retour en arrière (essais > 1 — la descente gloutonne seule aurait
+    // échoué là).
+    qint64 btTentatives = 0, btSucces = 0;
+    qint64 btSuccesApresBacktrack = 0;   // succes ET essais > 1
+    qint64 btEssaisTotal = 0;            // pour la moyenne d'essais par tentative
+    qint64 btEssaisMax = 0;
 };
 StatsMacro& statsMacro();
 #endif
@@ -144,6 +154,51 @@ public:
     // Index du but ACTIF (§10.5) : le plus profond (ordreButs) pas encore rempli,
     // ou -1 si tous le sont (état gagnant). C'est la cible de la goal macro.
     int butActif() const;
+    // Case (index plat) du but d'indice 'indexBut' — même indexation que
+    // butActif()/ordreButs. Pour l'UI, qui a besoin d'une position à surligner.
+    int getCaseBut(int indexBut) const { return goals[indexBut]; }
+    // Champ de distances vers le BUT ACTIF, SPARSE : une valeur uniquement sur
+    // les caisses réellement posées (leur dCur) et sur celles de leurs cases
+    // voisines vers lesquelles une poussée est LÉGALE dans l'état courant
+    // (dCur-1). Toutes les autres cases valent -1 (rien à afficher).
+    //
+    // ⚠️ Pas un champ dense sur tout le plateau : une première version
+    // affichait dpb[cell][regions[joueurRéel][cell]] pour CHAQUE case,
+    // indépendamment les unes des autres. C'était FAUX pour les voisins d'une
+    // caisse — regions[joueurRéel][cell] répond à « si le SEUL obstacle du
+    // plateau était une caisse ici, dans quelle région tomberait le joueur
+    // réel, où qu'il soit ? », pas à « si je pousse VRAIMENT cette caisse
+    // jusqu'ici, quelle distance ? ». La bonne référence, après une poussée,
+    // c'est la case que la caisse vient de quitter (le joueur s'y tient) — pas
+    // la position réelle et figée du joueur. C'est exactement ce que fait
+    // avanceVersBut (regions[c][devant], PAS regions[joueur][devant]), donc
+    // cette fonction rappelle avanceVersBut lui-même plutôt que de refaire le
+    // calcul : chaque valeur affichée est un coup que la macro jouerait
+    // réellement, jamais une distance orpheline sur une case que rien ne peut
+    // atteindre en un coup légal (mur, appui occupé par une AUTRE caisse...).
+    //
+    // Vide si aucun but actif (état gagné). À n'appeler que pour l'affichage
+    // humain (getZoneJoueur() + un balayage de 'size' cases), jamais dans le
+    // solveur.
+    QVector<int> champDistanceButActif() const;
+    // Trajet COMPLET de la goal macro pour la caisse 'idxCaisse' vers le but
+    // actif : rejoue macroVersBut sur une COPIE (ne modifie pas *this) et
+    // rend un champ sparse, une valeur (distance restante) sur CHAQUE case
+    // traversée — du départ ('idxCaisse') jusqu'à l'arrivée si la macro
+    // réussit, ou jusqu'à la case de BLOCAGE si elle échoue en route (auquel
+    // cas la dernière valeur du chemin n'est pas 0 : c'est justement ce qui
+    // montre où et pourquoi ça coince). Vide si 'idxCaisse' n'est pas une
+    // caisse, ou si aucun but n'est actif.
+    QVector<int> cheminMacro(int idxCaisse) const;
+    // Comme cheminMacro, mais rend TOUTES les branches explorées par les
+    // forks (pas juste celle qui gagne) : chaque case visitée par AU MOINS
+    // UN chemin monotone (distance strictement décroissante) depuis
+    // 'idxCaisse', qu'il mène au but ou se bloque. Sert à visualiser la forme
+    // de l'arbre de choix — un pas sans fork n'ajoute qu'une case, un pas
+    // avec fork fait bifurquer plusieurs branches à la fois. Coûte une
+    // exploration bornée (budget de nœuds) sur des copies jetables ; à
+    // n'appeler que pour l'affichage humain, jamais dans le solveur.
+    QVector<bool> arbreMacro(int idxCaisse, qint64 budgetNoeuds = 5000) const;
     // GOAL MACRO (§10.5) : pousse la caisse en 'idxCaisse' jusqu'au but d'index
     // 'indexBut', le long de son trajet solo, en vérifiant à CHAQUE pas que la
     // poussée est réellement jouable dans l'état courant (case d'arrivée libre,
@@ -160,6 +215,19 @@ public:
     // des recalculs à l'identique.
     bool macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees,
                       const QVector<bool>* zoneInitiale = nullptr);
+    // PROTOTYPE (2026-07-23, §6.3) — même contrat que macroVersBut, mais
+    // BACKTRACKE sur les forks au lieu de les oublier : à chaque pas où
+    // plusieurs directions font baisser la distance, mémorise les autres
+    // (une copie de l'état à cet instant, bon marché — une seule caisse
+    // bouge pendant tout l'appel, les tables statiques sont en COW) et, si
+    // la branche courante finit par se bloquer, reprend à la dernière non
+    // essayée au lieu d'abandonner. N'existe qu'à côté de macroVersBut — ne
+    // le remplace pas, mesuré séparément avant toute décision.
+    // 'essais' (optionnel) : nombre de branches réellement tentées (1 = la
+    // descente gloutonne a suffi). 'budgetBranches' borne le total, protection
+    // contre un niveau à forks denses ; dépassé => échec propre (pas un crash).
+    bool macroVersButBacktrack(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees,
+                                qint64* essais = nullptr, qint64 budgetBranches = 1000);
     // Filtre bon marché : la macro pourrait-elle faire AU MOINS UN pas ? Répond
     // sans copier le Game ni rien modifier — c'est le premier pas de
     // macroVersBut, dont il partage la condition exacte (avanceVersBut). Un
