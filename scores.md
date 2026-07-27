@@ -109,3 +109,24 @@ identiques au canari. Touche une famille de morts que le motif 1 ratait : le **8
 | 8 | 5 905 757 | 238 | A* macro + backtrack + corral pince | 2026-07-27 | 66db7ca |
 | 9 | 1 215 113 | 237 | A* macro + backtrack + corral pince | 2026-07-27 | 66db7ca |
 | 17 | 190 635 | 213 | A* macro + backtrack + corral pince | 2026-07-27 | 66db7ca |
+
+## Anchor prod `e77b98a` (merge de `gain-deadlock` en master)
+
+Passe bench de contrôle après merge en prod, sur `e77b98a` (« Optim mémoires +
+macro étendu + corrals static »). **Tous les compteurs identiques à `66db7ca`** :
+`optim mémoire` + `macro étendu` + `corrals static` n'ont régressé ni les états ni
+les poussées d'aucun résolu — le canari a tenu à travers le merge et ces trois évols.
+
+| Niveau | Nb État | Nb Poussé | Méthode | Date | N° de commit |
+|---|---|---|---|---|---|
+| 0 | 4 | 4 | A* macro + backtrack + corral pince | 2026-07-27 | e77b98a |
+| 1 | 14 | 97 | A* macro + backtrack + corral pince | 2026-07-27 | e77b98a |
+| 2 | 433 | 131 | A* macro + backtrack + corral pince | 2026-07-27 | e77b98a |
+| 3 | 509 | 134 | A* macro + backtrack + corral pince | 2026-07-27 | e77b98a |
+| 4 | 665 967 | 355 | A* macro + backtrack + corral pince | 2026-07-27 | e77b98a |
+| 5 | 30 510 | 143 | A* macro + backtrack + corral pince | 2026-07-27 | e77b98a |
+| 6 | 698 | 110 | A* macro + backtrack + corral pince | 2026-07-27 | e77b98a |
+| 7 | 29 725 | 90 | A* macro + backtrack + corral pince | 2026-07-27 | e77b98a |
+| 8 | 5 905 757 | 238 | A* macro + backtrack + corral pince | 2026-07-27 | e77b98a |
+| 9 | 1 215 113 | 237 | A* macro + backtrack + corral pince | 2026-07-27 | e77b98a |
+| 17 | 190 635 | 213 | A* macro + backtrack + corral pince | 2026-07-27 | e77b98a |
