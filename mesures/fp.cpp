@@ -21,6 +21,7 @@
 #include "level.h"
 #include "game.h"
 #include "solveur.h"
+#include "precedencepaires.h"
 
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
@@ -52,7 +53,13 @@ int main(int argc, char** argv) {
         // « but orphelin ». Même juge, même verdict binaire : toute détection sur
         // un chemin gagnant est un faux positif prouvé.
         auto detecte = [variante](const Game& e) {
-            return variante < 0 ? e.corralUnitaireMort() : e.butNonLivrable(variante);
+            // -3 : PRÉCÉDENCE PAR PAIRES (mesures/precedencepaires.h). Objet de
+            // diagnostic, pas encore un élagage — c'est précisément ce juge qui doit
+            // dire s'il pourrait le devenir un jour.
+            if (variante == -3) return PrecedencePaires::violations(e) > 0;
+            if (variante == -2) return e.gateEnclosMort();     // gate corral-N (item B)
+            if (variante <  0)  return e.corralUnitaireMort(); // corral unitaire + pince
+            return e.butNonLivrable(variante);
         };
 
         if (detecte(g)) { faux++; premier = 0; }   // l'état de départ !

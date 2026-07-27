@@ -1,4 +1,5 @@
 #include <QtDebug>
+#include <QSet>
 #include <cstdio>
 #include <algorithm>
 #include <climits>
@@ -25,8 +26,9 @@ static bool compare(const SolveurAStar::SElement& a, const SolveurAStar::SElemen
 }
 
 SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, bool macro, QObject *parent,
-                           bool macroCouplage)
-    : Solveur(etatDepart, parent), poids(poids), macro(macro), macroCouplage(macroCouplage) {
+                           bool macroCouplage, bool plongeon)
+    : Solveur(etatDepart, parent), poids(poids), macro(macro), macroCouplage(macroCouplage),
+      plongeon(plongeon) {
 }
 
 #ifdef DUMP_DEV
@@ -88,13 +90,274 @@ StatsDeltaF& statsDeltaF() {
 // Interrupteur de mesure, à retirer avec le verdict.
 static const bool livraisonSurEnfants = (qgetenv("LIVRAISON").toInt() == 5);
 
-// Corral unitaire : ACTIF par défaut (promu, cf. §6.1). Trappe `CORRAL=0` pour le
-// couper — réservée aux OUTILS DE MESURE (`fp`, `mort`) qui doivent collecter/
-// rejouer des états SANS que le corral les élague d'abord, sinon le juge est
-// aveugle aux faux positifs qu'il est censé chercher. La prod ne touche jamais
-// cette variable (défaut = actif).
+// Corral : ACTIF par défaut (promu, cf. §6.1) — les DEUX étages, le corral
+// unitaire (motifs 1 et 2) et le corral-N (strip + A* borné). Trappe `CORRAL=0`
+// pour tout couper — réservée aux OUTILS DE MESURE (`fp`, `mort`) qui doivent
+// collecter/rejouer des états SANS que le corral les élague d'abord, sinon le
+// juge est aveugle aux faux positifs qu'il est censé chercher. La prod ne touche
+// jamais cette variable (défaut = actif).
 static const bool corralActif = (qgetenv("CORRAL") != "0");
 
+// Budget du sous-solve d'enclos (corral-N). Balayage mesuré le 2026-07-27 : le
+// gain d'états SATURE dès ~150, tandis que le coût des sous-solves explose (×6)
+// au-delà — en « inconnus » qui ne prouvent rien et qu'on paie plein tarif.
+// Figé après verdict, comme les autres réglages promus.
+static const int CORRAL_BUDGET = 150;
+
+// Stats du corral-N, agrégées sur tout le solve puis imprimées sur stderr en fin
+// de run(). Runtime, pas de #ifdef : la fraction de durs prouvés morts est ce qui
+// PRÉDIT le gain sur un niveau neuf (§6.1), on veut la lire sans recompiler. Coût
+// nul devant le flood-fill de l'enfilage. Un seul solve par process (bench).
+struct StatsCorral {
+    qint64 enfilages = 0;
+    qint64 avecCandidat = 0, totCandidats = 0;   // portail brut
+    qint64 avecDur = 0, totDurs = 0;             // après gate Hall + non-rouvrable
+    qint64 totCells = 0, totFrontiere = 0, totButsVides = 0;   // sur les DURS
+    qint64 dursMorts = 0, dursVivants = 0, dursInconnus = 0;   // verdict strip + A*
+    qint64 cacheHits = 0, solveStates = 0;
+    qint64 enfilagesPrunes = 0;                  // enfilages coupés par une mort prouvée
+    // Étage 0 « clé du cache sans le joueur » (CACHE_JOUEUR=1, cf. game.cpp).
+    qint64 hitsTestes = 0, hitsZoneDiff = 0;
+    qint64 diffMort = 0, diffVivant = 0, diffInconnu = 0;
+    qint64 etage1[9] = {0,0,0,0,0,0,0,0,0};      // croisement cache × recalcul
+    qint64 etage1States = 0;
+    qint64 arbitre[3] = {0,0,0};                 // MORT→inconnu rejugés à budget large
+    qint64 arbitreStates = 0;
+};
+static StatsCorral& statsCorral() { static StatsCorral s; return s; }
+static void imprimeStatsCorral() {
+    const StatsCorral& s = statsCorral();
+    if (!s.enfilages) return;   // corral coupé (CORRAL=0), ou run sans enfilage
+    fprintf(stderr,
+        "[CORRAL-N] enfilages=%lld\n"
+        "   portail BRUT  : %lld enfilages avec candidat (%.3f%%), %lld candidats\n"
+        "   apres GATE    : %lld enfilages avec DUR      (%.3f%%), %lld durs\n"
+        "   taille moy. d'un DUR : cells=%.1f  frontiere=%.1f  buts=%.1f\n",
+        (long long)s.enfilages,
+        (long long)s.avecCandidat, 100.0 * (double)s.avecCandidat / (double)s.enfilages,
+        (long long)s.totCandidats,
+        (long long)s.avecDur, 100.0 * (double)s.avecDur / (double)s.enfilages,
+        (long long)s.totDurs,
+        s.totDurs ? (double)s.totCells / (double)s.totDurs : 0.0,
+        s.totDurs ? (double)s.totFrontiere / (double)s.totDurs : 0.0,
+        s.totDurs ? (double)s.totButsVides / (double)s.totDurs : 0.0);
+    const qint64 juges = s.dursMorts + s.dursVivants + s.dursInconnus;
+    if (juges) {
+        fprintf(stderr,
+            "   STRIP+A* : durs juges=%lld  MORTS=%lld (%.1f%%)  vivants=%lld  inconnus=%lld\n"
+            "              configs distinctes solvees=%lld  cache-hits=%lld (amortissement %.1fx)\n"
+            "              etats de sous-solve=%lld (moy %.0f/config)  enfilages PRUNES=%lld\n",
+            (long long)juges, (long long)s.dursMorts,
+            juges ? 100.0 * (double)s.dursMorts / (double)juges : 0.0,
+            (long long)s.dursVivants, (long long)s.dursInconnus,
+            (long long)(juges - s.cacheHits), (long long)s.cacheHits,
+            (juges - s.cacheHits) ? (double)juges / (double)(juges - s.cacheHits) : 0.0,
+            (long long)s.solveStates,
+            (juges - s.cacheHits) ? (double)s.solveStates / (double)(juges - s.cacheHits) : 0.0,
+            (long long)s.enfilagesPrunes);
+    }
+    // ÉTAGE 0 (plan.md §6.1) — le verdict caché a été PROUVÉ pour une position de
+    // joueur donnée ; combien de fois est-il transféré à une zone DIFFÉRENTE ?
+    //   diffMort    → prunes potentiellement INJUSTIFIÉS (le faux positif redouté)
+    //   diffVivant  } → prunes potentiellement MANQUÉS : c'est le GAIN possible,
+    //   diffInconnu }   et l'inconnu est le plus suspect (verdict par défaut, vide)
+    // Le désaccord de verdict lui-même n'est PAS mesuré ici : « zone différente » ne
+    // veut pas dire « verdict différent ». C'est l'étage 1 (recalcul du sous-solve
+    // sur les seules collisions) qui tranche, et lui seul.
+    if (s.hitsTestes) {
+        fprintf(stderr,
+            "   [ETAGE 0 cle-joueur] hits testes=%lld  zone DIFFERENTE=%lld (%.2f%%)\n"
+            "              dont verdict cache : MORT=%lld  vivant=%lld  inconnu=%lld\n",
+            (long long)s.hitsTestes, (long long)s.hitsZoneDiff,
+            100.0 * (double)s.hitsZoneDiff / (double)s.hitsTestes,
+            (long long)s.diffMort, (long long)s.diffVivant, (long long)s.diffInconnu);
+        const qint64 n1 = s.etage1[0]+s.etage1[1]+s.etage1[2]+s.etage1[3]+s.etage1[4]
+                        + s.etage1[5]+s.etage1[6]+s.etage1[7]+s.etage1[8];
+        if (n1) {
+            static const char* nom[3] = {"MORT   ", "vivant ", "inconnu"};
+            fprintf(stderr, "   [ETAGE 1 recalcul] %lld collisions rejugees pour la VRAIE position\n"
+                            "              cache \\ vrai :     MORT    vivant   inconnu\n", (long long)n1);
+            for (int c = 0; c < 3; c++)
+                fprintf(stderr, "                 %s : %8lld %8lld %8lld\n", nom[c],
+                        (long long)s.etage1[3*c], (long long)s.etage1[3*c+1], (long long)s.etage1[3*c+2]);
+            // ⚠️ LECTURE, ET ELLE EST ASYMÉTRIQUE — « inconnu » n'est PAS « vivant » :
+            // c'est « budget épuisé sans conclure », donc ça ne prouve RIEN.
+            //   MORT → vivant  : le SEUL faux positif prouvé (on a prune un état que
+            //                    le sous-solve résout depuis la vraie position).
+            //   MORT → inconnu : NON TRANCHÉ. Le prune repose sur un verdict qu'on ne
+            //                    sait pas reproduire ici, mais rien ne dit qu'il est
+            //                    faux — il faut un budget plus large pour conclure.
+            //   * → MORT       : prune MANQUÉ, et celui-là est PROUVÉ (l'exhaustion
+            //                    sous budget est une preuve, cf. sousSolveEnclos).
+            fprintf(stderr, "              => FP PROUVES (MORT->vivant)=%lld | non tranches (MORT->inconnu)=%lld\n"
+                            "                 prunes MANQUES PROUVES (->MORT)=%lld   (etats de recalcul=%lld)\n",
+                    (long long)s.etage1[1], (long long)s.etage1[2],
+                    (long long)(s.etage1[3] + s.etage1[6]),
+                    (long long)s.etage1States);
+        if (s.arbitre[0] + s.arbitre[1] + s.arbitre[2]) {
+            fprintf(stderr, "   [ARBITRAGE budget large] %lld cas MORT->inconnu rejuges :\n"
+                            "              MORT (transfert LEGITIME)=%lld | vivant (FAUX POSITIF PROUVE)=%lld"
+                            " | toujours inconnu=%lld   (etats=%lld)\n",
+                    (long long)(s.arbitre[0] + s.arbitre[1] + s.arbitre[2]),
+                    (long long)s.arbitre[0], (long long)s.arbitre[1], (long long)s.arbitre[2],
+                    (long long)s.arbitreStates);
+        }
+        }
+    }
+    fflush(stderr);
+}
+
+
+// PLONGEON SUR RECORD (§6.0) — le budget est une FRACTION DU TRAVAIL DÉJÀ FAIT,
+// et c'est tout le réglage. Ni seuil de remplissage, ni budget fixe.
+//
+// POURQUOI PAS UN SEUIL EN % DE BUTS REMPLIS (essayé le 2026-07-28, abandonné) :
+// aucune valeur ne convient. 80 % gagne sur le 4 (×32,6) et le 9 (×4,1) ; 66 %
+// gagne sur le 8 (×3,7) et le 3 (×2,5) mais DÉGRADE le 2 (+2 poussées) et le 5
+// (+8). Et le 8 a tranché la question : son record complétable le plus précoce est
+// à 28 % du plateau (5/18, finissable en 1 133 états) — alors qu'au MÊME
+// pourcentage, le 9 a des records MORTS qui coûtent 59 771 états à réfuter. Le
+// pourcentage ne distingue donc pas les deux cas : ce n'est pas la bonne variable.
+//
+// CE QUI LES DISTINGUE, c'est le travail déjà consenti. Le 8 atteint son 5/18
+// après 158 000 dépilements, le 9 ses records morts après ~1 000. D'où la règle :
+//
+//     budget du plongeon = (états déjà développés) / PLONGEON_DIVISEUR
+//
+// Plus on a ramé, plus il est rationnel de parier. Les conséquences tombent toutes
+// seules, sans réglage par plateau :
+//   - le 2 (412 états au total) n'accorde jamais assez de budget pour qu'un
+//     plongeon aboutisse → il ne plonge JAMAIS et garde son optimum, par
+//     construction et non par un seuil ;
+//   - les plongeons ruineux du 9 sont étouffés : à ce stade le budget vaut ~10 ;
+//   - le 8 à 158 000 dépilements dispose de 1 580, de quoi payer ses 1 133.
+// Le paramètre restant porte sur le COMPORTEMENT OBSERVÉ du solveur, pas sur une
+// propriété du plateau devinée — il a donc une chance de tenir sur un niveau
+// jamais vu, ce qu'aucun pourcentage calé sur 8 plateaux ne peut promettre.
+//
+// LE DIVISEUR, BALAYÉ puis FIGÉ le 2026-07-28 (méthode CORRAL_BUDGET : on ne fige
+// qu'après avoir mesuré les deux bords). Plage sûre mesurée : **[1/20, 1/100]**,
+// bornée par deux mécanismes opposés —
+//   - EN HAUT (budget trop généreux) : à 1/15 le niveau 2 dérive à 133 poussées,
+//     et à 1/10 à 139. On plonge trop tôt, depuis un chemin qui a déjà dévié.
+//   - EN BAS (budget trop maigre) : à 1/500 le 4 REPERD tout (67 159 états au lieu
+//     de 2 115) — il lui faut 19 états à ~2 000 dépilements, donc un diviseur ≤ 105 ;
+//     et le 8 retombe à 1 174 706 (il lui faut 340 états à 158 000, donc ≤ 464).
+// **1/50 est au centre** : ×2,5 de marge avant le bord haut, ×10 avant le bord bas.
+// Le premier réglage retenu (1/100) était à la limite basse et laissait **×6,9 sur
+// le 8** (159 484 contre 22 991) — d'où la règle : ne jamais figer sans balayer.
+static const int PLONGEON_DIVISEUR = 50;
+
+int SolveurAStar::plonge(const Game& etatDepart, int gDepart, int idxNoeudDepart,
+                         QHash<QByteArray,Game::VerdictEnclos>& cacheEnclos, int budget, qint64* etatsOut) {
+    // Un échec ne doit RIEN laisser derrière lui : on rend 'noeuds' à sa taille
+    // d'avant. Sans ça, chaque plongeon raté enflerait définitivement l'arbre de
+    // reconstruction de la recherche principale.
+    const int noeudsAvant = noeuds.size();
+
+    // Les états vivent dans un vecteur qui ne fait que croître ; le tas ne porte
+    // que (h, index), donc aucun Game n'est recopié pendant les push_heap.
+    std::vector<Game> etats;
+    std::vector<int> gs, idxN;
+    std::vector<std::pair<int,int>> tas;
+
+    // Tas-MIN sur h SEUL — c'est toute la différence avec la recherche principale :
+    // on ignore g, donc on fonce vers le but au lieu de développer les paliers.
+    // À h égal, le plus PROFOND d'abord (même raison : plonger, pas balayer).
+    auto apres = [&gs](const std::pair<int,int>& a, const std::pair<int,int>& b) {
+        if (a.first != b.first) return a.first > b.first;
+        return gs[a.second] < gs[b.second];
+    };
+
+    QSet<QByteArray> vus;
+    QVector<bool> zone, zoneEnfant, visiteCorral;
+    qint64 developpes = 0;
+    int idxGagnant = -1;
+
+    etats.push_back(etatDepart);
+    gs.push_back(gDepart);
+    idxN.push_back(idxNoeudDepart);
+    vus.insert(etatDepart.getEtat());
+    tas.push_back({etatDepart.getHeuristique(nullptr), 0});
+
+    // Ajoute un enfant : mêmes élagages que l'enfilage principal (corral unitaire
+    // puis corral-N, sur le même cache mémoïsé — un enclos déjà jugé ne se rejuge
+    // pas), même chaînage des noeuds pour que reconstruire() rejoue la macro.
+    auto ajoute = [&](Game& c, int gC, const QVector<QPair<int,int>>& chaine, int parent) {
+        const int arrivee = chaine.isEmpty() ? -1
+            : c.caseApres(chaine.last().first, (Game::EDirection)chaine.last().second);
+        if (corralActif && arrivee >= 0) {
+            if (c.corralUnitaireMort(arrivee)) return;
+            c.getZoneJoueur(zoneEnfant);
+            const Game::EnclosInfo inf = c.detecteEnclosArrivee(arrivee, zoneEnfant, visiteCorral,
+                                                                &cacheEnclos, CORRAL_BUDGET);
+            if (inf.dursMorts > 0) return;
+        }
+        const QByteArray cle = c.getEtat();
+        if (vus.contains(cle)) return;
+        vus.insert(cle);
+
+        int p = parent;
+        for (const auto& q : chaine) {
+            noeuds.append(Noeud{p, (quint16)q.first, (quint8)q.second});
+            p = noeuds.size() - 1;
+        }
+        etats.push_back(c);
+        gs.push_back(gC);
+        idxN.push_back(p);
+        tas.push_back({c.getHeuristique(nullptr), (int)etats.size() - 1});
+        std::push_heap(tas.begin(), tas.end(), apres);
+    };
+
+    while (!tas.empty() && developpes < budget) {
+        if (arretDemande()) break;
+
+        std::pop_heap(tas.begin(), tas.end(), apres);
+        const int i = tas.back().second;
+        tas.pop_back();
+        developpes++;
+
+        // COPIE et non référence : 'etats' grossit dans la boucle ci-dessous, et
+        // une réallocation invaliderait une référence dans son dos.
+        Game e = etats[i];
+        if (e.isGagne()) { idxGagnant = idxN[i]; break; }
+
+        e.getZoneJoueur(zone);
+        const QVector<quint8> caisses = e.getCaissesDeplacable(zone);
+
+        // Même régime d'engagement que la recherche principale : si le but actif
+        // est atteignable, on ne génère QUE les macros qui l'y envoient.
+        int macrosOk = 0;
+        const int but = e.butActif();
+        if (but >= 0) {
+            for (int c = 0; c < caisses.size(); c++) {
+                if (caisses[c] == 0) continue;
+                if (!e.macroPeutDemarrer(c, but, zone)) continue;
+                Game f(e);
+                QVector<QPair<int,int>> poussees;
+                if (f.macroVersButBacktrack(c, but, poussees) && !f.isPerdu()) {
+                    ajoute(f, gs[i] + poussees.size(), poussees, idxN[i]);
+                    macrosOk++;
+                }
+            }
+        }
+        if (macrosOk == 0) {
+            for (int c = 0; c < caisses.size(); c++) {
+                const quint8 dirs = caisses[c];
+                for (int d = 0; d < NB_DIRECTION; d++) {
+                    if (!(dirs & (1 << d))) continue;
+                    Game f(e);
+                    if (f.pousse(c, (Game::EDirection)d) && !f.isPerdu())
+                        ajoute(f, gs[i] + 1, {{c, d}}, idxN[i]);
+                }
+            }
+        }
+    }
+
+    if (etatsOut) *etatsOut = developpes;
+    if (idxGagnant < 0) noeuds.resize(noeudsAvant);
+    return idxGagnant;
+}
 
 void SolveurAStar::run() {
     std::vector<SElement> file;
@@ -158,12 +421,21 @@ void SolveurAStar::run() {
     Game etat(depart);
     int fileAvant = 0;   // taille de la file au dernier affichage (tendance)
     int maxRangees = 0;  // plus grand nombre de caisses rangées atteint (jauge de blocage)
+    int plongeons = 0;   // tentatives de plongeon (régime plongeon seulement)
+    qint64 etatsPlongeon = 0;   // ... et ce qu'elles ont coûté, réussies ou non
 
     // Tampons de flood-fill, hissés HORS de la boucle : réutilisés d'un état à
     // l'autre, ils ne réallouent plus (cf. getZoneJoueur(QVector<bool>&)). Ne
     // JAMAIS en garder une copie ailleurs, sinon le fill() détache et réalloue.
     QVector<bool> zone;        // zone de l'état développé
     QVector<bool> zoneEnfant;  // zone de l'enfant qu'on enfile
+    QVector<bool> visiteCorral; // tampon de la détection d'enclos (corral-N)
+    // Mémoïsation du sous-solve d'enclos, par frontière triée : le verdict ne
+    // dépend QUE d'elle (tout le reste — murs, buts, cases mortes — est statique),
+    // et le même corral revient des centaines de fois. C'est ce qui rend le coût
+    // soutenable malgré 10-21 % d'enfilages qui déclenchent une preuve. Local au
+    // run : rien à réinitialiser d'un solve à l'autre.
+    QHash<QByteArray,Game::VerdictEnclos> cacheEnclos;
 
     while(file.size()) {
         // Arrêt demandé depuis l'UI : on sort AVANT de dépiler, de sorte que le
@@ -217,6 +489,52 @@ void SolveurAStar::run() {
             // Copie figée pour l'UI (§10) + le chemin qui y mène, pour le rejeu pas
             // à pas d'un run qui n'aboutit pas.
             emit nouveauMaxCaisses(etat, rangees, reconstruire(cur.idxNoeud));
+
+            // PLONGEON SUR RECORD (§6.0) — régime d'essai. A* optimal ne « fonce »
+            // jamais : il doit vider toute la masse f < C* avant de descendre, même
+            // quand il tient déjà un état complétable en 13 coups (mesuré sur le 4 :
+            // 16/20 caisses posées dès 2 000 dépilements, puis 65 000 états pour
+            // finir). On tente donc de le compléter tout de suite, gloutonnement.
+            // Budget = fraction du travail déjà fait (cf. ci-dessus). Nul au
+            // démarrage : on ne plonge pas tant qu'on n'a rien investi.
+            const int budgetPlongeon = plongeon ? (int)(compteur / PLONGEON_DIVISEUR) : 0;
+            if (budgetPlongeon > 0) {
+                qint64 devPlongeon = 0;
+                const int idxGagnant = plonge(etat, cur.g, cur.idxNoeud, cacheEnclos,
+                                              budgetPlongeon, &devPlongeon);
+                // Ces états sont RÉELLEMENT développés : les compter, sinon le
+                // compteur du régime plongeon ne serait pas comparable au défaut.
+                compteur += devPlongeon;
+                plongeons++;
+                etatsPlongeon += devPlongeon;
+
+                // UNE LIGNE PAR TENTATIVE, réussie ou non, sur stderr comme la
+                // jauge : sur un run long, les échecs sont la seule façon de voir
+                // ce que le plongeon coûte AVANT la fin — et un run qu'on arrête à
+                // la main n'imprime jamais son bilan. (Manque constaté sur le 11 le
+                // 2026-07-28 : 14 minutes sans savoir s'il avait seulement tenté.)
+                qDebug().nospace()
+                    << "[plongeon " << plongeons << "] record " << rangees << "/"
+                    << etat.getNbButs() << " a " << compteur << " depiles"
+                    << " | budget " << budgetPlongeon
+                    << " -> " << (idxGagnant >= 0 ? "REUSSI" : "echec")
+                    << " en " << devPlongeon << " etats"
+                    << " | cumul plongeons " << etatsPlongeon
+                    << " (" << (compteur ? 100.0 * (double)etatsPlongeon / (double)compteur : 0.0)
+                    << " % du travail)";
+
+                if (idxGagnant >= 0) {
+                    qDebug() << "SolveurAStar: PLONGEON reussi depuis" << rangees << "/"
+                             << etat.getNbButs() << "caisses posees, apres" << devPlongeon
+                             << "etats de plongeon (budget" << budgetPlongeon << ","
+                             << plongeons << "plongeons au total).";
+                    qDebug() << "SolveurAStar: solution trouvee apres" << compteur
+                             << "etats explores.";
+                    imprimeStatsCorral();
+                    emit solutionTrouvee(reconstruire(idxGagnant), compteur);
+                    return;
+                }
+            }
         }
 
         if (compteur % 1000 == 0) {
@@ -257,6 +575,10 @@ void SolveurAStar::run() {
 #ifdef INSTRUM_F
             imprimeHistoF(histoF, cur.g, compteur);
 #endif
+            if (plongeons)
+                qDebug() << "SolveurAStar:" << plongeons << "plongeons TENTES, tous rates,"
+                         << etatsPlongeon << "etats depenses.";
+            imprimeStatsCorral();
             emit solutionTrouvee(reconstruire(cur.idxNoeud), compteur);
             return;
         }
@@ -274,6 +596,13 @@ void SolveurAStar::run() {
             // niveaux 3 et 5 perdus). Ici, la macro va au bout et c'est son
             // RÉSULTAT qu'on juge.
             if (livraisonSurEnfants && e.butNonLivrable(4)) return;
+            // Case de REPOS de la caisse déplacée : destination de la DERNIÈRE
+            // poussée de 'chaine'. Les deux étages du corral en partent — leurs
+            // formes incrémentales reposent sur le même argument : une transition
+            // (poussée simple ou goal macro) ne déplace qu'UNE caisse, vers une
+            // seule case, donc elle seule a pu sceller quelque chose.
+            const int arrivee = chaine.isEmpty() ? -1
+                : e.caseApres(chaine.last().first, (Game::EDirection)chaine.last().second);
             // Corral unitaire (§6.1 item 4) : élague l'enfant dont une case scellée
             // prouve l'immobilité définitive d'une caisse hors but. Élagage PROUVÉ
             // (0 faux positif au juge fp sur les 11 résolus), promu en défaut le
@@ -284,16 +613,64 @@ void SolveurAStar::run() {
             // (mesuré, plan §6.1 — niveaux 3 et 5 perdus). Ici la macro va au bout,
             // c'est son RÉSULTAT qu'on juge. Forme incrémentale (équivalence prouvée
             // au balayage complet, cf. game.h) : seule la case de repos de la caisse
-            // déplacée — destination de la DERNIÈRE poussée de 'chaine' — peut avoir
-            // nouvellement scellé une voisine.
-            if (corralActif && !chaine.isEmpty()) {
-                const auto& last = chaine.last();
-                const int arrivee = e.caseApres(last.first, (Game::EDirection)last.second);
+            // déplacée peut avoir nouvellement scellé une voisine.
+            if (corralActif && arrivee >= 0) {
                 if (e.corralUnitaireMort(arrivee)) return;
             }
             // getEtat(cle) referait le flood-fill en interne, dans un QVector
             // neuf — un par enfant enfilé. Le tampon évite l'allocation.
             e.getZoneJoueur(zoneEnfant);
+            // CORRAL-N (§6.1 item B) — promu en défaut le 2026-07-28. Trois étages :
+            //   1. DÉTECTION incrémentale des enclos au contact de 'arrivee' (les
+            //      seuls à pouvoir venir de se sceller) ;
+            //   2. GATE structurel (Hall + non-rouvrable) : un FILTRE, pas une
+            //      preuve — il ne prune JAMAIS, il décide seulement quoi soumettre
+            //      à l'étage 3. Mesuré faux positif s'il tranchait lui-même (juge
+            //      fp, variante -2) ; il ramène 40 % → 10-21 % des enfilages ;
+            //   3. PREUVE : strip (retirer les caisses non frontière = relaxation
+            //      valide, moins d'obstacles = joueur plus libre) puis BFS de
+            //      poussées borné. MORT ssi l'espace est ÉPUISÉ sous budget — le
+            //      strip relaxe, l'exhaustion prouve. Mémoïsée par frontière triée
+            //      (le verdict n'en dépend que d'elle) : amortissement ×37 à ×223.
+            // C'est le seul levier du projet qui attaque la masse f < C* (§3) :
+            // ×9,9 sur le 4, ×7,7 sur le 17, ×3,4 sur le 9. Sound par construction
+            // (on ne prune que sur une mort PROUVÉE), canari intact sur les 11
+            // résolus. La zone du joueur vient d'être calculée : réutilisée gratis.
+            if (corralActif && arrivee >= 0) {
+                const Game::EnclosInfo inf = e.detecteEnclosArrivee(arrivee, zoneEnfant,
+                                                                    visiteCorral, &cacheEnclos,
+                                                                    CORRAL_BUDGET);
+                StatsCorral& sd = statsCorral();
+                sd.enfilages++;
+                if (inf.candidats > 0) { sd.avecCandidat++; sd.totCandidats += inf.candidats; }
+                if (inf.durs > 0) {
+                    sd.avecDur++;
+                    sd.totDurs       += inf.durs;
+                    sd.totCells      += inf.cells;
+                    sd.totFrontiere  += inf.frontiere;
+                    sd.totButsVides  += inf.butsVides;
+                }
+                sd.dursMorts    += inf.dursMorts;
+                sd.dursVivants  += inf.dursVivants;
+                sd.dursInconnus += inf.dursInconnus;
+                sd.cacheHits    += inf.cacheHits;
+                sd.solveStates  += inf.solveStates;
+                // Étage 0 (CACHE_JOUEUR=1) — nuls hors instrumentation. Comme les
+                // stats ci-dessus, seule la recherche PRINCIPALE est comptée : le
+                // plongeon partage le cache mais n'alimente aucun compteur (choix
+                // existant), et l'étage 0 se mesure de toute façon à budget de temps.
+                sd.hitsTestes   += inf.hitsTestes;
+                sd.hitsZoneDiff += inf.hitsZoneDiff;
+                sd.diffMort     += inf.diffMort;
+                sd.diffVivant   += inf.diffVivant;
+                sd.diffInconnu  += inf.diffInconnu;
+                for (int i = 0; i < 9; i++) sd.etage1[i] += inf.etage1[i];
+                sd.etage1States += inf.etage1States;
+                for (int i = 0; i < 3; i++) sd.arbitre[i] += inf.arbitre[i];
+                sd.arbitreStates += inf.arbitreStates;
+                // PRUNE : une mort PROUVÉE (strip + exhaustion) est sound → on coupe.
+                if (inf.dursMorts > 0) { sd.enfilagesPrunes++; return; }
+            }
             e.getEtat(arene.reserve(), zoneEnfant);
             Cle cle{arene.dernier()};
             if (interditRedeveloppement && ferme.count(cle)) { arene.annule(); return; }
@@ -436,5 +813,6 @@ void SolveurAStar::run() {
     }
 
     qDebug() << "SolveurAStar: aucune solution," << compteur << "etats explores.";
+    imprimeStatsCorral();
     emit aucuneSolution();
 }

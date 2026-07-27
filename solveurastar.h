@@ -108,16 +108,32 @@ public:
     // fait voler son but, le couplage se réarrange et h ne baisse pas (l'enfant
     // part alors DERRIÈRE tout le palier). Sans effet si la caisse assignée ne
     // peut pas faire la macro : on retombe sur les autres candidates.
+    // 'plongeon' (régime d'essai, plan.md §6.0/§6.3) : dès qu'un état bat le max de
+    // caisses posées ET qu'il en a assez (SEUIL_PCT), on tente de le COMPLÉTER par
+    // une recherche gloutonne bornée (best-first sur h seul) avant de revenir à
+    // l'A* normal. Renonce à l'optimalité — mesuré : +2 poussées sur le 4, l'optimum
+    // exact sur 2/3/5/6/7/9/17.
     explicit SolveurAStar(const Game& etatDepart, int poids = 1, bool macro = false,
-                          QObject* parent = nullptr, bool macroCouplage = false);
+                          QObject* parent = nullptr, bool macroCouplage = false,
+                          bool plongeon = false);
 
 protected:
     void run() override;
 
 private:
+    // PLONGEON depuis 'etatDepart' (atteint en 'gDepart' poussées, noeud
+    // 'idxNoeudDepart') : best-first sur h SEUL, budget d'états, goal macro et
+    // corral actifs comme dans la recherche principale. Rend l'index du noeud
+    // GAGNANT dans 'noeuds' (utilisable tel quel par reconstruire()), ou -1 si le
+    // budget est épuisé sans victoire — auquel cas 'noeuds' est rendu à sa taille
+    // d'avant, pour que l'échec ne laisse aucune trace.
+    int plonge(const Game& etatDepart, int gDepart, int idxNoeudDepart,
+               QHash<QByteArray,Game::VerdictEnclos>& cacheEnclos, int budget, qint64* etatsOut);
+
     const int poids;
     const bool macro;
     const bool macroCouplage;
+    const bool plongeon;
 };
 
 #endif // SOLVEURASTAR_H

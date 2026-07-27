@@ -2,9 +2,11 @@
 #define GAME_H
 
 #include <QByteArray>
+#include <QHash>
 #include <QMetaType>
 #include <QPair>
 #include <QPoint>
+#include <QVarLengthArray>
 #include <QVector>
 #include "level.h"
 
@@ -157,6 +159,12 @@ public:
     // Case (index plat) du but d'indice 'indexBut' — même indexation que
     // butActif()/ordreButs. Pour l'UI, qui a besoin d'une position à surligner.
     int getCaseBut(int indexBut) const { return goals[indexBut]; }
+    // ordreButs[k] = indice du but à remplir en k-ième (cf. plus bas). Exposé en
+    // LECTURE pour le harnais `mesures/ordre`, qui vérifie que cet ordre respecte
+    // la précédence par approches (§6.2) — c'est la seule façon de voir POURQUOI la
+    // macro se mure sur un niveau donné, sans remettre d'interrupteur d'env dans le
+    // chemin chaud (piège §7).
+    const QVector<int>& getOrdreButs() const { return ordreButs; }
     // Champ de distances vers le BUT ACTIF, SPARSE : une valeur uniquement sur
     // les caisses réellement posées (leur dCur) et sur celles de leurs cases
     // voisines vers lesquelles une poussée est LÉGALE dans l'état courant
@@ -316,6 +324,87 @@ public:
     // vérification de borne : l'appelant garantit que la case existe (bordure
     // murée). Sert au solveur à retrouver la case de repos de la caisse déplacée.
     int caseApres(int idxCase, EDirection dir) const;
+    // CORRAL-N (§6.1 item B, promu en défaut le 2026-07-28) — le seul élagage du
+    // projet qui attaque la masse f < C* (§3). Résumé d'un appel de détection.
+    //   candidats = enclos scellés avec ≥1 caisse-frontière HORS but (portail brut).
+    //   durs      = ceux qui passent AUSSI le gate structurel : sous-dotés en buts
+    //               (Hall) ET non-rouvrables — les seuls sur lesquels un strip + A*
+    //               borné aurait à trancher.
+    //   cells/frontiere/butsVides = totaux sur les DURS (pour dimensionner le strip).
+    struct EnclosInfo {
+        int candidats = 0, durs = 0;                 // portail / après gate
+        int cells = 0, frontiere = 0, butsVides = 0; // tailles (sur durs)
+        int dursMorts = 0, dursVivants = 0, dursInconnus = 0;  // verdict strip+A* (si cache)
+        int cacheHits = 0;                           // durs résolus par le cache
+        qint64 solveStates = 0;                      // états de sous-solve payés (miss cache)
+        // ÉTAGE 0 de la mesure « clé du cache sans le joueur » (plan.md §6.1, réserve
+        // du 2026-07-28). Remplis UNIQUEMENT sous CACHE_JOUEUR=1 ; aucun verdict n'en
+        // dépend, le binaire rend les mêmes états à l'unité dans les deux régimes.
+        int hitsTestes = 0;                          // hits dont la zone joueur a été recalculée
+        int hitsZoneDiff = 0;                        // … dont la zone DIFFÈRE de celle du calcul
+        int diffMort = 0, diffVivant = 0, diffInconnu = 0;   // ventilation par verdict caché
+        // ÉTAGE 1 (CACHE_JOUEUR=2) — sur les SEULES collisions, on relance le
+        // sous-solve pour la position de joueur RÉELLE et on croise avec le verdict
+        // caché : etage1[3*cache + recalcul], index 0=MORT 1=vivant 2=inconnu.
+        // La case [MORT][≠MORT] est le FAUX POSITIF prouvé ; la colonne
+        // [≠MORT][MORT] est le prune MANQUÉ (le gain). Le verdict RENDU reste
+        // toujours celui du cache : on mesure, on ne corrige pas.
+        int etage1[9] = {0,0,0,0,0,0,0,0,0};
+        qint64 etage1States = 0;                     // coût des recalculs (hors prod)
+        // ARBITRAGE des seuls MORT→inconnu : « inconnu » n'est pas « vivant », c'est
+        // « budget trop court ». On rejuge donc ces cas-là à budget LARGE, seul moyen
+        // de savoir si le prune transféré était légitime. arbitre[0]=mort 1=vivant
+        // 2=toujours inconnu. Un seul 'vivant' ⇒ faux positif PROUVÉ du corral-N.
+        int arbitre[3] = {0,0,0};
+        qint64 arbitreStates = 0;
+    };
+
+    // Valeur mémoïsée d'un enclos DUR. 'zoneCanon' = case canonique (min) de la zone
+    // du joueur sur le board STRIPPÉ au moment où le verdict a été calculé — servait
+    // de rien à la décision, sert à MESURER si le transfert du verdict à une autre
+    // position de joueur est légitime (cf. EnclosInfo ci-dessus). -1 si non instrumenté.
+    struct VerdictEnclos {
+        int verdict = -1;      // 0 = mort, 1 = vivant, -1 = inconnu (budget)
+        int zoneCanon = -1;
+    };
+
+    // INCRÉMENTALE : ne flood que les enclos au contact de 'caisseArrivee' (seuls à
+    // pouvoir venir de se sceller — même argument que corralUnitaireMort ci-dessus),
+    // reset O(région) sans fill O(size). Si 'cache' est fourni, chaque DUR est PROUVÉ
+    // par sousSolveEnclos (strip + BFS borné 'budget'), mémoïsé par frontière triée :
+    // dursMorts>0 ⇒ l'appelant peut PRUNER (mort prouvée, sound par construction).
+    // ⚠️ Le GATE n'est qu'un filtre : il est FAUX POSITIF s'il tranche seul (mesuré
+    // au juge fp, variante -2 — le « non-rouvrable » est un test à UN pas, il rate
+    // les enclos rouvrables en plusieurs coups). Ne jamais pruner sur 'durs', seul
+    // 'dursMorts' est une preuve.
+    EnclosInfo detecteEnclosArrivee(int caisseArrivee, const QVector<bool>& zone,
+                                    QVector<bool>& visite,
+                                    QHash<QByteArray,VerdictEnclos>* cache = nullptr,
+                                    int budget = 0) const;
+    // GATE comme PRUNE, version FULL-SCAN (pour le juge fp, qui interroge des états
+    // quelconques). Renvoie true dès qu'un enclos est DUR (scellé + ≥1 caisse hors
+    // but + sous-doté en buts + non-rouvrable en un pas). ⚠️ Le non-rouvrable est un
+    // test À UN PAS : possiblement faux positif si l'enclos est rouvrable en
+    // plusieurs coups — c'est CE que fp doit vérifier avant tout câblage en prune.
+    bool gateEnclosMort() const;
+    // Mini-solveur BORNÉ pour le strip d'un enclos (§6.1 item B). 'boxesInit' = les
+    // caisses-frontière (seules mobiles) ; TOUTES les autres caisses sont traitées
+    // comme du SOL (le strip est une relaxation valide : moins d'obstacles = joueur
+    // plus libre). Board statique (murs, buts, cases mortes) pris de *this. BFS de
+    // poussées avec dédup, joueur-aware. Renvoie :
+    //    0 = MORT   (espace épuisé sous budget → PREUVE, car le strip relaxe)
+    //    1 = vivant (les caisses-frontière atteignent toutes un but)
+    //   -1 = inconnu (budget atteint)
+    // 'zoneCanonOut' rend la zone canonique du joueur AU DÉPART du sous-solve — elle
+    // est calculée de toute façon (c'est la clé de l'état initial du BFS), donc gratuite.
+    int sousSolveEnclos(const QVarLengthArray<int, 32>& boxesInit, int budget,
+                        int* developpesOut = nullptr, int* zoneCanonOut = nullptr) const;
+    // Case canonique (min) de la zone du joueur sur le board STRIPPÉ {murs + 'boxes'},
+    // joueur à playerPoint. Exemplaire UNIQUE du calcul : sousSolveEnclos s'en sert
+    // pour l'état initial de son BFS, et l'étage 0 de la mesure pour recalculer la
+    // zone à un cache-hit. Les deux ne peuvent donc pas diverger (piège du §6.3 :
+    // deux lectures indépendantes d'un même champ ne donnent pas la même chose).
+    int zoneCanoniqueStrip(const QVarLengthArray<int, 32>& boxes) const;
     // Quelle caisse le couplage destine-t-il à ce but ? Index de CASE, -1 si aucune.
     // Utilisé par le régime de macro « but du couplage » (solveurastar.cpp) : pousser
     // vers un but la caisse que le couplage lui assigne garantit Δh = −N, donc un
@@ -440,6 +529,10 @@ private:
 // Distance de livraison d'une caisse (poussées) depuis les caisses de départ, les
 // buts marqués dans `bloque` faisant obstacle. -1 = inatteignable.
 QVector<int> distanceLivraison(const QVector<bool>& bloque) const;
+
+// PRÉCÉDENCE GLOBALE (§6.2 famille B) : requis[B] = les buts qui doivent être
+// remplis AVANT B, parce que sans eux plus aucune caisse n'atteint B. Statique.
+QVector<QVector<int>> precedenceGlobale() const;
 
 // Ordre de remplissage déduit de la PRÉCÉDENCE DE LIVRAISON (§6.2, 2026-07-20) :
 // glouton avant + garde anti-échouage. Rend une permutation des indices de buts.

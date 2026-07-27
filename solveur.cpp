@@ -16,7 +16,9 @@ QVector<Solveur::SType> Solveur::types() {
         {Astar, "A* (optimal)"},
         {AstarPondere, "A* pondéré (rapide, approché)"},
         {AstarMacro, "A* macro (rapide)"},
-        {AstarMacroCouplage, "A* macro — but du couplage (essai)"}
+        {AstarMacroCouplage, "A* macro — but du couplage"},
+        {AstarMacroPlongeon, "A* macro — plongeon sur record (essai)"},
+        {AstarMacroCouplagePlongeon, "A* macro — couplage + plongeon (essai)"}
     };
 }
 
@@ -33,6 +35,10 @@ Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
         // Régime d'essai (§6.3, 2026-07-24) : même solveur, la macro vise d'abord
         // la caisse que le couplage assigne au but actif.
         case AstarMacroCouplage: return new SolveurAStar(etatDepart, 1, true, parent, true);
+        // Régime d'essai (§6.0, 2026-07-28) : A* macro + PLONGEON dès qu'un état
+        // bat le record de caisses posées et dépasse le seuil de remplissage.
+        case AstarMacroPlongeon: return new SolveurAStar(etatDepart, 1, true, parent, false, true);
+        case AstarMacroCouplagePlongeon: return new SolveurAStar(etatDepart, 1, true, parent, true, true);
     }
     return nullptr;
 }

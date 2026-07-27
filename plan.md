@@ -14,13 +14,21 @@ en silence pendant que le code bouge (c'est exactement ce qui a fait passer inap
 régression du niveau 9, cf. §6.3 — corrigé par la règle du §1).
 
 - ⚠️ **UN NIVEAU EST « RÉSOLU » SI ET SEULEMENT S'IL A UNE LIGNE DANS [scores.md](scores.md)**
-  (solve mené au bout, états/poussées/commit relevés). À ce jour : **11 résolus sur les 33**
-  (0-9 et 17). **Les 22 autres — 10, 11, 12, 13 à 16, 18 à 32 — ne sont PAS résolus**, y compris
-  ceux dont ce document parle beaucoup (10, 18, 24, 25, 26 au §6.2 ; 13-16 dans les tableaux de
+  (solve mené au bout, états/poussées/commit relevés). À ce jour : **15 résolus sur les 33**
+  (0-11, 17, 21 et 32 — le 11 le 2026-07-28, le **10, le 21 et le 32 le 2026-07-29**, cf. §6.0).
+  **Les 18 autres — 12, 13 à 16, 18 à 20, 22 à 31 — ne sont PAS résolus**, y compris
+  ceux dont ce document parle beaucoup (18, 24, 25, 26 au §6.2 ; 13-16 dans les tableaux de
   diagnostic du §6.3). Apparaître dans un tableau de mesure ne veut PAS dire résolu : `mort`,
   `macro` et la jauge `rangees` tournent justement sur des niveaux qu'on ne sait pas finir.
   Hors carte : 190 et 191 sont des **bancs d'essai** (endgame du 11 isolé), résolus mais ils ne
   comptent pas dans les 33.
+- ⚠️ **CORRIGÉ le 2026-07-29 — « les non-résolus n'ont, pour la plupart, jamais été attaqués »
+  était FAUX.** Cette phrase figurait ici et au §6.6, et elle a orienté à tort une reprise de
+  travail (« il suffirait de les lancer »). L'utilisateur les relance **régulièrement** ; aucun ne
+  passe dans un temps raisonnable. Ce n'est donc pas un trou de mesure, c'est un mur. Ce qui reste
+  vrai : **la frontière bouge quand les leviers changent** — le 10 et le 21 sont tombés le
+  2026-07-29 **sans une ligne de code neuve**, simplement parce qu'ils n'avaient pas été relancés
+  depuis que le corral-N et le plongeon existent. Relancer après chaque promotion, donc.
 - ⚠️ **Ne jamais écrire « il ne reste que X et Y » sans dire de QUEL sous-ensemble.** Les
   « cibles » de ce document sont les quelques niveaux travaillés activement (8, 11, 12), pas
   l'ensemble des non-résolus. Le raccourci « il ne reste que 11 et 12 » a été écrit deux fois
@@ -48,10 +56,13 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `mou <niv> [n]` | les états dépilés sont-ils du gaspillage ? (sur chemin / hors chemin / **deadlock**) |
 | `mort <niv> …` | **(neuf, 2026-07-17)** taux de deadlocks non détectés sur un niveau qu'on NE sait PAS résoudre |
 | **rejeu pas à pas** (dans l'app) | **(neuf, 2026-07-24)** ◀ ▶ + slider + libellé `coup n/N — poussée p/P`, **Maj = saut de poussée à poussée**. Rejoue la solution, mais surtout le chemin du **MEILLEUR ÉTAT d'un run qui n'aboutit pas** (`nouveauMaxCaisses` porte désormais le chemin, pas seulement l'état). C'est lui qui a fait voir les deadlocks non détectés du niveau 4 → §6.1 |
-| `fp <niv> [variante]` | **(neuf, 2026-07-21) LE JUGE D'UN ÉLAGAGE** : rejoue une solution GAGNANTE et interroge le test sur chacun de ses états — tous solubles par construction, donc **toute détection est un faux positif prouvé**. À passer AVANT de câbler quoi que ce soit dans `checkDefaite` |
+| `fp <niv> [variante]` | **(neuf, 2026-07-21) LE JUGE D'UN ÉLAGAGE** : rejoue une solution GAGNANTE et interroge le test sur chacun de ses états — tous solubles par construction, donc **toute détection est un faux positif prouvé**. À passer AVANT de câbler quoi que ce soit dans `checkDefaite`. Variantes : `-1` corral unitaire+pince, `-2` gate corral-N, **`-3` précédence par paires** (2026-07-30 — a réfuté celle-ci en une heure, 9 niveaux sur 10 en faute) |
 | `macro <niv> [s]` | **(neuf, 2026-07-21)** POURQUOI la goal macro échoue : tentatives/succès, cause de l'échec, **à quel pas** il survient, et la part d'échecs survenus après un choix arbitraire de descente. Tourne à budget de temps → marche sur les niveaux jamais résolus |
 | `deltaf <niv> [s]` | **(neuf, 2026-07-24)** la macro **PROMEUT-elle** ses enfants dans la file ? Distribution de `Δf = N + poids·Δh` sur les enfants enfilés, macro contre poussée simple ; `Δf = 0` = promu par le tie-break `g`, `Δf > 0` = relégué d'un palier. Décompose Δh en part **caisses** et part **joueur** |
 | `usok <niv> [mode]` | **(neuf, 2026-07-27)** coût en **TEMPS** normalisé par machine (§ règle ci-dessous). Chronomètre l'étalon `bench 2 astar` ET la cible sur le même binaire, rend la cible en **USok**. `CORRAL=1 usok.sh …` = coût d'une feature sur la cible. Script `mesures/usok.sh`, pas un binaire |
+| `moureel <niv> [astar]` | **(neuf, 2026-07-28) OÙ NAÎT LE MOU DE `h`** : rejoue une solution **optimale** et décompose le mou poussée par poussée. Sur un chemin optimal `C*(état) = C* − g`, donc `mou = (C* − g) − h` **sans aucun sous-solve**. Repère les poussées de RECUL (`Δh = +1`), suit le devenir de la case libérée (la même caisse revient ? une autre passe ? le joueur ?) et compte les conflits de trajets. Auto-vérifié par `Σ(1+Δh) = mou` |
+| `bench <niv> <mode> record` | **(neuf, 2026-07-28)** écrit en `.xsb` **chaque état qui bat le record de caisses posées**, daté en dépilements (stderr, entrelacé avec la jauge). Vérifie que le chemin reconstruit mène bien à l'état exporté. C'est ce qui a chiffré le plongeon AVANT de le coder. `bench` accepte aussi un **chemin `.xsb`** au lieu d'un numéro |
+| `ordre <niv>` | **(neuf, 2026-07-29) POURQUOI LA MACRO SE MURE** : imprime `ordreButs` (carte des rangs en base 36 + déroulé), et vérifie **deux** précédences — la **locale** du §6.2 (approches du dernier pas) et une **globale** neuve (trajet de tirage complet : *G doit précéder B si, B traité comme occupé, plus aucune caisse n'atteint G*). Statique, O(buts²×plateau), aucune recherche. À sa création : **0 violation sur les 14 résolus + 190/191, 1 à 29 sur 11 non-résolus** — depuis que la précédence globale est CODÉE (2026-07-30, §6.2), **0 violation partout**, l'outil ne sert donc plus qu'à surveiller les régressions et le murage LOCAL |
 | `diverge`, `paires`, `trace`, `passages`, `congestion` | mou de `h`, interactions de paires, solution pas à pas, cartes de trajets |
 
 **Règles de mesure, non négociables :**
@@ -72,6 +83,19 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
   l'étalon sur place à chaque appel (aucun état persistant à maintenir entre machines) et rend la
   cible en multiples. Un ratio ≥ ×1,1 est significatif ; en dessous, c'est du bruit best-of-3
   (~3 %). Pour comparer deux régimes, figer la calibration : `USOK_REF=<s> usok.sh …`.
+- ⚠️ **Chronométrer le CPU, PAS le mural** (neuf, 2026-07-31). Sur une machine qu'on utilise en même
+  temps, le mural est du bruit pur : le même run (21 défaut) a rendu **254 s puis 1391 s** de mural
+  pour **254 s puis 251 s de CPU**. Le CPU rejoue à moins de 1 %, le mural varie d'un facteur 5,5 —
+  et le meilleur-de-3 n'y peut rien, ce n'est pas du bruit gaussien mais de la contention.
+  `/usr/bin/time -l` et sa ligne `user` suffisent. ⚠️ **`usok.sh` chronomètre le mural** (builtin
+  `time`, `%R`) : **à corriger**, sinon l'USok n'est pas un mètre.
+- ⚠️ **Le nombre d'ÉTATS n'est pas portable entre plateformes** (neuf, 2026-07-31). À commit égal,
+  le niveau 10 rend **2 160 492 états sur macOS et 2 175 724 sur Linux** (+0,70 %) : `std::sort` et
+  `push_heap` n'ont pas la même implémentation entre libc++ et libstdc++, donc les ex æquo ne sont
+  pas départagés pareil. **Ce qui dépend de la géométrie est portable à 0,01 %** (enclos, sous-solves,
+  fraction de morts) ; ce qui dépend de la trajectoire dérive. Le piège « jamais à un chiffre écrit »
+  vaut donc aussi **entre machines**, pas seulement dans le temps — et en régime plongeon la dérive
+  est amplifiée (×17 sur le coût du plongeon gagnant du 10).
 - **`ps rss` ment sur macOS** (le compresseur sort les pages de la RSS). Utiliser
   `/usr/bin/time -l` (« peak memory footprint ») ou `footprint -p PID`.
 - **La jauge de progression part sur `stderr`, et un pipe l'avale.** `bench <niv> 2>&1 | tail`
@@ -144,6 +168,83 @@ C*  =  Σ trajets solos  +  coût de congestion
   (coûte 2 : elle s'éloigne + devra revenir), ou qui bloque le **joueur**. **Critère PAR
   CAISSE, jamais par case** — une carte de trafic agrégée a perdu l'identité des caisses et ne
   peut structurellement pas voir la congestion (niv 17 : 12 de mou pour 2 passages hors réseau).
+
+### ✅ 2026-07-28 — LE MOU OBSERVÉ SUR PIÈCES (outil `moureel`)
+
+Le §3 avait **déduit** la congestion de quatre niveaux et d'un raisonnement. Elle est maintenant
+**mesurée poussée par poussée**, exactement, et sans le moindre sous-solve : sur un chemin OPTIMAL,
+`C*(état) = C* − g` par définition, donc `mou(état) = (C* − g) − h`.
+
+**LA LOI, et elle est structurelle.** En dérivant le long du chemin, `Δh` ne vaut **jamais que −1 ou
++1** — jamais 0, jamais ±2. Une poussée est donc soit PRODUCTIVE (elle consomme une unité de trajet
+solo), soit un **RECUL** qui coûte 2 (elle s'éloigne, et il faudra revenir). D'où :
+
+> **`mou = 2 × (nombre de poussées de recul)`** — et par conséquent **le mou est TOUJOURS PAIR**.
+> Les quatre valeurs du §3 (2, 2, 6, 12) le sont, ce que personne n'avait relevé.
+
+| niveau | C\* | h(départ) | mou | reculs | mou/reculs |
+|---|---|---|---|---|---|
+| 1 | 97 | 95 | 2 | 1 | 2 |
+| 2 | 131 | 129 | 2 | 1 | 2 |
+| 3 | 134 | 128 | 6 | 3 | 2 |
+| 17 | 213 | 201 | 12 | 6 | 2 |
+
+- **Les événements de congestion sont RARISSIMES** : 0,8 % à 2,8 % des poussées. Tout le reste du
+  chemin optimal est du trajet solo pur — le §3 avait raison sur les artères.
+- **Et concentrés** : 5 des 6 reculs du 17 surviennent dans les **9 premières poussées**, tous dans
+  la même zone (x 3-8, y 8-11). « Tout l'écart est concentré là où les caisses se démêlent » : vérifié.
+- **La caisse qui recule REVIENT sur la case libérée dans 9 cas sur 10.** La déduction du §3
+  (« elle s'éloigne + devra revenir ») est confirmée par observation directe.
+- ⚠️ **`autour = 0` sur les 10 reculs** : aucune caisse adjacente au moment du recul. **La congestion
+  n'est PAS de la densité locale**, contrairement à ce que supposait le §4.
+
+**LES DEUX CAUSES DU MOU, enfin départagées** — le §3 les énonçait toutes deux (« assise sur le
+trajet d'une autre, **ou** qui bloque le joueur ») sans jamais les séparer. Elles ne coexistent pas :
+elles se répartissent PAR NIVEAU.
+
+| niveau | reculs | **aller-retour PUR (joueur)** | **écart pour laisser passer** |
+|---|---|---|---|
+| 1 | 1 | **1** | 0 |
+| 2 | 1 | **1** | 0 |
+| 3 | 3 | 0 | **2** |
+| 17 | 6 | 0 | **6** |
+
+Sur le 1 et le 2, la caisse sort et revient **à la poussée suivante**, sans qu'aucune autre ne bouge :
+la configuration des caisses est **rigoureusement identique** avant et après. Deux poussées qui ne
+changent rien au plateau — **sauf la position du joueur**. Sur le 3 et le 17, aucun cas de ce type :
+tous les reculs laissent passer d'autres caisses.
+
+⚠️ **Piège §11.4, tombé dedans en direct** : après avoir vu 1 et 2, j'ai conclu « le mou est du coût
+de mobilité du JOUEUR » — ce que corroborait joliment le `Δh(joueur) = 0` de `deltaf` (§6.3). Les
+niveaux 3 et 17 l'ont démenti aussitôt, et ils le démentent **là où ça compte** (le 17 porte 93 % de
+sa masse en `f < C*`). Deux niveaux ne font pas une loi, même quand une autre mesure semble les
+appuyer.
+
+**DEUX CANDIDATS `h` RÉFUTÉS, avec les chiffres :**
+
+| candidat | 1 | 2 | 3 | 17 | verdict |
+|---|---|---|---|---|---|
+| mou réel | 2 | 2 | 6 | 12 | — |
+| 2 × (caisses sur le trajet d'une autre) | 6 | 16 | 16 | — | **SURESTIME ×3 à ×8 → inadmissible** |
+| 2 × (conflits CROISÉS entre paires) | 0 | 0 | 0 | 0 | **VIDE → admissible mais inutile** |
+
+- Le comptage géométrique surestime parce qu'il **ignore le TEMPS** : une caisse ne gêne que si elle
+  est encore là quand l'autre passe. Sur le 2, huit caisses se gênent géométriquement et **une seule**
+  doit s'écarter — les sept autres conflits sont résolus **gratuitement par l'ORDRE de passage**.
+- **D'où la vraie nature du mou : `mou` n'est pas le nombre de conflits, c'est le nombre de conflits
+  qu'AUCUN ORDRE ne peut éviter.** Ça explique d'un coup pourquoi l'oracle du mou, les PDB par paires
+  et les caisses-murs ont tous échoué : ils cherchaient une propriété **géométrique** là où le mou est
+  le résidu d'un problème d'**ORDONNANCEMENT** — c'est-à-dire précisément ce que Sokoban a de
+  PSPACE-complet (§4).
+- Le conflit croisé (l'analogue du *linear conflict* du taquin : A sur le trajet obligatoire de B
+  **et** B sur celui de A) est une **preuve** — mais il ne se déclenche jamais. Ça confirme et
+  généralise le « 0/15 paires sur le 17 » du §4 : **le mou n'est jamais dû à un conflit symétrique
+  entre DEUX caisses**, il vient d'interactions à **3+ caisses**.
+
+**Conséquence pour la feuille de route : la « méga astuce » n'est pas une `h` plus serrée obtenue par
+comptage.** Toute borne qui capturerait le mou devrait résoudre un ordonnancement optimal. Ce qui
+reste : l'élagage prouvé (corral, §6.1) et le contournement anytime (plongeon, §6.0) — les deux
+leviers qui ont effectivement fait tomber le 8 et le 11 aujourd'hui.
 
 ### Les DEUX régimes de `f` — décident quel levier mord où
 
@@ -229,6 +330,52 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 ## 6. Pistes à explorer
 
 ### 6.0 Feuille de route — ordre de reprise (décidé le 2026-07-17)
+
+> 🎯 **PROCHAIN CHANTIER (2026-07-28) — LE PLONGEON-SUR-RECORD** (idée utilisateur).
+> Le corral-N (§6.1 suite 3) a fait sa part : il élague le **bois mort**. Ce qui bloque
+> le 11 (et vraisemblablement les 22 non-résolus) est le **DÉMÊLAGE** pur — le mur PSPACE
+> (§4/§6.2). Diagnostic prouvé : l'endgame bloquant du 11 est **solvable en 9 états macro**,
+> mais A\* optimal refuse d'y foncer (il doit d'abord vider toute la masse `f < C*` vivante).
+>
+> **L'idée** : dès qu'un état bat le **max de caisses posées** (`nouveauMaxCaisses`), le
+> **prioriser** — un **plongeon greedy borné** (best-first sur `h` seul, budget d'états) qui
+> tente de le compléter. Solution → gagné (SOUS-OPTIMAL). Budget épuisé → on remonte dans
+> l'A\* normal. C'est la famille **anytime / diving**, la forme concrète du « repli anytime »
+> du §6.3.
+> - ~~**Pourquoi maintenant et pas avant** : un record pouvait être une **branche morte** (le
+>   11/14 mirage). Le corral-N élague les morts → **les records sont enfin fiables** → plonger
+>   devient sûr.~~ ❌ **RÉFUTÉ le 2026-07-28, mesuré (voir ci-dessous) : les records ne sont PAS
+>   fiables**, même corral-N promu. Sur le niveau 4, les records **4/20 et 7/20 sont MORTS** —
+>   « AUCUNE » rendu par l'**A\* pur**, qui est complet, donc espace épuisé et pas un artefact du
+>   régime d'engagement ; et identique avec `CORRAL=0`, donc pas un faux positif du corral non
+>   plus. Ce sont de vraies branches condamnées que le corral ne voit pas. Le bornage du plongeon
+>   n'est donc PAS une précaution de confort, c'est la pièce maîtresse — et il faut prévoir de ne
+>   pas replonger dans une lignée déjà condamnée (les records 1 à 7 du niveau 4 sont tous sur la
+>   même branche morte : on plongerait sept fois pour rien).
+> - Ce qui sauve l'affaire : **le plongeon échoue VITE sur les morts** (« AUCUNE » en < 1 s sur ces
+>   fixtures en macro). Quelques milliers d'états de budget suffisent à les rejeter sans douleur.
+> - **Assumé** : ça renonce à l'optimalité (record = `h` bas / `g` haut → prioriser = greedy).
+>   Donc **régime d'essai SÉPARÉ** (comme couplage/pondéré), jamais le défaut : le canari des
+>   résolus reste sur l'optimal. Pour les **non-résolus**, une solution sous-optimale = **première
+>   résolution**, un vrai gain.
+> - **À border** : un record vivant mais loin du but (le §6.3 mesure reste 5-31 au blocage) — le
+>   plongeon doit être **borné** pour ne pas y perdre, d'où le repli A\*.
+> - Distinct du pondéré (écarté) : chirurgical (plongeon sur record, A\* optimal entre) vs
+>   gonflement global de `h`.
+> - 🎯 **LE BANC, c'est le 8 — pas le 11** (idée utilisateur, 2026-07-28) : « à 1 million d'états
+>   dépilés, on arrive sur un motif solvable ». Le 8 est le SEUL niveau qui mesure les **deux**
+>   côtés du plongeon, parce qu'il est **résolu** (238 poussées, 4 376 070 états) : on lit le temps
+>   gagné ET les poussées perdues. Le 11, lui, n'a aucune solution de référence — n'importe quel
+>   résultat y serait un gain, il ne peut donc pas dire ce que le plongeon COÛTE.
+> - ⚠️ **Nuance sur « ça renonce à l'optimalité » : sur le 8 il n'y a rien à renoncer.** Le régime
+>   d'engagement de la macro n'est **déjà pas** optimal par construction (il ne génère que les
+>   macros vers le but actif et abandonne le reste) ; 238 est la solution du macro, pas un C\*
+>   prouvé (§6.3, suite du 2026-07-23). L'argument ne pèse vraiment que sur les canaris (1, 2, 17),
+>   où les poussées macro coïncident avec C\*.
+> - **Protocole AVANT de coder** (celui qui a prouvé le diagnostic du 11) : `nouveauMaxCaisses`
+>   porte le chemin → exporter l'état de record vers ~1 M dépilements en `.xsb` (comme
+>   `level0194`) et le faire résoudre seul. S'il tombe en quelques états macro, le plongeon est
+>   prouvé rentable sur le 8 **sans avoir écrit une ligne de solveur**.
 
 Séquence convenue, du plus sûr au plus risqué :
 
@@ -617,11 +764,151 @@ pas) et **net positif** là où elle élague (17 macro 0,550 vs 0,581).
   que dans des prédicats indépendants qui re-balaieraient. C'est le bon niveau tant que les motifs
   sont S-centrés ; on ne fabrique pas d'abstraction générale à partir de deux cas (piège §11.4).
 
-- [ ] **B — Corral rigoureux comme ÉLAGAGE** (le vrai levier des gros niveaux, régime `f<C*`).
-  Prune seulement si la région est **scellée** ET **non-rouvrable** (aucune caisse-frontière
-  poussable vers l'extérieur — induction PI-corral) ET **sous-dotée en buts atteignables**.
-  Prouvablement mort, zéro faux positif. C'est le seul qui attaque la masse `f<C*` que le
-  guidage ne peut pas toucher.
+#### ✅ Session du 2026-07-27 (suite 3) — CORRAL-N par STRIP + A\* BORNÉ : le premier levier `f<C*`
+
+**C'est l'item B, et il MARCHE.** Premier levier de tout le projet qui attaque la masse `f<C*` des
+gros niveaux — là où tie-breaks, motifs locaux et goal-ordering étaient tous nuls (§3).
+
+**L'architecture, en trois étages (chacun a un rôle distinct) :**
+1. **DÉTECTION** (`detecteEnclosArrivee`, incrémental) — trouve les régions libres que le joueur
+   n'atteint pas, au contact de la caisse arrivée. Coût +3-4 % USok sur le chemin macro (§ USok).
+2. **GATE** (filtre, pas preuve) — ne garde que les enclos scellés avec ≥1 caisse-frontière hors
+   but, **sous-dotés en buts** (Hall) et **non-rouvrables en un pas**. Ramène 40 % → 10-21 % des
+   enfilages. ⚠️ **Le gate seul est FP** (juge `fp`, variante -2 : FPs dès le coup 0 sur 1/2/3/6/7 —
+   le non-rouvrable un-pas rate les corrals rouvrables en plusieurs coups). Donc il **ne prune
+   jamais** : il ne fait que décider **quoi soumettre à la preuve**. Un gate heuristique ne peut pas
+   faire de FP puisque c'est l'A\* qui tranche.
+3. **PREUVE** (`sousSolveEnclos`, mini-BFS borné) — **strip** (on retire toutes les caisses non
+   frontière → relaxation valide : moins d'obstacles = joueur plus libre) puis BFS de poussées borné.
+   **Mort ssi l'espace est ÉPUISÉ sous budget** = preuve (le strip relaxe, l'exhaustion prouve).
+   Mémoïsé par **frontière triée** (le verdict ne dépend que d'elle, tout le reste est statique) :
+   amortissement **×37 (niv 4), ×223 (niv 8)** — le même corral revient des centaines de fois, jugé
+   une seule. C'est ce qui rend le coût soutenable malgré 10-21 % de déclenchement.
+
+**Sound par construction** (pas d'échantillonnage, pas de gate faillible dans la décision) : on ne
+prune que sur un `sousSolveEnclos == MORT`. **Canari intact sur les 11 résolus** (poussées inchangées).
+
+**Budget — les morts sont PEU PROFONDES** (§6.1 confirmé). Balayage : le gain d'états **sature dès
+budget ~150**, le coût de sous-solve **explose ×6 au-delà** (inconnus qui ne prouvent rien). Réglage
+retenu : **`CORRAL_BUDGET=150`**.
+
+**⚠️ UN BUG CORRIGÉ, trouvé par le niveau 11** (à retenir — il faisait rater des corrals morts). Le
+test non-rouvrable identifiait les « voisins d'enclos » d'une caisse-frontière par `libre && hors
+zone` — ce qui inclut les cases d'AUTRES régions scellées. Une caisse bordant DEUX enclos était
+déclarée rouvrable (le joueur « entrerait » dans l'autre enclos) alors que CELUI-CI reste scellé.
+Corrigé : appartenance à la **région courante** (`dansRegion` / test sur `file`). Gain immédiat :
+niv 5 ×2,74 → **×3,34**, et surtout **le corral qui bloquait le 11 au coup 38 est enfin vu**.
+
+**Gains mesurés (`CORRAL_DETECT=3 CORRAL_BUDGET=150`, états, poussées TOUTES intactes) :**
+
+| niv | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 17 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| ratio états | = | = | ×1,05 | ×1,02 | **×9,9** | **×3,3** | ×1,22 | ×1,22 | ×1,34 | **×3,4** | **×7,7** |
+
+**USok** (le coût des sous-solves paie-t-il ?) : **net GAIN à forte incidence** (17 : **×5,6 plus
+rapide** ; 4/9 idem), **neutre** au point d'équilibre (5 : ×0,96), **légère perte** à faible
+incidence (7 : ×1,37, 8 : perte — déjà bien nettoyés par la pince, les sous-solves des durs
+non-morts sont du coût pur). Les niveaux qui perdent sont **déjà rapides en absolu** ; ceux qui
+gagnent sont les gros. La fraction de durs prouvés morts prédit tout : **40,6 % sur le 4, 24,5 % sur
+le 9, ~10 % sur 7/17**.
+
+**LE NIVEAU 11 — grande avancée, mais pas encore résolu, et on sait POURQUOI.**
+- Le corral-N a rendu le 11 **6× moins cher** pour atteindre 11/14 (**14 M vus** contre 85 M avant),
+  mémoire **÷2** (~2,5 Go contre 5 Go). Il élague massivement les branches mortes (dont le coup-38).
+- Mais il **ne finit pas** : le blocage restant n'est PAS du deadlock, c'est le **DÉMÊLAGE**
+  (§4/§6.2, le mur PSPACE). **Prouvé** : l'état bloquant exporté (endgame 11/14) est **solvable** —
+  mode3 le résout en **9 états macro**. Le solveur ne « fonce » pas dedans parce qu'A\* est optimal
+  et doit d'abord développer toute la masse `f < C*` vivante (le démêlage). Ce n'est ni un FP ni un
+  bug : c'est l'optimalité face à un espace vivant énorme.
+- Piste laissée pour demain (idée utilisateur) : un **démêlage plus savant**. Le pondéré (§2.1)
+  foncerait dans le vivant mais renonce à l'optimalité — écarté par l'utilisateur.
+
+**Outillage (branche de chantier, `CORRAL_DETECT` = interrupteur de mesure, PAS promu en défaut) :**
+- `game.cpp` : `sousSolveEnclos` (mini-BFS strippé), `detecteEnclosArrivee` (détection+gate+preuve
+  mémoïsée), `gateEnclosMort` (gate full-scan pour `fp`), `detecteRegionsScellees` (coût détection).
+- `solveurastar.cpp` : `CORRAL_DETECT` (1=coût full-scan, 2=coût incr, 3=strip+A\* mémoïsé+prune),
+  `CORRAL_BUDGET`, stats sur stderr, cache `QHash<frontière,verdict>` dans `run()`.
+- `mesures/bench.cpp` : modes test `enclos` (mini-solve sur toutes les caisses) et `gate`
+  (`gateEnclosMort` sur un plateau) ; `CORRAL_DBG` dumpe régions + verdicts.
+- `mesures/fp.cpp` : variante `-2` (juge le gate-comme-prune → réfuté).
+- Fixtures : `level0194` (endgame bloquant du 11, solvable), `level0195/0196` (parent vivant /
+  corral-4 mort).
+
+**Reste ouvert / à faire :**
+- [x] **Décider la PROMOTION** — ✅ **FAIT le 2026-07-28** (session ci-dessous). Gate GARDÉ, budget
+  figé à 150, `CORRAL_DETECT` retiré.
+- [x] **Nettoyer** : `CORRAL_DBG`, macro `RESET_REGION`, modes test — ✅ fait avec la promotion.
+- [x] **La clé du cache d'enclos ignore la position du JOUEUR** — ✅ **MESURÉ le 2026-07-29**
+  (étages 0 et 1, session dédiée plus bas) : **0 faux positif prouvé** sur 3 050 transferts rejugés,
+  mais **492 prunes MANQUÉS** prouvés, et 163 preuves qui **ne se transportent pas**. Correction
+  elle-même toujours non faite (étage 2).
+- [ ] **Le 11/12/les 22 non-résolus** : le corral-N a fait sa part (bois mort), reste le **démêlage
+  savant** (§6.2) — c'est le prochain chantier convenu.
+
+#### ✅ Session du 2026-07-28 — CORRAL-N PROMU EN DÉFAUT (et l'écart bench/UI expliqué)
+
+**Ce qui change.** `detecteEnclosArrivee` + preuve `sousSolveEnclos` sont appelées **sans
+condition** à l'enfilage, juste après le corral unitaire et sur la zone joueur que l'enfilage
+calcule de toute façon. `CORRAL_DETECT` **retiré** (ses modes 1 et 2 étaient de l'instrumentation à
+résultat jeté), `CORRAL_BUDGET` **figé à 150** en constante nommée (le balayage avait montré la
+saturation du gain à ~150 et l'explosion ×6 du coût au-delà, en « inconnus » payés plein tarif).
+
+**Les trois choix qui restaient ouverts, et leur raison :**
+- **Le GATE est GARDÉ.** Il ne peut pas changer un verdict (c'est l'A\* borné qui tranche, cf. la
+  réfutation du gate-comme-prune au juge `fp` variante -2) : il ne décide que **quoi soumettre à la
+  preuve**, et ramène 40 % → 10-21 % des enfilages. Le retirer ne rendrait pas un état de plus, il
+  multiplierait les sous-solves.
+- **La trappe `CORRAL=0` couvre désormais les DEUX étages** (unitaire + N). Non négociable : `fp` et
+  `mort` doivent solver/collecter sans aucun corral, sinon le juge est aveugle aux faux positifs
+  qu'il est censé chercher — c'est déjà la raison qui avait fait ré-introduire la trappe à `66db7ca`.
+- **Les stats `[CORRAL-N]` sur stderr sont GARDÉES** (elles n'étaient pas du debug de chantier) : la
+  **fraction de durs prouvés morts** est ce qui PRÉDIT le gain sur un niveau neuf — 40,6 % sur le 4,
+  24,5 % sur le 9, ~10 % sur 7/17. Coût nul devant le flood-fill de l'enfilage.
+
+**Vérification — binaire contre binaire, la seule qui vaille.** Le défaut post-promotion reproduit
+**à l'unité** le régime d'essai `CORRAL_DETECT=3 CORRAL_BUDGET=150` mesuré sur le binaire d'avant :
+4 / 14 / 412 / 499 / 67 224 / 9 123 / 570 / 24 376 / 354 622 / 24 786, **poussées inchangées**
+(4/97/131/134/355/143/110/90/237/213) — canari intact. Chiffres et commit : [scores.md](scores.md).
+
+**⚠️ L'ÉCART BENCH / UI ÉTAIT CELUI-LÀ** (constaté par l'utilisateur, d'abord attribué à un écart
+Mac/PC). L'app ne recevait **jamais** `CORRAL_DETECT=3` : lancée depuis un launcher, elle n'hérite
+pas de l'environnement du shell où l'on tape les `bench`. Elle tournait donc en régime « corral
+pince » pendant que les mesures tournaient en corral-N — 4 : 665 967 contre 67 224, 17 : 190 635
+contre 24 786, 8 : 5,9 M contre 4,4 M. **La promotion efface l'écart par construction** : plus
+aucune variable d'environnement ne gouverne l'élagage. Leçon générale au §7.
+
+**⚠️ RÉSERVE CONNUE — la clé du cache n'inclut pas le JOUEUR. CORRECTION REPORTÉE** (décidé le
+2026-07-28 : on promeut d'abord, on regardera pour corriger plus tard). `sousSolveEnclos` lit `playerPoint` (game.cpp) : le verdict dépend d'où
+est le joueur, puisque c'est de là que part le flood qui décide des poussées faisables. Or le cache
+est indexé par la **seule frontière triée**, sur la foi du commentaire « le verdict ne dépend que
+d'elle, tout le reste est statique ». Deux conséquences, de gravité très inégale :
+- **Dépendance à l'ordre d'arrivée** des états (le premier calculé fixe le verdict de tous les
+  suivants de même frontière). Sans importance : « sur les gros niveaux on n'est pas à 1000 ou 2000
+  états près », et le binaire reste **déterministe** (vérifié : 3 runs du 9 identiques à l'unité,
+  plus un run à `QT_HASH_SEED=0` — les deux conteneurs hachés du solveur ne sont jamais itérés).
+- **Risque de FAUX POSITIF**, lui non mesuré : un MORT est une preuve *pour la position de joueur
+  qui a servi au calcul* ; le transférer ailleurs n'est pas justifié par l'argument du strip. Le
+  risque est faible en pratique (après strip, l'extérieur de l'enclos est presque toujours d'un seul
+  tenant, donc même zone ⇒ même verdict) mais **« presque toujours » n'est pas la barre du projet
+  pour un élagage** — c'est la forme du piège qui a tué le couplage de Hall. Le canari n'en dit
+  rien : un FP qui ne coupe pas le chemin optimal reste invisible.
+- Si on veut trancher un jour : ajouter la **zone canonique du joueur** (son `getMinIdx` dans le
+  board strippé) à la clé du cache et re-mesurer. Compteurs inchangés ⇒ le problème était théorique ;
+  compteurs qui bougent ⇒ on a trouvé des prunes injustifiés. Coût : le taux de cache, qui est ce
+  qui rend le corral-N soutenable (amortissement ×228 sur le 8).
+
+**Nettoyage fait** : `CORRAL_DETECT`/`CORRAL_BUDGET`/`corralDetect` (`solveurastar.cpp`),
+`CORRAL_DBG` et la macro `RESET_REGION` (remplacée par une lambda, `gateEnclosMort`),
+`detecteRegionsScellees` **supprimée** (c'était le mode 1 — plus aucun appelant, et son
+`volatile sink` n'avait de sens que pour chronométrer un résultat jeté). `gateEnclosMort` **reste**,
+seul usage : le juge `fp -2`, qui documente pourquoi le gate ne prune pas. Le mode test
+`bench <niv> enclos` reste aussi : `sousSolveEnclos` est désormais du code de PROD, il faut pouvoir
+le rejouer sur les fixtures (`level0195` vivant, `level0196` mort).
+
+- [x] ~~**B — Corral rigoureux comme ÉLAGAGE**~~ — **✅ FAIT ci-dessus (2026-07-27 suite 3)**, mais
+  réalisé par **strip + A\* borné** (preuve par exhaustion) plutôt que par le test structurel
+  « non-rouvrable + Hall » pur, qui s'est révélé **FP** (le non-rouvrable un-pas n'est pas une
+  preuve). Le structurel sert de **gate** (filtre), l'A\* borné de **juge**. Zéro FP, canari intact.
 - [x] ~~**A — Guidage corral-aware**~~ — **❌ FAIT ET RÉFUTÉ le 2026-07-21** (c'est le guidage par
   portes ci-dessus : ranger les poussées par corral-créé croissant). La réserve écrite ici,
   « n'aide que le régime `f=C*` », était **exacte** — et c'est précisément ce qui l'a tué.
@@ -630,6 +917,304 @@ pas) et **net positif** là où elle élague (17 macro 0,550 vs 0,581).
   < 500–2000 états (mesuré sur le 11). Une **mini-recherche bornée** qui ne déclare mort que si
   elle **épuise** l'espace sous un petit budget est une **preuve** (pas une heuristique) → sûre.
   Reste à voir le coût par nœud (ne pas la lancer sur chaque état).
+
+#### ✅ Session du 2026-07-29 — LA CLÉ DU CACHE SANS LE JOUEUR : mesurée en deux étages
+
+**La réserve** (posée le 2026-07-28, correction reportée) : `sousSolveEnclos` part de `playerPoint`,
+donc son verdict dépend de la position du joueur — mais le cache est indexé par la **seule frontière
+triée**. Le commentaire du code affirmait « le verdict ne dépend que d'elle, tout le reste est
+statique ». **C'est faux dans un solve réel**, et le transfert joue dans **DEUX sens** — le plan n'en
+voyait qu'un :
+
+| verdict caché | vrai verdict ici | effet | corriger… |
+|---|---|---|---|
+| MORT | pas mort | prune injustifié (le FP redouté) | fait **perdre** des états |
+| vivant / **inconnu** | MORT | **prune MANQUÉ** | fait **GAGNER** des états |
+
+La seconde ligne était l'angle mort : `game.cpp` mémoïse les **trois** verdicts sans les distinguer,
+or un `inconnu` (budget 150 épuisé) est un verdict **vide**, figé ensuite pour toutes les positions
+de joueur suivantes.
+
+⚠️ **Aucun juge existant ne peut voir ce bug.** `fp` juge `corralUnitaireMort` (variante −1) et
+`gateEnclosMort` (−2) — il n'exerce **jamais** `detecteEnclosArrivee` avec son cache, et ne le
+pourrait pas : le bug n'existe que dans un solve où l'historique a peuplé le cache. Le canari est
+aveugle aussi (un FP qui épargne le chemin optimal ne se voit pas). D'où une mesure dédiée.
+
+**ÉTAGE 0 — compter les collisions** (`CACHE_JOUEUR=1`). À chaque cache-hit, recalculer la zone
+canonique du joueur sur le board strippé et la comparer à celle du calcul d'origine. **Le verdict
+rendu ne change pas** → états identiques à l'unité dans les deux régimes (vérifié sur 10 niveaux),
+seul le temps bouge. Exemplaire UNIQUE du calcul (`Game::zoneCanoniqueStrip`), partagé avec
+`sousSolveEnclos` : les deux **ne peuvent pas** diverger.
+
+| niveau | hits testés | configs distinctes | amortissement | zone diff | **MORT** | inconnu |
+|---|---|---|---|---|---|---|
+| **9** | 170 069 | **60 498** | **×3,8** | 2 358 (1,39 %) | **183** | 2 175 |
+| 4 | 25 164 | 1 122 | ×23 | 683 (2,71 %) | 0 | 683 |
+| 17 | 22 982 | 383 | ×61 | 9 (0,04 %) | 0 | 9 |
+| 8 | 6 100 321 | 26 832 | ×228 | 62 (0,00 %) | 0 | 62 |
+| 0-3, 5, 6, 7 | ≤ 11 945 | — | — | **0** | 0 | 0 |
+
+- **Un seul niveau sur dix transfère des verdicts MORT** : le 9. Ailleurs, le risque de faux positif
+  n'a littéralement jamais l'occasion de se produire.
+- ⚠️ **Prédiction RÉFUTÉE** : « plus un verdict est réutilisé, plus il a d'occasions d'être
+  transféré » ⇒ le 8 (×228) devait être le cas décisif. **C'est l'inverse** — le niveau au plus fort
+  amortissement collisionne le moins. C'est la **variété des frontières** qui crée les collisions
+  (60 498 configs sur le 9 pour 20× moins de hits), pas la fréquence de réutilisation.
+- **Coût du recalcul : NUL** — 17 macro 0,096 USok des deux côtés, 9 macro 9,608 → 9,621 (+0,13 %).
+  Conséquence directe : **si on corrige la clé, le flood n'est pas le problème**, seul le taux de
+  cache l'est. La piste d'optimisation « mono-composante » envisagée est donc **sans objet**.
+
+**ÉTAGE 1 — rejuger les collisions** (`CACHE_JOUEUR=2`) : relancer `sousSolveEnclos` pour la position
+RÉELLE, croiser avec le verdict caché. Le verdict **rendu** reste celui du cache — sinon on
+mesurerait un autre solveur.
+
+| niveau | collisions | `MORT→vivant` | `MORT→inconnu` | **`inconnu→MORT`** |
+|---|---|---|---|---|
+| 9 | 2 358 | **0** | 163 | **311** |
+| 4 | 683 | **0** | 0 | **181** |
+| 17 | 9 | **0** | 0 | 0 |
+
+> ⚠️ **PIÈGE DE LECTURE, tombé dedans en écrivant l'outil : « inconnu » n'est PAS « vivant ».** Le
+> premier rapport agrégeait `MORT→vivant` et `MORT→inconnu` sous l'étiquette « FAUX POSITIFS » et
+> annonçait 163 sur le 9. Un `inconnu` est « budget épuisé sans conclure » — il ne prouve **rien**.
+> Seul `MORT→vivant` est un faux positif, et il vaut **0**. Libellé corrigé dans `solveurastar.cpp`.
+
+**Conclusions, asymétriques :**
+1. **Aucun faux positif prouvé**, à trois budgets (150, 10 000, 100 000) sur 3 050 transferts.
+2. **Mais 163 preuves ne se transportent pas.** Rejugés à budget large, les 163 `MORT→inconnu` du 9
+   sont **163/163 « toujours inconnu »**, avec un coût **exactement** égal au budget (163×10 000 puis
+   163×100 000) : **aucun n'a épuisé son espace**. Or ces mêmes enclos avaient été prouvés morts en
+   **< 150 états** depuis l'autre position de joueur — l'espace atteignable est **> 666× plus grand**
+   selon où se tient le joueur. **L'argument du plan (« après strip, l'extérieur est presque toujours
+   d'un seul tenant, donc même zone ⇒ même verdict ») est RÉFUTÉ sur ces cas.**
+3. **Conclure « vivant » est hors de portée de cet outil**, et c'est structurel : `sousSolveEnclos`
+   est un BFS aveugle fait pour **prouver la mort par exhaustion**. Monter le budget coûte
+   linéairement sans améliorer ses chances. Ne pas insister par là.
+4. **Le gain, lui, est PROUVÉ : 492 prunes manqués** (311 + 181), l'exhaustion sous budget étant une
+   preuve. C'est le résultat solide de la mesure — et il **renverse** la présentation d'origine, qui
+   ne voyait qu'un risque.
+
+- [ ] **ÉTAGE 2, non fait** : mettre la zone canonique du joueur dans la clé, solve complet, binaire
+  contre binaire. Il supprime les 163 transferts douteux **et** récupère les 492 prunes manqués d'un
+  coup. Seule inconnue : le **taux de cache**, qui est ce qui rend le corral-N soutenable.
+- **État du code** : instrumentation `CACHE_JOUEUR` (0 = coupée, défaut ; 1 = étage 0 ; 2 = étage 1)
+  dans `game.cpp`/`game.h`/`solveurastar.*`, plus `CACHE_JOUEUR_BUDGET` (défaut 10 000) pour
+  l'arbitrage. **Elle ne fait que COMPTER** — elle n'ajoute ni ne coupe aucun comportement, donc elle
+  ne peut pas faire diverger l'app du bench (§7). À retirer une fois l'étage 2 tranché.
+
+#### ⚠️➡️❌ Session du 2026-07-29 — LE CORRAL-N COÛTE ×7 à ×25 SUR LES GROS NIVEAUX
+
+> ❌ **LA LIGNE DU 10 EST FAUSSE, corrigée le 2026-07-31.** Le bloc `[CORRAL-N]` d'où viennent ses
+> 55 001 399 états de sous-solve et ses 23,6 % de durs morts **n'appartient pas au run du 10** :
+> re-mesuré sur les DEUX plateformes au même commit, le 10 rend **4,18 M états de sous-solve pour
+> 0,4 % de durs morts, soit ×1,94** — et les deux machines s'accordent **à 0,01 %** là-dessus (cf.
+> session du 2026-07-31). Le ×7,3 du 21, lui, se reproduit exactement et reste valide.
+> **Ce chiffre a orienté deux jours de travail ; il n'a jamais existé.**
+
+Mesuré sur les deux niveaux tombés ce jour-là, **et personne ne l'avait vu** :
+
+| niveau | états de recherche | états de **sous-solve** | ratio | durs prouvés morts | inconnus |
+|---|---|---|---|---|---|
+| **21** | 2 923 006 | **21 442 865** | **×7,3** | 8,2 % | **71 %** |
+| ~~**10**~~ ❌ | ~~2 175 724~~ | ~~**55 001 399**~~ | ~~**×25**~~ | ~~23,6 %~~ | ~~**68,7 %**~~ |
+| **10** (vrai, 31/07) | 2 175 724 | **4 182 892** | **×1,94** | **0,4 %** | 99,5 % |
+
+- ⚠️ **Le prédicteur du §6.1 (« la fraction de durs morts prédit le gain ») est PRIS EN DÉFAUT** : à
+  8,2 % il annonçait une perte en états sur le 21 ; mesuré `CORRAL=0`, le corral y gagne **×1,66**
+  (4 861 308 → 2 923 006). Un prune supprime une descendance entière — 328 757 prunes pèsent lourd
+  même à faible taux.
+- **Mais le COÛT, lui, empire avec la taille**, indépendamment de l'efficacité : le 10 a une fraction
+  saine (23,6 %, comparable au 9) et le pire ratio. ⚠️ **Le corral-N a été promu en défaut sur un
+  échantillon de niveaux à moins de 400 000 états** (4, 5, 7, 9, 17) — **aucun** de ceux où on
+  l'utilise aujourd'hui. La promotion n'est pas invalidée, elle est **hors domaine de mesure**.
+- **Le suspect est le taux d'INCONNUS** (68-71 %) : chacun paie le budget plein (~145 états) et ne
+  prouve rien. C'est le **même chiffre** que l'étage 1 éclaire du côté du gain — un seul phénomène,
+  deux symptômes : ce qui coûte est aussi ce qu'on rate.
+- ⚠️ **À LIRE AVEC LA SESSION DU 2026-07-30 ci-dessous** : ces ratios disent ce que le corral
+  **DÉPENSE**, pas ce qu'il **RAPPORTE**. Chronométré sur solve complet, il rend **×2,45** (niv 9) et
+  **×5,7** (niv 17). Un ratio sous-solve/recherche n'est pas un verdict.
+- [x] **À faire** : `CORRAL=0` chronométré (USok) sur 10 et 21. Si le corral-N y fait perdre du
+  temps, il faut le **conditionner** — ce qui est exactement le §6.6 (aucun levier n'est universel).
+  ✅ **FAIT le 2026-07-31** (session dédiée en fin de §6.1) : le 21 **perd ×2,13**, le 10 **gagne
+  ×1,54** — et une fois les deux étages séparés, **l'étage N perd sur les deux**.
+
+#### ✅ Session du 2026-07-30 (fin) — LE CORRAL-N PAIE, et le run BORNÉ le sous-estime STRUCTURELLEMENT
+
+**⚠️ Chantier ouvert sur une prémisse FAUSSE, à dire d'emblée.** Il partait du ×5,1
+sous-solve/recherche mesuré le matin même sur la fixture r08 du 13 (§6.2). Deux biais, tous deux
+identifiables après coup :
+1. **C'était de l'A\* PUR**, où les états sont bon marché et où le corral pèse donc relativement
+   beaucoup plus. Le §6.1 le disait déjà : « ~0 sur le chemin macro, +6 % en A\* pur seulement ».
+   Le régime de production est `coupl-plongeon`, pas l'A\* pur.
+2. **Un RATIO DE COÛT n'est pas un EFFET NET.** 148 M états de sous-solve pour 29 M états de
+   recherche dit ce que le corral dépense, pas ce qu'il rapporte.
+
+**PHASE 1 — non résolus, borné 120 s, `coupl-plongeon`, défaut contre `CORRAL=0` :**
+
+| niveau | dépilés défaut | dépilés `CORRAL=0` | surcoût/état | vus économisés | progression |
+|---|---|---|---|---|---|
+| 13 | 1 222 000 | 1 289 000 | +5 % | −24 % | 8 contre **10** |
+| 28 | 2 673 000 | 3 111 000 | +16 % | −18 % | **13** contre 9 |
+| 14 | 1 639 000 | 2 390 000 | +46 % | −36 % | égale (12) |
+| 31 | 1 275 000 | 2 551 000 | **×2,0** | −56 % | égale (10) |
+| 27 | 1 240 000 | 3 105 000 | **×2,5** | −62 % | égale (13) |
+
+**Trié, et la corrélation est nette : plus le corral élague, plus il coûte, dans le même rapport.**
+Logique — ce qui coûte (les sous-solves) est ce qui produit les prunes, et les 65-70 % d'« inconnus »
+se paient au même tarif sans rien rendre. Lu ainsi, le corral-N ressemble à un **échange à parité** :
+il divise l'espace par deux en multipliant le temps par deux. **Cette lecture est FAUSSE.**
+
+**PHASE 2 — témoins résolus, solve COMPLET, en USok** (étalon stable sur les 4 appels : 6,73 à
+6,80 s, 1 % d'amplitude) :
+
+| niveau | USok défaut | USok `CORRAL=0` | **gain temps** | états défaut | états `CORRAL=0` | gain états | poussées |
+|---|---|---|---|---|---|---|---|
+| **9** | **2,673** | 6,556 | **×2,45** | 83 029 | 1 296 470 | ×15,6 | 237 = 237 |
+| **17** | **0,094** | 0,535 | **×5,7** | 24 813 | 202 180 | ×8,1 | 213 = 213 |
+
+> **LA LEÇON, et elle vaut plus que le résultat : UN RUN BORNÉ SOUS-ESTIME STRUCTURELLEMENT TOUT
+> ÉLAGAGE.** Couper une branche supprime toute sa **descendance** — or cette descendance ne se
+> développe que dans des états qu'une fenêtre de 120 s n'atteint jamais. D'où la contradiction
+> apparente : parité sur les cinq bornés, ×2,45 et ×5,7 sur les deux complets. C'est le §6.3 pour la
+> quatrième fois (« un solve incomplet ne prouve rien — seul un solve mené au bout tranche »),
+> appliqué cette fois non pas à la solubilité mais à l'**évaluation d'une feature**.
+
+- **Canari intact** : poussées identiques dans les deux régimes (237 et 213), et l'étalon rend ses
+  590 066 états / 131 poussées à chaque appel.
+- ⚠️ **L'ITEM N'EST PAS CLOS, et il ne faut pas lire ce tableau comme s'il l'était.** 9 et 17
+  appartiennent à l'**échantillon d'origine de la promotion** (niveaux à moins de 400 000 états). Ils
+  confirment que le corral paie **là où il payait déjà** ; ils ne disent rien du domaine hors mesure,
+  qui est exactement ce que la session du 2026-07-29 mettait en cause.
+- [x] **Ce qui ferme l'item** : solve **complet** du **10** et du **21**, défaut contre `CORRAL=0`.
+  ✅ **FAIT le 2026-07-31**, session ci-dessous — et l'item est allé plus loin que sa formulation :
+  `CORRAL=0` coupant les DEUX étages, il a fallu les séparer pour imputer quoi que ce soit.
+- **Outillage** : `mesures/` inchangé (le protocole n'utilise que `bench` et `usok.sh`). Script de
+  campagne jetable, non versionné.
+
+#### ✅ Session du 2026-07-31 — L'ITEM FERMÉ, et l'ÉTAGE N SÉPARÉ DE L'UNITAIRE+PINCE
+
+**L'item demandait « 10 et 21, solve complet, défaut contre `CORRAL=0` ». Fait — et la réponse
+n'était pas exploitable telle quelle**, parce que `CORRAL=0` coupe les **deux** étages : elle mesure
+leur somme et n'impute rien. D'où un interrupteur de chantier, **`CORRAL_N=0`**, qui coupe le seul
+étage N (strip + A\* borné) en laissant le corral unitaire + pince actif. Il **coupe, il n'ajoute
+pas** (§7) : le défaut reste les deux étages, l'app ne peut pas diverger du bench. Neutralité
+vérifiée binaire contre binaire — états, poussées et stats `[CORRAL-N]` **identiques à l'unité** sur
+le 10 et le 21.
+
+**Le tableau, tous régimes en `coupl-plongeon`, USok sur temps CPU** (1 USok = 6,44 s ici) :
+
+| niv | % durs morts | défaut | `CORRAL_N=0` | `CORRAL=0` | **étage N** | **unitaire+pince** |
+|---|---|---|---|---|---|---|
+| 4 | 22,9 % | 0,256 | 5,306 | 19,936 | **×20,7** | ×3,76 |
+| 17 | 71,4 % | 0,096 | 0,526 | 0,550 | **×5,5** | ×1,05 |
+| 8 | 7,9 % | 0,370 | 1,163 | 2,744 | **×3,14** | ×2,36 |
+| 9 | 21,6 % | 2,812 | 6,306 | 6,828 | **×2,24** | ×1,08 |
+| 5 | 41,6 % | 0,090 | 0,104 | 0,130 | ×1,16 | ×1,25 |
+| **7** | 15,2 % | 0,090 | 0,067 | 0,486 | **÷1,34** | ×7,3 |
+| **10** | 0,4 % | 45,41 | 37,25 | 70,41 | **÷1,22** | ×1,89 |
+| **21** | 8,2 % | 38,99 | 18,71 | 18,35 | **÷2,08** | ×0,98 |
+
+- **L'étage N perd sur les trois niveaux hors échantillon de promotion** (7, 10, 21) et gagne
+  massivement sur celui-ci (4, 9, 17) plus le 8. La promotion du 2026-07-28 n'était pas fautive,
+  elle était **hors domaine** — exactement la réserve du 2026-07-29, cette fois chiffrée.
+- **L'unitaire+pince n'est pas le levier marginal qu'on croyait** : ×7,3 sur le 7, ×3,76 sur le 4,
+  ×2,36 sur le 8, ×1,89 sur le 10 — où il fait TOUT le travail. Il ne coûte jamais rien (−2 % au
+  pire, sur le 21, où son motif est absent). Le gain que le §6.1 attribuait au « corral » sur le 10
+  est le sien, pas celui de l'étage N.
+- **`CORRAL=0` rend une solution égale ou meilleure** sur les deux gros : 147 poussées contre 165
+  (21), 542 contre 544 (10). C'est l'instabilité du plongeon, pas une propriété du corral — mais
+  elle pèse dans la décision.
+- Poussées inchangées partout ailleurs : canari intact dans les trois régimes.
+
+**❌ LE PRÉDICTEUR « FRACTION DE DURS MORTS » EST RÉFUTÉ, définitivement.** Sur les sept premiers
+niveaux il séparait gain et perte **sans une inversion** (tout ce qui est ≥ 21,6 % gagne, tout ce qui
+est ≤ 15,2 % perd) — et **le 8 casse la loi** : 7,9 % de durs morts, sous le 21 (8,2 %) qui perd,
+et il **gagne ×3,14**. Le ratio sous-solve/recherche ne prédit pas davantage (le 9 est à ×28,9 et
+gagne, le 10 à ×1,94 et perd) : il mesure la dépense, pas le rendement.
+
+> ⚠️ **Leçon de méthode, et elle a été payée en direct dans la session** : la loi « monotone sur
+> sept niveaux » a été annoncée, puis cassée par le **huitième**, ajouté à la demande de
+> l'utilisateur (« mesurer d'abord sur plus de niveaux »). C'est le §11.4 en une heure — dont quatre
+> des sept points étaient des niveaux triviaux (0-3, 6 se résolvent en 0,01 à 0,04 s, soit 0,002 à
+> 0,006 USok : **sous la résolution du chronomètre**, ils ne peuvent rien départager).
+
+**LE CANDIDAT QUI SURVIT, et il n'est pas ajusté — il est arithmétique :**
+
+> **états de recherche ÉPARGNÉS ÷ états de sous-solve DÉPENSÉS**
+
+| niv | épargnés / dépensés | verdict |
+|---|---|---|
+| 4 | 967 336 / 100 827 = **9,6** | gain ×20,7 |
+| 17 | 165 949 / 50 368 = **3,3** | gain ×5,5 |
+| 8 | 178 163 / 187 096 = **0,95** | gain ×3,14 |
+| 9 | 1 076 102 / 2 395 652 = **0,45** | gain ×2,24 |
+| 5 | 20 640 / 47 272 = **0,44** | gain ×1,16 |
+| 21 | 1 928 614 / 21 442 865 = **0,090** | perte ×2,08 |
+| 7 | 4 932 / 64 431 = **0,077** | perte ×1,34 |
+| 10 | 87 976 / 4 183 492 = **0,021** | perte ×1,22 |
+
+**Monotone sur les huit**, et le seuil n'est pas un réglage : c'est le **rapport de coût entre un
+état de sous-solve et un état de recherche**. Estimé depuis les temps mesurés — 10 : 14,8 µs contre
+106,7 µs ; 21 : 8,3 contre 24,8 ; 8 : 8,1 contre 37,2 — il vaut **0,14 à 0,34**, et il tombe dans le
+trou observé entre 0,090 (perte) et 0,44 (gain). La bascule est **expliquée**, pas constatée.
+
+- ⚠️ **Mais ce n'est PAS un gate** : « états épargnés » n'est connaissable qu'en faisant tourner les
+  deux régimes — en vol, le solveur connaît ses prunes, pas la descendance qu'ils ont supprimée.
+  Outil d'ANALYSE. Conditionner l'étage N demanderait d'abord un **estimateur de descendance
+  épargnée**, chantier distinct, à discuter avant de coder.
+
+**⚠️ DEUX CORRECTIONS DE MÉTHODE, toutes deux mesurées :**
+
+1. **Le temps MURAL est inutilisable sur une machine partagée, `usok.sh` le chronomètre pourtant.**
+   Le même travail (21 défaut) a rendu **254,41 s puis 1390,80 s** de mural pour **253,80 s puis
+   251,09 s de CPU**. Le CPU rejoue à moins de 1 % sur les quatre runs, le mural varie d'un facteur
+   5,5. Toutes les mesures ci-dessus sont donc en **temps CPU** (`/usr/bin/time -l`, `user`), écart
+   assumé au §1. `usok.sh` utilise le builtin `time` (`%R` = mural) : **à corriger** si on veut que
+   l'USok reste un mètre.
+2. **Deux tirages, pas trois** — justifié par la mesure et non par le confort : l'écart CPU entre
+   tirages est de 0,5 à 1,1 %, très en dessous du bruit de 3 % que la règle des 3 tirages combat.
+   L'étalon, lui, est bien en meilleur de 3 (6,476 / 6,498 / 6,490 s).
+
+**⚠️ ET UN PIÈGE NEUF : le nombre d'états N'EST PAS PORTABLE** (constaté par l'utilisateur, qui a
+rejoué le 10 sur sa machine Linux et dans l'app). À commit égal, sur le même niveau :
+
+| | macOS | Linux | écart |
+|---|---|---|---|
+| états explorés | 2 160 492 | 2 175 724 | **+0,70 %** |
+| durs jugés | 3 456 570 | 3 474 427 | +0,52 % |
+| configs distinctes / états de sous-solve | 27 947 / 4 183 492 | 27 943 / 4 182 892 | **−0,01 %** |
+| **plongeon gagnant** | **259 états** | **4 339 états** | **×17** |
+
+- **Ce qui dépend de la GÉOMÉTRIE est portable à 0,01 %** (configurations d'enclos, états de
+  sous-solve, fraction de durs morts) ; ce qui dépend de la **TRAJECTOIRE** dérive de ~0,6 %.
+  L'ordre de dépilement départage autrement les ex æquo — `std::sort`/`push_heap` n'ont pas la même
+  implémentation entre libc++ et libstdc++.
+- **Le plongeon amplifie violemment cette dérive** : même record 13/32, atteint 15 000 états plus
+  tard, complété en 4 339 états au lieu de 259. Nouvelle illustration de l'instabilité du §6.3.
+- **Le run de l'app a reproduit le bench au chiffre près** (états, enfilages, durs, morts,
+  sous-solve, cache, et les douze lignes `[plongeon]` budgets compris) : l'écart app/bench du §7 a
+  bien disparu avec la promotion, c'est vérifié de l'extérieur.
+
+**État du code** : ⚠️ **RIEN.** L'interrupteur `CORRAL_N` qui a produit ces chiffres était un
+outil de chantier (`solveurastar.cpp`, +16/−5 : une constante `corralNActif` et deux gardes) ; il a
+été **retiré avant le merge**, le corral redevenant inconditionnel comme avant. Les mesures, elles,
+restent valides — elles ont été prises binaire contre binaire, défaut vérifié identique à l'unité.
+**Le re-dériver est un travail de dix minutes** : les deux étages vivent déjà dans deux blocs
+`if (corralActif …)` distincts (corral unitaire puis corral-N à l'enfilage, plus le même couple dans
+`plonge()`), il suffit d'ajouter une seconde constante au second de chaque paire. Ne pas le
+reproposer comme feature : il ne COUPE qu'un élagage, il n'ajoute rien, et le défaut ne doit pas
+dépendre d'une variable d'environnement (§7).
+
+**Reste ouvert :**
+- [ ] **Conditionner l'étage N**, bloqué faute d'observable en vol (cf. ci-dessus). Tant que ce n'est
+  pas tranché, le défaut reste les deux étages — il gagne sur 4/5/8/9/17 et perd sur 7/10/21.
+- [ ] **Corriger `usok.sh`** pour chronométrer le CPU et non le mural.
+- [ ] **Les 18 non-résolus ne sont pas plaçables sur cet axe** : les stats `[CORRAL-N]` ne
+  s'impriment qu'en **fin** de `run()`, donc un run tué n'en rend aucune — même piège que le
+  profilage du §6.6, qui ne peut relever que ce qui part en continu. Les faire partir
+  périodiquement avec la jauge est un ajout de trois lignes, sans effet sur aucun verdict.
+- [ ] **11 et 32 laissés de côté** (décision utilisateur) : leurs runs `CORRAL=0` sont d'ordre de
+  grandeur inconnu et un run interrompu ne rendrait aucun verdict.
 
 ### 6.2 Ordre de remplissage — multi-salles
 
@@ -905,12 +1490,649 @@ ne rend pas une permutation complète. `game.cpp` compile pour le bench ET l'app
 **Ce qui reste pour le vrai 11 / 192 / les multi-salles** : plus l'ordre (fini), mais l'**acheminement
 et le démêlage** — item 3 (connectivité) puis 4 (corral) / 5 (repli anytime) de la feuille de route.
 
+#### 🎯 Session du 2026-07-29 — LE GOAL-ORDERING N'AVAIT PAS FINI SON TRAVAIL (outil `ordre`)
+
+**La phrase à retirer.** La session du 2026-07-20 (suite 2) se clôt sur « chantier bouclé » et
+« le goal-ordering a fini son travail ; ce qui reste est l'acheminement et le démêlage ». **C'est
+faux, et ça a détourné neuf jours de travail vers le corral et le plongeon.** Mesuré aujourd'hui :
+**11 des 19 niveaux non résolus ont un ordre de remplissage DÉFECTUEUX**, dont trois par un bug de
+la règle déjà codée.
+
+**Ce qui a déclenché la mesure** : l'utilisateur exporte l'état d'un run du **27** arrêté à
+**17/20 caisses posées** (85 %, « de bon espoir »). Rejoué seul, il rend **`AUCUNE 0`** — zéro état
+développé, l'état est mort à la racine. Vérifié `CORRAL=0` : **ce n'est pas le corral**. La cause se
+lit à l'œil sur le plateau : les caisses posées sur les deux premières rangées **ferment l'accès aux
+trois buts restants**, plus aucun retournement n'est possible. Le solveur n'a pas échoué à chercher,
+**il a exécuté un ordre qui condamnait la partie**.
+
+**L'outil (`mesures/ordre`, cf. §1).** Statique, aucune recherche. Il imprime l'ordre calculé (carte
+des rangs en base 36 sur le plateau — le format qui rend le défaut visible d'un coup d'œil) et teste
+DEUX précédences :
+1. **LOCALE** — celle du §6.2, déjà codée : à son tour, ce but a-t-il encore une approche (caisse en
+   `G−d`, joueur en `G−2d`) dont aucune case ne porte un but déjà rempli ?
+2. **GLOBALE, neuve** — le **trajet de tirage complet**, exactement ce que le §6.2 réclamait sans
+   jamais le faire (« le rebours doit simuler le trajet de tirage, pas juste le premier pas ») :
+
+   > **G doit précéder B si, en traitant B comme OCCUPÉ, plus aucune caisse du départ n'atteint G.**
+
+   BFS de tirage à rebours depuis chaque but, une fois par autre but marqué obstacle.
+   `O(buts² × plateau)` ≈ 100 000 opérations sur le 27 — négligeable, et **statique**, donc
+   calculable au chargement comme `casesMortes`. **C'est une ARÊTE de précédence, pas un score** —
+   la forme qui a marché le 2026-07-20, pas celle qui a échoué le 19.
+
+⚠️ **Relaxation OPTIMISTE** (joueur supposé capable d'atteindre n'importe quel appui, aucune autre
+caisse) : **une violation est une PREUVE, un « 0 violation » ne promet rien.** Le 12 l'illustre —
+ordre parfaitement sain, et il échoue quand même (son problème est ailleurs, cf. §6.3).
+
+**LE DISCRIMINANT — c'est le résultat de la session :**
+
+| | violations |
+|---|---|
+| les **14 résolus** + 190 + 191 | **0 partout** |
+| **11 non résolus sur 19** | 1 à **29** |
+
+Le test n'est pas creux : il produit **1 à 99 arêtes** de précédence selon les niveaux (28 sur le 11,
+32 sur le 21, 99 sur le 10). Il est simplement **silencieux là où l'ordre marche**. Seize niveaux qui
+passent contre onze qui ne passent pas, sans un seul faux positif.
+
+**DEUX FAMILLES, et elles ne se soignent pas pareil :**
+
+| famille | niveaux | ce que c'est |
+|---|---|---|
+| **A — murage LOCAL** | **22, 29, 32** | la règle **déjà codée** est violée par sa **propre sortie** → **BUG** de `ordreParPrecedence`, pas une limite théorique. Le 22 se mure au rang 25 sur le but (12,9) |
+| **B — murage GLOBAL** | 13, 15, 18, 20, **23**, **25**, 27, 28 | précédence locale OK, trajet de tirage ignoré → la limite connue. Massif sur le **23 (26 arêtes violées)** et le **25 (29)** |
+
+**Le cas du 27, en clair** : ses trois buts du haut sont classés aux rangs **17, 18, 19** (les
+derniers), alors que **(6,2), rempli au rang 16, est leur passage obligé**. L'ordre remplit de bas en
+haut ; il fallait l'inverse.
+
+**Reste à faire :**
+- [x] **Famille A** — ✅ **CORRIGÉE le 2026-07-29** (session ci-dessous). Cause : le glouton se
+  peignait dans un coin puis FORÇAIT. Corrigé par backtracking borné ; **le 32 redevient sain, aucun
+  autre ordre ne bouge**. ⚠️ Le 22 résiste, et deux modes d'échec neufs sont apparus (voir plus bas).
+- [x] **Famille B** — ✅ **FAIT le 2026-07-30** (session dédiée ci-dessous) : `precedenceGlobale()` +
+  tri topologique stable. 0 violation sur les 35 niveaux, 30 ordres inchangés à l'octet, canari
+  intact. ⚠️ Neutre au profilage borné — corrigé n'est pas débloqué.
+- [ ] ⚠️ **Ne pas conclure que l'ordre EST la cause** des 11 échecs — c'est une corrélation sur un
+  test optimiste. Le vrai juge sera : corriger, relancer, compter les niveaux qui tombent.
+- [x] ⚠️ **Le correctif MULTI-SALLES perd son cas d'école** : le **10 est tombé le 2026-07-29 sans
+  lui** (2 175 724 états, 544 poussées), alors que tout le §6.2 le présentait comme le niveau qui
+  l'exigeait. Son ordre calculé est d'ailleurs **sain** (99 arêtes, 0 violée). Le correctif reste
+  ouvert pour 18/24/25/26, mais **déclassé en priorité**.
+
+#### ✅ Session du 2026-07-29 (suite) — FAMILLE A CORRIGÉE : le glouton ne force plus, il recule
+
+**La cause, isolée par une trace jetable.** Quand plus aucun but n'est « sûr » (poser n'importe
+lequel condamne un autre), l'ancien code faisait `surs = candidats` et posait **quand même**. Mesure
+du nombre de relâchements :
+
+| relâchements | niveaux |
+|---|---|
+| **> 0** | 27 (7), 22 (6), 32 (6), 25 (2) |
+| **0** | 1, 3, 7, 10, 21, 23, 29, 190, 191 |
+
+**Aucun niveau résolu ne relâche jamais.** Le relâchement est donc le symptôme exact du murage, pas
+un incident bénin — et il n'y avait aucune raison de croire qu'il fût rare.
+
+**La correction** : empiler les candidats sûrs **triés par le tie-break** et **RECULER** au lieu de
+forcer (`ordreParPrecedence`, game.cpp). C'est la même correction que `macroVersButBacktrack`
+(§6.3) : mémoriser les forks au lieu de les oublier. Sur un niveau qui ne relâche jamais, la pile ne
+recule jamais et le premier candidat est toujours retenu → **ordre identique, canari intact PAR
+CONSTRUCTION**.
+
+⚠️ **Ce n'est pas la tentative n°5 du 2026-07-19** (« backtracking : rend le MÊME ordre que le
+greedy »). Celle-là portait sur le 191, où la garde ne se relâche jamais : la recherche n'avait rien
+à explorer. Ici on ne recule que sur un échec avéré du modèle.
+
+**⚠️ DEUX BUGS DE PREMIER JET, tous deux instructifs :**
+1. **Le repli était PIRE que l'existant.** En cas d'échec, je reprenais le plus long préfixe atteint
+   (`meilleurOrdre`) — un chemin d'**exploration**, pas un ordre réfléchi. Résultat mesuré : le **27
+   passait de sain à muré au rang 18**, le 25 de muré au rang 10 à **muré au rang 1**. Corrigé en
+   refaisant *exactement* l'ancien glouton relâché : **le backtracking est un BONUS, il ne peut
+   qu'améliorer.** Règle générale : un ajout dont le cas d'échec n'est pas *identique* à l'existant
+   n'est pas un ajout, c'est un remplacement.
+2. **Le budget coûtait ×10 au CHARGEMENT.** `ordreParPrecedence` tourne dans le ctor `Game(Level)` —
+   donc à chaque ouverture de niveau dans l'app. À `200×nbButs`, le 22 passait de **0,51 s à 5,11 s**.
+   Balayé (méthode `CORRAL_BUDGET`) :
+
+   | budget | 32 | temps de chargement du 22 |
+   |---|---|---|
+   | 50 | muré | 0,11 s |
+   | **200** ✅ | **SAIN** | **0,23 s** (moins que les 0,51 s d'origine) |
+   | 1000 | sain | 0,91 s |
+   | 5600 | sain | 4,67 s |
+
+   **Figé à 200** : au-delà, on paie sans rien gagner.
+
+**Vérification — ordre par ordre, binaire contre binaire** (les 33 niveaux + 190 + 191, cartes de
+rangs comparées) : **UN SEUL ordre change, celui du 32.** Canari revérifié au solveur
+(4/97/131/134/143/110/90/213, états inchangés).
+
+**Résultat, et il est maigre — 1 niveau sur 4 :**
+
+| niveau | avant | après |
+|---|---|---|
+| **32** | muré rang 14 | **SAIN** ✅ |
+| 22 | muré rang 25 | muré rang 25 |
+| 25 / 23 / 13 / 15 / 18 / 20 | murés | murés |
+
+**⚠️ LE VRAI DIAGNOSTIC EST AILLEURS, et c'est le résultat important de la session.** Pourquoi le
+backtracking n'aboutit-il pas ? Deux modes, mesurés :
+
+| mode | niveaux | symptôme |
+|---|---|---|
+| **A — budget épuisé** | 22, 13, 15, 27 | atteint 11 à 19 buts, budget à 0 |
+| **B — échec au RANG 0** | **25, 23, 18, 20** | **0 but posé**, budget quasi intact |
+
+Le mode B est un aveu du modèle : **dès le premier rang, la garde estime que TOUT choix condamne un
+but** — sur des niveaux pourtant solubles. `distanceLivraison` est donc **trop PESSIMISTE**, et la
+cause est connue et déjà écrite au §6.1 : elle ne retient qu'**UNE** position de joueur par case
+atteinte (`joueurApres[a] = c`), exactement le défaut qui avait produit 86 faux positifs au test
+« but orphelin ». Elle rate des routes, déclare des buts non livrables, la garde refuse tout, et le
+glouton relâche.
+
+- [x] **La correction de fond : rendre `distanceLivraison` joueur-aware**, indexé par
+  **(case, région joueur)** comme `distanceParBut` l'est depuis le §2.2. C'est la troisième fois que
+  ce même défaut est identifié dans ce projet (§6.1 pour `butNonLivrable`, ici pour la garde).
+  ✅ **FAIT et committé** (`816412d`, constaté le 2026-07-30 — le code avait pris de l'avance sur ce
+  document). Effet mesuré : le **mode B est guéri**, 20/23/25 ne violent plus aucune arête et ne
+  sont plus murés. ⚠️ **Coût non documenté** : le chargement du 22 passe de **0,23 s à 1,78 s** (×8).
+  C'est le ctor `Game(Level)`, donc payé à chaque ouverture de niveau dans l'app.
+
+#### ✅ Session du 2026-07-30 — FAMILLE B PORTÉE DANS LE SOLVEUR (précédence globale)
+
+**⚠️ La ligne de base avait bougé, et le tableau du 2026-07-29 était périmé** (il précédait le
+correctif joueur-aware ci-dessus). Re-mesuré avant de coder quoi que ce soit :
+
+| | plan (29/07) | **mesuré le 30/07** |
+|---|---|---|
+| famille B (arêtes violées) | 8 niveaux, jusqu'à 29 arêtes | **5 niveaux : 13, 15, 18, 27, 28 — 2 à 3 arêtes** |
+| 20 / 23 / 25 | violés (25 → 29 arêtes) | **0 violation** |
+| famille A (murage local) | 22, 29, 32 | **22 (rang 25), 13 (14), 15 (14), 18 (10)** |
+
+**Le code, deux pièces, aucune variable d'environnement (§7) :**
+1. **`Game::precedenceGlobale()`** (game.cpp) — la règle du §6.2 enfin codée : BFS de tirage à
+   rebours depuis chaque but, une fois par autre but marqué occupé. Rend `requis[B]`. Statique, donc
+   calculé une fois au chargement comme `casesMortes`. **Coût mesuré : nul** (identique à la
+   centiseconde sur 10/22/24/25/27/31/13/32 — noyé dans les `distanceLivraison` du glouton).
+2. **Clé de tête du tie-break** + **TRI TOPOLOGIQUE STABLE en post-passe**.
+
+**Le diagnostic qui a décidé du design, et il n'était pas prévu.** Le tie-break seul ne corrigeait ni
+le 27 ni le 28. Cause trouvée par trace jetable : sur le 27, les buts (2,1)/(3,1)/(4,1) ne sont
+**JAMAIS livrables** selon `distanceLivraison`, le glouton ne les choisit donc jamais, et la boucle
+de complétion (« les buts jamais livrables ferment la liste ») les colle en **fin** de liste — aux
+rangs 17-19, alors que (6,2), leur passage obligé, est posé au rang 16. **Leurs rangs n'étaient pas
+un choix, c'était un résidu.** D'où la post-passe, qui les remonte à leur place.
+
+> **Le tri est STABLE au sens fort** : on émet toujours le premier but dont tous les prédécesseurs
+> sont déjà émis. Donc un ordre qui respecte déjà ses arêtes ressort **inchangé** — l'identité, et
+> donc le canari, sont préservés **par construction**, pas par réglage.
+
+**Mesuré (binaire contre binaire, worktree sur `HEAD`) :**
+
+| juge | résultat |
+|---|---|
+| arêtes violées, 35 niveaux | **0 partout** |
+| cartes de rangs | **30 identiques à l'octet**, 5 changent (13, 15, 18, 27, 28) |
+| canari solveur (0-9, 17, 190, 191) macro | **états ET poussées identiques à l'unité** |
+| murage local du 15 | **14 → sain** |
+
+- ⚠️ **Variante FILTRE DUR codée puis RETIRÉE** (garde `attente == 0` sur les sûrs + couches de
+  raffinement dans le repli) : **cartes de rangs identiques sur les 35 niveaux**, donc strictement
+  **inerte**. Consignée dans le code pour ne pas être reproposée sans un cas qui la distingue.
+- ⚠️ **Le gain est NEUTRE au profilage borné** (120 s, `coupl-plongeon`, ref contre new) : 13 (9/16),
+  15 (10/15), 27 (13/20), 28 (13/20) **inchangés** ; seul le **18 passe de 8/11 à 9/11**. La crainte
+  inverse ne s'est pas réalisée non plus — remonter des buts jamais livrables n'empêche pas la macro
+  de s'engager (le 27 atteint toujours 13/20). **Correction gratuite et prouvée, pas un déblocage.**
+- [ ] **Le vrai juge reste à passer** : relancer 13/15/18/27/28 **sans budget**, compter ceux qui
+  tombent. C'est la règle que le §6.2 s'était donnée (« ne pas conclure que l'ordre EST la cause »),
+  et le §6.3 l'a vérifiée trois fois : « ne termine pas dans le budget » veut dire **lent**, pas mort.
+  ⚠️ **Entamé sur le 13** (session ci-dessous) : run `coupl-plongeon` arrêté par un plantage de
+  terminal à 7,19 M dépilés / 17,8 M vus, `max 9/16`, file **+2051 qui MONTE**. Aucun verdict.
+
+#### ❌ Session du 2026-07-30 (suite) — LE 13 JUGÉ : ordre SAIN, niveau muré quand même
+
+**Le point de départ** : passer le « vrai juge » ci-dessus sur le 13, premier des cinq niveaux dont
+l'ordre a changé. Il n'est pas tombé, mais il a livré trois faits et une réfutation.
+
+**FAIT 1 — l'ordre du 13 est SAIN, et ça ne suffit pas.** `ordre 13` : **0 violation locale, 0
+violation globale** (4 arêtes de précédence). Le correctif du jour n'avait rien à corriger ici, et le
+niveau se mure quand même. **Le goal-ordering n'est pas le verrou du 13.**
+
+**FAIT 2 — deux records du 13 sont MORTS, prouvés par EXHAUSTION** (A\* pur, donc complet, relancé
+depuis les fixtures de `bench <niv> <mode> record`) :
+
+| record | posées | verdict | états | prunes corral |
+|---|---|---|---|---|
+| **r09** | 9/16 | `AUCUNE`, espace épuisé | **5 191 833** | 3 181 508 sur 28,9 M enfilages (67,5 % des durs) |
+| **r08** | 8/16 | `AUCUNE`, espace épuisé | **29 032 799** | 653 093 sur 162,8 M (5,2 % des durs) |
+| r07 | 7/16 | **arrêté à la main, AUCUN VERDICT** | 43,9 M dépilés / 64,2 M vus, 4,1 Go | — |
+
+- ⚠️ **r07 : arrêt manuel ⇒ aucun verdict, dans aucun sens** — même règle que le 8 et le 31. Sa file
+  MONTAIT encore (+864 par millier) quand il a été coupé, à l'inverse de r08 dont la file plafonnait
+  à 1,9 M avant de drainer. Il ressemblait à un espace vivant **ou** simplement énorme ; on ne sait pas.
+- **Le verdict de r08 ne repose quasiment pas sur le corral** (653 k prunes pour 29,0 M états
+  explorés, 2,2 %), là où celui de r09 en dépendait lourdement. Corroboration indépendante bienvenue.
+- **Coût du corral-N sur r08, et il alimente l'item ouvert du §6.1** — ⚠️ cité alors comme « ×7 à
+  ×25 sur les gros niveaux » : **le ×25 du 10 est FAUX** (corrigé le 2026-07-31, vrai ratio ×1,94),
+  seul le ×7,3 du 21 tient : **148,1 M états de sous-solve pour 29,0 M états de recherche, ×5,1**, avec **64,6 %
+  d'inconnus** et 5,2 % de durs prouvés morts. Plein tarif pour presque rien.
+
+**FAIT 3 — LES RECORDS NE SUIVENT PAS `ordreButs`, et c'est là qu'est le trou.** Rangs réellement
+posés (l'ordre calculé va de 0 à 15) :
+
+| record | r02 | r06 | r07 | r08 | r09 |
+|---|---|---|---|---|---|
+| rangs posés | `0,1` | `0,1,6,9,14,15` | `0,1,4,6,9,14,15` | `0,1,3,4,6,7,11,15` | `0,1,3,4,5,6,7,11,12` |
+| préfixe de l'ordre ? | **oui** | non | non | non | non |
+
+> **`ordreButs` ne pilote que le BUT ACTIF DE LA MACRO. Les poussées simples posent une caisse sur
+> n'importe quel but, à n'importe quel moment.** Un ordre prouvé correct n'est donc jamais *appliqué* :
+> le solveur pose les rangs 3, 4, 6, 7, 11 et 12 en laissant le **rang 2 vide**, et c'est ça qui scelle.
+
+Le motif, lisible sur le plateau : **(14,6) est enclavé entre les murs (13,6) et (15,6)**, donc ses
+seules approches sont verticales — appui joueur en (14,4) par le haut, en (14,8) par le bas. Il faut
+occuper les **deux** pour le condamner ; c'est le cas dès r08. Même motif ailleurs dans la salle :
+(15,9) entre (14,9) et (16,9), (15,3) entre (14,3) et (16,3).
+
+**❌ LA PRÉCÉDENCE PAR PAIRES — proposée, codée en diagnostic, RÉFUTÉE LE JOUR MÊME.**
+
+`precedenceGlobale()` ne teste qu'**un** bloqueur : elle est structurellement aveugle à ce motif (aucun
+but SEUL ne ferme les deux routes de (14,6) — elle rend d'ailleurs 0 arête vers lui). La
+généralisation évidente : *{B1,B2} affame G si, B1 ET B2 traités comme occupés, plus aucune caisse
+n'atteint G*. Elle **retrouve exactement** `{(14,4),(14,8)} → (14,6)` sur r08 et r09, en quelques
+millisecondes de calcul statique, là où A\* a mis 34 M d'états.
+
+**Et elle est fausse.** Juge `fp -3` (rejeu de solutions GAGNANTES ⇒ toute détection est un faux
+positif PROUVÉ), macro, niveaux résolus :
+
+| niveau | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 9 | 17 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| poussées | 4 | 97 | 131 | 134 | 355 | 143 | 110 | 90 | 237 | 213 |
+| **faux positifs** | **0** | 1 | 2 | 4 | **10** | 6 | 4 | **14** | 6 | 1 |
+
+**9 sur 10 en faute** ; seul le 0 est propre, et il fait 4 poussées. Le mécanisme était écrit d'avance
+et il se réalise : l'arête suppose « B1 et B2 RESTENT occupés », or les solutions **ressortent des
+caisses des buts** (§4 : le parking temporaire et le ressortir-d'un-but sont indispensables). Les
+records du 13 le font eux-mêmes — (14,9) est posée dans r04–r08 et **plus du tout** dans r09.
+
+- **La version renforcée « exiger B1 et B2 IMMOBILES » ne sauve rien** : le plus grand point fixe de
+  gel (sain par induction sur *le premier instant où une caisse du bloc bouge*) **s'effondre à vide**
+  sur r09 — la caisse (16,5) peut sortir vers (15,5), ce qui décoince (16,4), puis (16,3), puis toute
+  la cascade. Vérifié à la main avant de coder.
+- **Le repli « dé-prioriser au lieu de couper » (§6.4a) ne mord pas non plus** : le §3 dit qu'un
+  guidage ne touche pas la masse `f < C*`, qui est exactement ce qui bloque le 13.
+- ⚠️ **Ça invalide rétroactivement les lectures de r04 à r07** faites avec ce prédicat (il criait dès
+  4 caisses posées). **Ne survivent que r08 et r09, prouvés par A\*.**
+
+**DEUX LEÇONS DE MÉTHODE :**
+1. **La précédence est un objet d'ORDONNANCEMENT, pas de SOLUBILITÉ.** « Si tu remplis B avant G, tu
+   ne pourras plus remplir G » est vrai comme conseil d'ordre et faux comme test de mort, parce que
+   rien n'oblige B à rester rempli. Les confondre, c'est le piège « caisses = murs » sous un cinquième
+   déguisement (gel naïf, `h` qui soustrait, caisses=murs, gelées=murs — et maintenant
+   buts-remplis=murs). **Le juge `fp` l'a tranché en une heure, sans une ligne dans le solveur.**
+2. **Un ordre PROUVÉ CORRECT ne vaut que s'il est APPLIQUÉ.** Tout le §6.2 depuis le 2026-07-19 porte
+   sur la qualité de `ordreButs` ; personne n'avait vérifié que le solveur le suivait. Il ne le suit
+   pas, et il ne peut pas — les poussées simples ne le lisent jamais.
+
+**État du code** : `mesures/precedencepaires.h` (NEUF — BFS en exemplaire unique, partagé
+`ordre`/`fp`, entête abondamment marqué RÉFUTÉ pour qu'il ne ressorte pas), `mesures/ordre.cpp`
+(section paires + délégation à l'entête ; le verdict affiché est un **indice**, avec les chiffres de
+FP en clair), `mesures/fp.cpp` (variante **-3**). **Rien dans le solveur, aucune variable
+d'environnement** (§7). Fixtures : `mesures/build/bench/record_niv13_r01..r09*.xsb`.
+
+**Reste ouvert :**
+- [ ] **Le 13 n'est toujours pas jugé** : aucun run mené au bout. r07 à relancer si on veut savoir à
+  partir de combien de caisses posées la partie est condamnée — prévoir des heures et surveiller la
+  RSS (4,1 Go à 30 min, +2 Go par quart d'heure, machine à 18 Go).
+- [ ] **La vraie question soulevée par le FAIT 3, et elle est neuve** : peut-on faire RESPECTER
+  l'ordre aux poussées simples ? ⚠️ La forme naïve est **déjà réfutée** (§4 : « interdire de remplir
+  dans le désordre » rend le niveau 1 **insoluble**) — donc ne pas la reprendre telle quelle. À
+  discuter avant de coder quoi que ce soit. ➡️ **Repris le 2026-07-31, cf. ci-dessous.**
+
+#### ⏸️ Session du 2026-07-31 — LE TEST EN DUR RETIRÉ, l'escalade RÉFUTÉE, la piste déplacée
+
+**Ce qui est parti.** `game.cpp` portait `int budget = (numNiveau == 13) ? 100000 : 200;` dans
+`ordreParPrecedence` — un **numéro de niveau en dur dans le solveur**, daté du 2026-07-30 et marqué
+« À RETIRER ». Retiré. ⚠️ **Il portait la prémisse du §6.2** : le « FAIT 1 — l'ordre du 13 est SAIN »
+n'était vrai que grâce à lui. Sans lui, le 13 est **muré au rang 14 sur le but (16,5)**, et le
+chargement retombe de **63,94 s à 0,84 s**.
+
+**L'escalade de budget, essayée et réfutée le jour même** (relancer une fois à 100 000 quand la pile
+se vide alors que le budget est à 0 — donc *tronqué* et non *épuisé*, une distinction que le code
+sait déjà faire) :
+
+| niveau | résultat | chargement |
+|---|---|---|
+| **13** | ✅ devient **sain** | **65,02 s** |
+| **18** | ❌ muré au rang 10 — **il n'escalade même pas** | 0,16 s |
+| **22** | ⏸️ **> 9 min, arrêté sans finir** | — |
+
+- ⚠️ **Le murage du 18 n'est PAS un coût de recherche** : son espace est réellement épuisé à
+  budget 200. **Aucun ordre sain complet n'existe dans ce modèle**, aucun budget n'y changera rien.
+  C'est une information neuve, et elle sépare deux causes qu'on confondait.
+- **L'escalade échange un numéro en dur contre un temps de chargement NON BORNÉ**, payé dans le ctor
+  `Game(Level)` donc à chaque ouverture de niveau dans l'app. Retirée. Ne pas la reproposer sans
+  traiter d'abord le coût de `distanceLivraison`, rappelée pour chaque candidat de chaque rang.
+- **Seuls trois niveaux sont murés** (balayage des 33 + 190/191) : **13** (rang 14), **18** (rang 10),
+  **22** (rang 25).
+
+**🎯 LA PISTE RETENUE (idée utilisateur) — RÉVÉLER LES BUTS AU FIL DU RUN.** Le murage n'existe que
+parce qu'on exige une **permutation complète, décidée à l'aveugle, avant le premier coup**. Si le but
+suivant est choisi **depuis l'état courant**, la question « existe-t-il un ordre sain complet ? » ne
+se pose plus : elle devient « quel but ensuite, depuis cet état-ci ? », locale et toujours
+répondable. Le 18 cesse d'être un problème par disparition de la question.
+
+- **C'est R1 gratuitement** : un but non révélé est du sol ordinaire, donc une poussée simple ne peut
+  pas y poser définitivement une caisse. Aucun veto à écrire, aucune exemption de transit à régler —
+  et la **case-porte du 11 se résout seule** (elle n'est pas encore un but quand les caisses la
+  traversent, donc rien ne les empêche de repartir). ⚠️ Rappel utilisateur : **une case-porte n'est
+  une destination finale qu'en fin de run**, jamais pendant l'acheminement.
+- **Trois garde-fous décidés avant de coder** : `casesMortes` reste calculée sur **TOUS** les buts
+  (la masquer inventerait des cases mortes — le piège du projet en cinquième déguisement) ; `h`
+  aussi (le couplage est le seul levier universel, §2.2) ; et le choix se fait **au JALON** — quand
+  un but vient d'être rempli, au plus `nbButs` fois par chemin, jamais par état.
+- **Première version à écrire, la moins chère** : `butActif()` rend non plus le premier but non
+  rempli de `ordreButs`, mais **le premier but non rempli encore LIVRABLE depuis l'état courant** —
+  une seule passe `distanceLivraison`, et seulement quand l'actif vient d'être rempli ou est devenu
+  inatteignable. L'ordre statique reste la **préférence** ; il cesse d'être une camisole. Aucun
+  refactor des lambdas de tie-break de `ordreParPrecedence`.
+- [ ] **Juge le moins cher, à passer avant de toucher au solveur** : vérifier hors ligne, sur les
+  fixtures **r08/r09 du 13** (déjà produites), qu'un ordre révélé dynamiquement existe bien depuis
+  ces états réels. S'il se mure aussi en dynamique, la piste tombe sans une ligne de solveur.
+
 ### 6.3 Robustesse / temps
 
 - [ ] **Repli anytime pour la macro** : passe 1 avec macro plafonnée en états, passe 2 sans
   macro si le budget est épuisé. Le repli doit se déclencher sur le **budget**, pas sur
   l'échec (un cas lent n'émet jamais « aucune solution »). Borne surtout le temps des cas
   lents (8, 9).
+
+#### 🎯 Session du 2026-07-28 — MESURE PRÉALABLE du PLONGEON (avant toute ligne de solveur)
+
+**L'outil : `bench <niv> <mode> record`** (neuf). Écrit en `.xsb` **chaque état qui bat le max de
+caisses posées**, au fil du solve, et le DATE en dépilements (la ligne `[record]` part sur stderr,
+donc elle s'entrelace avec la jauge — pas besoin de toucher à la signature du signal). Le chemin
+reconstruit est rejoué sur une copie du départ pour compter les poussées **et vérifier que ce
+chemin mène bien à cet état** (une fixture fausse ne se verrait pas autrement — c'est le bug
+big-endian de `mou`, §5). `bench` accepte désormais un **chemin `.xsb`** à la place d'un numéro, ce
+qui rend les fixtures produites directement re-solvables.
+
+**La question du chantier, et sa réponse chiffrée** : à quel moment apparaît un état complétable à
+bas coût, et que coûte-t-il de le finir ? Mesuré sur les 10 résolus (hors 8), `macro` depuis chaque
+record, budget 30 s :
+
+| niveau | solve complet | 1ᵉʳ record **vivant** | dépilements | états pour finir | poussées totales |
+|---|---|---|---|---|---|
+| 2 | 412 | 6/10 | < 1 000 | 38 | 133 (+2) |
+| 3 | 499 | **1/11** | < 1 000 | 442 | **134 = optimum** |
+| 4 | 67 224 | 8/20 | ~2 000 | 120 | 357 (+2) |
+| 6 | 570 | 7/10 | < 1 000 | 4 | **110 = optimum** |
+| 9 | 354 622 | 12/14 | ~85 000 | 8 | **237 = optimum** |
+| 5 | 9 123 | 9/12 | ~9 000 | 15 | 151 (+8) |
+| 7 | 24 376 | 6/11 | ~22 000 | 1 509 | 112 (+22) |
+| 17 | 24 786 | 5/6 | ~24 000 | 22 | **213 = optimum** |
+
+⚠️ **Ce tableau ne dit PAS le gain — il ignore ce que coûtent les plongeons RATÉS**, et c'est
+l'erreur qu'on a failli garder. Mesuré (états explorés avant « aucune solution » depuis chaque
+record mort) : de **1 à 59 771 états**, avec une queue lourde — 59 770 et 59 771 sur le 9, ~5 000
+sur le 7, ~4 280 sur le 5, ~810 sur le 2. **Un plongeon raté peut coûter plus cher que tout ce
+qu'on espérait gagner.** Bilan NET (dépilements + tous les ratés + le succès) :
+
+| niveau | défaut | **budget 100** | **budget 2000** |
+|---|---|---|---|
+| 4 | 67 224 | **2 670 → ×25** | 2 171 → ×31 |
+| 9 | 354 622 | **85 557 → ×4,1** | 95 057 → ×3,7 |
+| 5 | 9 123 | 9 398 → −3 % | 15 098 → **perte ×1,65** |
+| 7 | 24 376 | 24 315 → neutre | 27 519 → −13 % |
+| 2 | 412 | 768 → −87 % | 3 310 → **perte ×8** |
+| 3 | 499 | 723 → −45 % | 642 → −29 % |
+
+> **Un budget SERRÉ bat un budget large** — contre-intuitif, et la raison est dans les données :
+> **quand un record est cher à finir, le suivant est presque toujours bon marché.** Sur le 4, le
+> record 8 coûte 120 états, le 14 en coûte 19 et le 16 en coûte 13 — tous atteints au même moment
+> (~2 000 dépilements). S'acharner sur un record ne sert à rien : le suivant fait le travail pour
+> dix fois moins cher.
+
+**🎯 LE SEUIL DE REMPLISSAGE BAT LE BUDGET (idée utilisateur) — et c'est le réglage retenu.** Le
+budget décide *ce qu'on perd quand on se trompe* ; un **seuil en % de buts remplis** décide *quand
+on tente*. Comme les records morts sont **concentrés dans le bas du tableau**, le seuil les évite au
+lieu de les payer :
+
+| niveau | 4 | 7 | 2 | 3 | 6 | 5 | 17 | **9** |
+|---|---|---|---|---|---|---|---|---|
+| morts jusqu'à | 35 % | 45 % | 50 % | 55 % | 60 % | 67 % | 67 % | **79 %** |
+| 1ᵉʳ vivant | 40 % | 55 % | 60 % | 64 % | 70 % | 75 % | 83 % | 86 % |
+
+À **seuil 80 %** : **zéro plongeon raté sur les huit niveaux**, aucune perte nulle part, et
+**7 niveaux sur 8 rendent l'OPTIMUM EXACT** (le 4 est à +2) :
+
+| niveau | 4 | 9 | 5 | 7 | 17 | 2 | 3 | 6 |
+|---|---|---|---|---|---|---|---|---|
+| défaut | 67 224 | 354 622 | 9 123 | 24 376 | 24 786 | 412 | 499 | 570 |
+| seuil 80 % | **~2 013** | **85 008** | 9 003 | ~24 003 | ~24 022 | ~314 | ~303 | ~303 |
+| | **×33** | **×4,2** | = | = | = | = | = | = |
+
+Deux raisons, toutes deux lisibles dans les données : plus il y a de caisses posées, **moins il
+reste à faire** (les plongeons gagnants coûtent 3 à 22 états), **et** les branches condamnées se
+révèlent surtout tôt.
+
+- ⚠️ **Le seuil ne GARANTIT rien** : sur le 9, un record est encore mort à **11/14 = 79 %**, juste
+  sous la barre. Rien ne dit qu'un autre niveau n'aura pas un mort à 85 ou 90 % — c'est même
+  l'attendu sur les gros non résolus, où le démêlage se joue tard. **Résonance directe avec le 11**,
+  dont le record est justement **11/14 = 79 %** (§6.3, 2026-07-24) : la mesure du 9 prouve qu'un
+  11/14 peut parfaitement être MORT.
+- **D'où le réglage retenu : seuil pour décider QUAND plonger, budget pour borner ce qu'on perd
+  quand le seuil s'est laissé avoir.** Le seuil fait le gros du travail, le budget est le garde-fou.
+- ⚠️ Réserve §11.4 : ces 80 % sont calés sur **8 niveaux**, dont plusieurs triviaux. Défaut
+  raisonnable, pas une loi — à revérifier dès qu'un non-résolu tombe.
+
+#### ✅ Session du 2026-07-28 (suite) — PLONGEON CODÉ et MESURÉ : la prédiction tombe juste
+
+**Le code** : `Solveur::AstarMacroPlongeon` (« A\* macro — plongeon sur record (essai) »), régime
+**SÉPARÉ** comme le couplage — `AstarMacro` reste le défaut, aucune variable d'environnement (§7).
+`SolveurAStar::plonge()` : best-first sur **h SEUL** (à h égal, le plus profond d'abord), goal macro
+et les deux corrals actifs, cache d'enclos **partagé avec la recherche principale** (un enclos déjà
+jugé ne se rejuge pas). Déclenché au point exact où le record est battu, si `rangees ≥ 80 %` des
+buts. Un échec rend `noeuds` à sa taille d'avant : **un plongeon raté ne laisse aucune trace**. Les
+états du plongeon sont **comptés dans le compteur** — sinon les chiffres ne seraient pas comparables
+au défaut. CLI : `bench <niv> plongeon`.
+
+| niveau | macro | **plongeon** | | poussées |
+|---|---|---|---|---|
+| **4** | 67 224 | **2 061** | **×32,6** | 359 (+4) |
+| **9** | 354 622 | **85 729** | **×4,1** | **237 = optimum** |
+| 0 | 4 | 5 | −1 état | 4 = |
+| 1 | 14 | 15 | −1 état | 97 = |
+| 2 | 412 | 417 | −5 états | 131 = |
+| 3 | 499 | 500 | −1 état | 134 = |
+| 5 | 9 123 | 9 124 | −1 état | 143 = |
+| 6 | 570 | 571 | −1 état | 110 = |
+| 7 | 24 376 | 24 377 | −1 état | 90 = |
+| 17 | 24 786 | 24 788 | −2 états | 213 = |
+
+**Deux gains massifs, et une NEUTRALITÉ parfaite ailleurs** (+1 à +5 états, poussées identiques au
+canari sur 9 niveaux sur 10). Le seuil tient sa promesse : **un seul plongeon tenté par niveau, et
+il réussit du premier coup** — jamais un raté à payer.
+
+**La mesure préalable avait prédit le comportement à l'état près** — c'est la validation de la
+méthode « mesurer avant de coder », pas seulement du chantier :
+
+| niveau | déclenché à | états de plongeon | prédit par les fixtures |
+|---|---|---|---|
+| 3 | 9/11 = 82 % | 3 | r9, 3 états ✓ |
+| 5 | 10/12 = 83 % | 3 | r10, 3 états ✓ |
+| 17 | 5/6 = 83 % | 23 | r5, 22 états ✓ |
+| 9 | 12/14 = 86 % | 9 | r12, 8 états ✓ |
+| 4 | 16/20 = 80 % | — | ×33 prédit, ×32,6 obtenu ✓ |
+
+- **Seul écart** : le 4 rend **359 poussées, pas les 357** annoncés. Normal et attendu — la mesure
+  préalable lançait un A\* **macro** depuis le record, le solveur lance un **greedy** ; les deux ne
+  prennent pas le même chemin. L'ordre de grandeur du gain, lui, est exact.
+- **Le canari n'est pas concerné** : régime séparé, `AstarMacro` inchangé. Les poussées du plongeon
+  sont d'ailleurs identiques au canari partout sauf sur le 4.
+
+#### ❌➡️✅ Session du 2026-07-28 (fin) — LE SEUIL EN % RÉFUTÉ, remplacé par un BUDGET RELATIF
+
+**Le 8 a tout fait basculer.** Il ne gagnait RIEN à seuil 80 % (4 376 071 états, +1). Cause :
+son record plafonne à **12/18 = 67 %**, sous la barre — le plongeon ne se déclenchait qu'une fois la
+partie déjà jouée. À seuil 66 % il passe à **1 171 492 (×3,7)**, à 238 poussées, le plongeon
+réussissant depuis 12/18 en **23 états**. (C'est l'observation utilisateur « à 1 million d'états
+dépilés, on arrive sur un motif solvable » — vérifiée, à 1,17 M.)
+
+**Mais baisser le seuil ne marche pas non plus** : à 66 %, le 3 gagne (×2,51) alors que le **2 perd
+2 poussées et le 5 en perd 8** — on plonge depuis un chemin qui a déjà dévié. **Aucune valeur ne
+convient : 80 % est bon pour 4/9, 66 % est bon pour 8/3 et mauvais pour 2/5.**
+
+**La carte des records du 8 dit pourquoi, et donne la bonne variable.** Les records n'arrivent pas
+régulièrement, ils tombent **par PAQUETS séparés de longs plateaux de stagnation** :
+
+| records | atteints à | stagnation qui suit |
+|---|---|---|
+| 1-2 | ~0 | 22 000 |
+| 3 | 22 000 | 136 000 |
+| **4-10** | **158 000** | **1 013 000** (à 10/18) |
+| **11-12** | **1 171 000** | **3 205 000** (à 12/18) |
+| 13-18 | 4 376 000 | fin |
+
+Et surtout : le record **5/18 — 28 % du plateau** — est **complétable en 1 133 états**. Au même
+pourcentage, le **9** a des records **MORTS qui coûtent 59 771 états** à réfuter. **Le pourcentage de
+remplissage ne distingue pas les deux cas : ce n'est structurellement pas la bonne variable.**
+
+> **CE QUI LES DISTINGUE, c'est le TRAVAIL DÉJÀ CONSENTI.** Le 8 atteint son 5/18 après 158 000
+> dépilements ; le 9 atteint ses records morts après ~1 000. D'où la règle retenue, qui remplace À
+> LA FOIS le seuil et le budget fixe :
+>
+> **budget du plongeon = (états déjà développés) / 100**, et on plonge à CHAQUE record.
+>
+> *Plus on a ramé, plus il est rationnel de parier.* Le 2 (412 états au total) n'accorde jamais assez
+> de budget pour qu'un plongeon aboutisse → il ne plonge jamais et garde son optimum **par
+> construction, pas par réglage**. Les plongeons ruineux du 9 sont étouffés (budget ~10 à ce stade).
+> Le 8 à 158 000 dépilements dispose de 1 591.
+
+**Mesuré (`bench <niv> plongeon`, contre `macro`) :**
+
+| niveau | macro | **plongeon** | | poussées |
+|---|---|---|---|---|
+| **4** | 67 224 | **2 238** | **×30,0** | 359 (+4) |
+| **8** | 4 376 070 | **159 484** | **×27,4** | 240 (+2) |
+| **9** | 354 622 | **85 797** | **×4,13** | **237 = optimum** |
+| 2 | 412 | 431 | −5 % | **131 = optimum** |
+| 3 | 499 | 502 | = | **134 = optimum** |
+| 5 | 9 123 | 9 120 | = | **151 (+8)** ⚠️ |
+| 0 / 1 / 6 / 7 / 17 | — | ±2 % | = | **identiques** |
+
+**Les trois plus gros solves gagnent ×4 à ×30 pour 0 à 4 poussées de plus.** Sur le 8, le plongeon
+gagnant part de **4/18 = 22 %** en 340 états — le greedy fait mieux que l'A\* macro de la mesure
+préalable (1 133 états depuis 5/18), il fonce vraiment.
+
+- ⚠️ **Le 5 est le cas défavorable** : +8 poussées pour un gain d'états nul. Son record à 75 % est
+  complétable en 15 états alors que le budget en autorise déjà 90 — le plongeon part, alors
+  qu'attendre le record suivant donnait l'optimum. **Aucun budget ne corrige ça** : l'information
+  manquante est « combien de temps me reste-t-il ? », que le solveur ne connaît pas. C'est la
+  frontière habituelle du projet — on sait mesurer ce qui s'est passé, pas prédire ce qui reste.
+  Et c'est un argument de plus pour le vrai levier : une `h` plus serrée, elle, SAIT ce qui reste.
+- ⚠️ **Ce qui est gagné et ce qui ne l'est pas.** Le paramètre ne porte plus sur une **propriété du
+  plateau** (« à partir de quel remplissage un état devient sûr » — faux en général : complétable à
+  28 % sur le 8, mort à 79 % sur le 9) mais sur le **comportement observé du solveur**. Il a donc une
+  chance de tenir sur un niveau jamais vu. Mais **1/100 reste un nombre choisi** : à 1/1000 le 8
+  raterait ses 1 133 états, à 1/10 le 5 se dégraderait davantage. On a déplacé l'arbitraire, pas
+  supprimé.
+**✅ LE DIVISEUR BALAYÉ puis FIGÉ à 1/50 (fin de session).** Le 1/100 initial venait de projections,
+jamais d'un balayage — exactement le reproche fait aux constantes empiriques. Mesuré sur les 12
+résolus :
+
+| diviseur | ce qui casse |
+|---|---|
+| 1/10 | **le 2 dérive à 139 poussées** (+8) : on plonge trop tôt, depuis un chemin déjà dévié |
+| 1/15 | le 2 dérive encore (133) |
+| **1/20 à 1/100** | **plage SÛRE** — poussées correctes partout |
+| 1/500 | **le 4 REPERD tout** (67 159 états au lieu de 2 115), le 8 retombe à 1 174 706 |
+
+**Les deux bords ont un mécanisme identifié** : en haut un budget trop généreux fait plonger depuis
+un record trop précoce (qualité perdue) ; en bas un budget trop maigre ne paie plus le plongeon
+gagnant — le 4 a besoin de 35 états à ~2 100 dépilements (donc diviseur ≤ 60), le 8 de 340 états à
+158 000 (donc ≤ 464). **1/50 est au centre** : ×2,5 de marge en haut, ×10 en bas.
+
+**Le 1/100 coûtait ×6,9 sur le 8** (159 484 contre 22 991) sans qu'on le sache. Chiffres complets :
+[scores.md](scores.md). ⚠️ **La fenêtre est ÉTROITE (facteur 5)** et le 4 la ferme de justesse : son
+plongeon gagnant réussit **en 35 états pour un budget de 41**, soit 17 % de marge. Un niveau dont le
+premier record complétable demanderait 50 états au même stade échapperait au plongeon. C'est la
+fragilité connue du réglage.
+
+- **Le log par TENTATIVE** (`[plongeon n] record r/N a X depiles | budget B -> REUSSI/echec en E
+  etats | cumul ...`) est ajouté après coup : sur le 11, 14 minutes se sont écoulées sans qu'on
+  puisse savoir si le solveur avait seulement tenté quelque chose, et un run arrêté à la main
+  n'imprime jamais son bilan de fin. Il montre le mécanisme en clair — sur le 4, les 7 records morts
+  sont réfutés pour **51 états au total**, puis le 8ᵉ aboutit ; cumul 4 % du travail.
+- **Propriété qui n'était pas dans l'intention de départ, et qui rend le régime SÛR : le surcoût est
+  borné a priori.** Chaque record coûte au plus 1 % du travail fait à cet instant, et il y a au plus
+  un record par but — le plongeon ne peut donc jamais faire dérailler un solve, au pire l'alourdir de
+  quelques pour cent. Observé : +4,6 % (2), +1,4 % (7), +0,1 % (17). Aucun budget FIXE ne pouvait
+  offrir cette garantie.
+
+**✅ DÉCISION : le plongeon reste un SOLVEUR À PART ENTIÈRE, PAS le défaut** (2026-07-28). Ce n'est
+pas de la prudence de façade, c'est le canari qui l'impose :
+- Le canari est **le juge de toute modif** du projet (§0) — une `h` qui surestime ou un élagage faux
+  positif « fait manquer l'optimum **sans aucun signal** ». Avec le plongeon en défaut, les poussées
+  de référence deviendraient 359 / 151 / 240 / 243 au lieu de 355 / 143 / 238 / 241, et surtout
+  elles deviendraient **INSTABLES** : toute modif décalant le compteur d'états décale le moment du
+  plongeon, donc le record d'où il part, donc le nombre de poussées. **On perdrait l'invariant qui
+  détecte les régressions silencieuses.**
+- La promotion n'apporterait rien de fonctionnel : le régime est déjà dans le menu de l'app et en
+  CLI (`bench <niv> plongeon` / `coupl-plongeon`). C'est **le régime à utiliser sur un niveau NON
+  RÉSOLU** — c'est ainsi que le 11 est tombé.
+- Argument renforcé par le balayage : un réglage qui gouverne la QUALITÉ de la solution et dont la
+  fenêtre utile fait un facteur 5 n'a pas sa place dans le défaut.
+
+#### 🎉🎉 2026-07-28 — **LE NIVEAU 11 EST RÉSOLU**, deux fois le même jour
+
+**La cible historique du projet tombe.** Jamais finie jusque-là (meilleur résultat antérieur :
+11/14 caisses posées, arrêt manuel à 57,7 M dépilements le 2026-07-24 ; et avant cela 8/14 à
+12,4 M). **12 niveaux résolus sur 33** — la carte du §0 est à jour.
+
+| régime | états | poussées | commit |
+|---|---|---|---|
+| `couplage` + corral-N (run utilisateur, mené au bout sans budget) | **87 085 967** | **241** | `cb4780c` |
+| **`couplage` + corral-N + PLONGEON** | **13 918 468** | 243 (+2) | (ce diff) |
+
+- **×6,3 pour +2 poussées.** Le plongeon gagnant part de **10/14 caisses posées** et coûte
+  **11 états**, sur un budget de 139 184 dont il n'utilise donc que 0,008 %. **10 plongeons tentés**
+  sur tout le run. C'est le résultat le plus net du régime : il n'accélère pas seulement des niveaux
+  déjà résolus, **il rend abordable le plus dur**.
+- **Ce qui a rendu ça possible, dans l'ordre** : le corral-N (élague le bois mort — 24 088 361
+  enfilages prunés sur 349 M, amortissement de cache ×208 pour 670 738 configurations distinctes
+  jugées), le régime `couplage` (seul à amener le 11 à 11/14), et le plongeon (fonce dans le vivant).
+  **Aucun des trois seul n'y arrivait.**
+- ⚠️ **Le mur mémoire du §6.5 est confirmé et dépassé** : 123,98 M clés en arène, file à 41,5 M,
+  `noeuds` à 142,5 M → de l'ordre de **8 Go** sur le run brut. Le plongeon, en divisant les états par
+  6,3, divise aussi la mémoire d'autant — **c'est le premier levier qui repousse le mur mémoire**,
+  alors qu'il n'a pas été conçu pour ça.
+- **241 poussées est sans référence** (premier solve du 11, régime macro donc pas un optimum prouvé).
+  Pour borner l'écart : `passages 11` donne les trajets solos (§3).
+
+**Quatre conclusions, toutes mesurées :**
+1. **Le levier est RÉEL mais INÉGAL.** Gros gains sur 2/3/4/6/9, **zéro** sur 5/7/17 — là, le
+   premier record vivant n'apparaît qu'à ~97 % du solve, il n'y a plus rien à gagner. Comme toute
+   technique de ce projet, il mord sur une famille, pas partout (§2.2).
+2. **La dégradation est minime, et souvent NULLE.** Sur 3/6/9/17, plonger rend **exactement
+   l'optimum du niveau**. Ailleurs +2 poussées (2, 4) ; seuls le 5 (+8) et le 7 (+22) paient
+   vraiment. C'était l'inconnue principale du chantier — elle est levée dans le bon sens.
+3. **Les records MORTS dominent la phase initiale, partout** : 11 d'affilée sur le 9, 8 sur le 5,
+   6 sur le 3 et le 6. Un plongeon sur chaque record plongerait donc des dizaines de fois dans le
+   vide avant son premier succès → **budget serré obligatoire** (les échecs, eux, tombent en < 1 s).
+4. ⚠️ **« Meilleur record » n'est PAS « meilleur état » — le niveau 3 le prouve.** Son record
+   **1/11 est vivant et se complète à l'optimum**, puis les records 2 à 6 sont **morts**, puis ça
+   redevient vivant. Le solveur bat donc son record en s'enfonçant dans des branches condamnées
+   alors qu'il avait déjà eu un état parfaitement complétable en main. Un plongeon qui ne se
+   déclenche que sur un record **strictement supérieur** rate ce cas.
+
+⚠️ **Réserve de méthode** : « MORT » signifie ici « A\* **macro** épuise l'espace depuis cet état »,
+ce qui n'est **pas** une preuve d'insolubilité (le régime d'engagement est incomplet — il ne génère
+que les macros vers le but actif). Vérification faite en **A\* pur** (complet) sur deux fixtures du
+niveau 4 : r04 et r07 sont **réellement morts**, et identiques avec `CORRAL=0` (donc pas un faux
+positif du corral). Pour le design, c'est de toute façon la bonne mesure : si le plongeon utilise la
+macro, il échouera exactement là où ces solves échouent.
 
 #### ✅ Session du 2026-07-21 (suite 2) — le COÛT PAR ÉTAT de la goal macro (outil `macro`)
 
@@ -1286,6 +2508,138 @@ w1 | 57673000 depiles | file 30837887 (+277 MONTE) | vus 85790194 | f 233 h(rest
   (`caisseAssignee`). Invisible sur les gains ci-dessus, mais à regarder si un niveau ralentit sans
   que ses états baissent.
 
+#### ✅ Session du 2026-07-29 — LE PLONGEON À L'ÉPREUVE DE DEUX NIVEAUX NEUFS (10, 21)
+
+**Deux niveaux tombent le même jour, sans une ligne de code** : le **21** (2 923 006 états, 165
+poussées) et le **10** (2 175 724, 544). Détails et réserves : [scores.md](scores.md).
+
+**Le seuil en % est réfuté une quatrième et cinquième fois.** Le plongeon gagnant part de :
+
+| niveau | 8 | **10** | **21** | 11 | 9 (records morts jusqu'à) |
+|---|---|---|---|---|---|
+| remplissage au déclenchement | 22 % | **40,6 %** | **54 %** | 71 % | **79 %** |
+
+Aucune valeur de seuil n'attrape cet ensemble. Le **budget relatif** (dépilés/50) les prend tous —
+c'est sa justification définitive.
+
+⚠️ **MAIS le plongeon n'est plus gratuit sur les gros niveaux.** Son coût cumulé :
+
+| niveau | 21 | 4 | **10** |
+|---|---|---|---|
+| cumul des plongeons | **0,065 %** | ~4 % | **9,72 %** |
+| états du plongeon gagnant | 53 | 35 | **4 339** |
+
+Le 10 a **32 buts, donc jusqu'à 32 records, donc 32 plongeons à payer**. La borne a priori (au plus
+1/50 du travail par record) tient, mais elle croît avec le nombre de buts — à surveiller sur les
+niveaux à beaucoup de caisses (22 en a 27, 24 en a 22).
+
+**⚠️ L'INSTABILITÉ DES POUSSÉES EST MESURÉE — c'était l'argument qui a refusé la promotion du
+plongeon en défaut (§6.3), il est maintenant chiffré.** Sur le 21, le simple fait de couper le
+corral change la solution :
+
+| régime | états | **poussées** |
+|---|---|---|
+| corral-N ON | 2 923 006 | **165** |
+| `CORRAL=0` | 4 861 308 | **147** |
+
+**+18 poussées (+12 %) pour une modif qui ne touche pas la qualité de la recherche.** Mécanisme :
+décaler le compteur d'états décale le moment du plongeon, donc le record d'où il part. **En régime
+plongeon, les poussées ne sont donc PAS un canari, même approximatif** — et le meilleur résultat
+connu sur le 21 est 147, pas 165.
+
+#### ⚠️➡️❌ Session du 2026-07-29 — le log des plongeons N'EST PAS un détecteur de branche morte
+
+> **RÉFUTÉ le jour même, par le profilage à témoins (§6.6).** Ce qui suit reste vrai *techniquement*
+> — `E ≪ B` signifie bien « espace épuisé » — mais la conclusion qu'on en tirait (« le 12 s'enfonce
+> dans des culs-de-sac, c'est son problème ») est **fausse** : avoir des records morts est **BANAL**,
+> y compris sur les niveaux qui tombent. Mesuré sur les témoins résolus :
+>
+> | niveau | statut | records morts |
+> |---|---|---|
+> | **4** | ✅ résolu en 40 408 états | **7** |
+> | **9** | ✅ résolu | **6** |
+> | 6 / 17 | ✅ résolus | 2 |
+> | 12 | non résolu | **1** |
+>
+> Le plan le disait déjà (« les records MORTS dominent la phase initiale, **partout** ») ; la section
+> ci-dessous l'a oublié faute de témoin. **Leçon de méthode : un indicateur mesuré sur les seuls
+> niveaux qui ÉCHOUENT ne prouve rien — il faut le passer sur ceux qui réussissent.** C'est le même
+> piège que le §11.4, appliqué à un diagnostic au lieu d'une loi.
+>
+> Ce qui distingue réellement les résolus n'est pas l'absence de records morts, c'est que **le
+> plongeon finit par réussir** — un constat *a posteriori*, donc pas un prédicteur.
+
+#### 🎯 Session du 2026-07-29 — le log des plongeons, ce qu'il dit vraiment
+
+**La lecture, et elle est gratuite** (le log existe depuis le 2026-07-28) :
+
+> Sur `[plongeon n] … budget B -> echec en E etats` :
+> **`E = B`** ⇒ **budget épuisé**, on ne sait rien.
+> **`E ≪ B`** ⇒ **espace épuisé** ⇒ le record est **MORT** (dans le régime macro, cf. réserve §6.0).
+
+**Appliqué au 12** (run arrêté à 35,1 M dépilements, `rangees 9 (max 11)/15`) :
+
+| plongeon | record | budget | états | verdict |
+|---|---|---|---|---|
+| 1 | 1/15 | 122 | 6 | **espace épuisé** |
+| 2 / 3 | 2-3/15 | ~47 000 | **= budget** | budget épuisé |
+| 4 → 11 | 4/15 → **11/15** | 48 k → **686 282** | 4 811 → **1** | **espace épuisé** |
+
+**Neuf des onze records du 12 sont MORTS**, dont le 11/15 réfuté en **un seul état** sur un budget de
+686 282. Le 12 n'approche pas la solution : il accumule des records dans des culs-de-sac.
+**Conséquence pour le §6.3 (deltaf)** : la relégation `Δf = +2` à 100 % n'est **pas** la cause de son
+échec — le régime `couplage`, conçu pour elle, tourne ici et n'y change rien. Le plan le soupçonnait
+déjà (« rien ici ne prouve que la relégation est LA cause »), c'est confirmé.
+
+**Même diagnostic sur le 27** par une autre voie : son record **17/20 (85 %)** rejoué seul rend
+`AUCUNE 0` — mort à la racine, et **pas à cause du corral** (identique en `CORRAL=0`). Cause trouvée
+au §6.2 : l'ordre de remplissage a condamné la partie au rang 16.
+
+- ⚠️ **« De bon espoir » est un piège.** Un `max 17/20` affiché par la jauge peut être un cul-de-sac
+  intégral. Le §6.3 avait prévu le cas (« rien ne dit qu'un autre niveau n'aura pas un mort à 85 ou
+  90 % ») — **le 27 le réalise**.
+- ⚠️ **PAS un mur mémoire — correction du même jour.** J'avais écrit ici « MUR MÉMOIRE confirmé »
+  parce que le 12 atteignait **6,2 Go de RSS** en 2 h 46. **Faux** : la machine a **18 Go** et
+  `memory_pressure` rendait **82 % de mémoire libre**. Deux erreurs cumulées — avoir lu
+  `vm_stat: Pages free` comme « mémoire disponible » (les pages inactives et purgeables sont
+  réutilisables, et le §1 avertit déjà que **`ps rss` ment sur macOS**), et avoir extrapolé le
+  « machine à 8 Go » du §6.5, qui décrit une AUTRE machine. **Ne jamais déduire une saturation d'une
+  RSS sans lire la RAM totale ni la pression réelle.**
+  Ce qui reste vrai du diagnostic : la file contenait **95 % des états vus** et montait de **+4 305
+  par millier** — c'est ÇA qui disait l'absence de convergence. Le 12 n'était pas au mur, il était
+  **lent**. Le plafond réel sur cette machine est vers 15-16 Go, soit de l'ordre de **150 M états
+  vus** (extrapolation du §6.5).
+
+#### ⏸️ Session du 2026-07-29 (fin) — LE 31 : 188 M états vus, arrêté sans verdict
+
+Premier des deux candidats désignés par le profilage (§6.6) — retenu pour ses **0 record mort** et
+une dizaine de plongeons échouant *uniquement* par budget. Lancé sans budget, **arrêté à 45 min sans
+conclusion**. À retenir avant de le reprendre :
+
+| à 2 min (profilage) | à 30 min | à 45 min (arrêt) |
+|---|---|---|
+| max 10/20, file +724 | max 15/20, file **+97 (stagne)** | **max 16/20**, file +273, **188 M vus** |
+
+- **188 M états vus, c'est plus que tout ce que ce projet a résolu** (87 M pour le 11 en `couplage`
+  seul, qui était le record). Le 31 n'a donc pas été « essayé sérieusement » — il a été *entamé*.
+- ⚠️ **La pente de la file est AMBIGUË, et ce niveau le montre.** Le profilage la donnait comme le
+  seul signal cohérent (résolus entre +278 et +685). Mais une pente basse a **deux** causes opposées :
+  une recherche qui se referme, **ou** un espace où presque aucune poussée n'est légale. Sur le 31 —
+  **densité 18,2 %, ZÉRO point d'articulation**, et un « gros démêlage d'entrée » identifié à l'œil
+  par l'utilisateur — c'est la seconde lecture qui est plausible. Elle n'est d'ailleurs pas stable :
+  +724 → +1579 → +97 → +273 au fil du même run.
+- **Le front reste très en amont** : `f 248 h(reste) 220` ⇒ `g ≈ 28` après 107 M dépilements. Le
+  `max 16/20` est un **pic isolé** d'une branche lointaine, pas le régime courant (`rangees 0`) —
+  exactement le tableau du 11 en juillet (`g ≈ 26`, « pic isolé »).
+- **Ses plongeons épuisent leur budget au symbole près** (`384 787 -> echec en 384 787`,
+  `392 483 -> 392 483`). Ses branches ne sont pas condamnées ; elles sont trop vastes pour être
+  réfutées. **Le « 0 record mort » qui l'avait fait choisir signifie donc « on ne sait rien », pas
+  « c'est prometteur ».** Troisième indicateur du jour à se dégonfler.
+- [ ] **Le 14 n'a jamais démarré** (runs séquentiels) : c'est le candidat le plus frais — 12/18 en
+  deux minutes, 0 record mort, 10 plongeons par budget. À lancer en premier à la reprise.
+- [ ] Si le 31 est repris : prévoir **des heures**, pas des minutes, et surveiller la file plutôt que
+  la RSS.
+
 ### 6.4 🧠 Le RÉSEAU DE NEURONES — comme GUIDE, JAMAIS comme coupeur
 
 **Le fantasme, à garder tel quel.** Un RN pour orienter la recherche. Le risque fatal est le
@@ -1331,6 +2685,126 @@ cles, meilleurG = 17 739 915, noeuds = 24 128 131, file = 9 759 745, capacite fi
 - [ ] Ces chiffres restent **calculés, pas mesurés** : confirmer par `/usr/bin/time -v` (RSS réelle)
   avant de dimensionner quoi que ce soit.
 
+### 6.6 🧭 CLASSER LE PLATEAU pour choisir les leviers (idée utilisateur, 2026-07-28)
+
+> « Les gains apportés par telle ou telle astuce dépendent grandement de la nature du plateau. Si on
+> arrive à déterminer à l'avance à quelle famille appartient un plateau, on gagne sur tous les points. »
+
+**Le constat est déjà chiffré, chantier par chantier — on ne s'en est simplement jamais servi comme
+d'un système.** Presque chaque levier a produit, en même temps que son gain, l'indicateur qui
+PRÉDIT ce gain :
+
+| levier | gain max | famille où il mord | **prédicteur, déjà mesuré** |
+|---|---|---|---|
+| couplage hongrois joueur-aware | ×59 | **universel** | aucun — à garder partout |
+| goal macro + goal-ordering | ×1000 à ×14000 | salle de buts unique | s'effondre en **multi-salles** (10, 18, 24-26) |
+| tie-breaks (guidage, portes) | ÷2,8 | — | **part de `f = C*`** (§3) : 100 % → gain, 0,3 % → zéro |
+| corral unitaire, motif 1 | ×6,8 | coins scellés | **fréquence du motif** : 100 % sur 4/7, 2 % sur 5/9 |
+| pince, motif 2 | ×1,98 | **autre** famille | nulle sur le 4, décisive sur 8/17 |
+| corral-N | ×9,9 | enclos sous-dotés | **% de durs prouvés morts** : 40,6 % (4), 24,5 % (9), 10 % (7/17) |
+| backtrack macro | qualitatif | descentes à forks | **taux de forks** : 50,7 % (9) → bascule ; 1-20 % → rien |
+| but du couplage | ×10,2 | — | **% relégués × part de macro dans le flux** |
+| plongeon sur record | ×33 | record vivant précoce | **date du 1ᵉʳ record ≥ 80 %** |
+| pondéré | ×34 | petits niveaux | **PIRE** sur les gros |
+
+**Aucun levier n'est universel sauf le couplage.** Le §6.1 l'écrit déjà noir sur blanc pour le
+corral (« la fréquence prédit le gain, exactement ») ; ce tableau ne fait que constater que c'est
+vrai partout.
+
+**Ce qui manque : ces prédicteurs sont tous A POSTERIORI** — ils exigent un solve ou un
+échantillonnage par sous-solves. Pour choisir le régime AVANT de lancer, deux voies :
+
+- **(a) Indicateurs STATIQUES au chargement**, à la manière de `casesMortes`/`distanceParBut`.
+  Candidats calculables sans rien explorer : **composantes connexes de buts** (= le multi-salle, qui
+  décide du goal-ordering), **densité caisses / espace libre** (= la congestion, donc le démêlage),
+  **comptage statique des motifs corral** (le motif 1 se voit sur le plateau nu), **degré moyen des
+  cases libres** (couloirs contre salles ouvertes).
+- **(b) Passe de PROFILAGE bornée** : 10 000 états, on relève les prédicteurs qu'on sait déjà
+  produire (`INSTRUM_F` pour `f<C*`, `macro` pour les forks, les stats `[CORRAL-N]` pour les durs
+  morts, `deltaf` pour la part de macro dans le flux), puis on choisit le régime. **Une seconde pour
+  orienter des heures de solve.**
+
+> **(b) d'abord.** Elle réutilise des mesures **déjà validées**, là où (a) demanderait de prouver que
+> chaque indicateur statique corrèle vraiment avec le gain — sur 11 niveaux résolus, c'est le piège
+> du §11.4 en plein. Les indicateurs statiques s'ajouteront à (b) à mesure qu'ils font leurs preuves.
+
+**Ce que ça débloquerait concrètement** : un profilage dirait lesquels des 19 non résolus sont
+multi-salles (donc bloqués sur l'ordering), lesquels sont riches en corrals (donc déjà bien servis),
+lesquels sont du pur démêlage — au lieu de lancer un solve de plusieurs heures au hasard.
+
+⚠️ **CORRIGÉ le 2026-07-29** : ce paragraphe disait « les 22 niveaux non résolus n'ont, pour la
+plupart, jamais été attaqués ». **C'est faux** — ils sont relancés régulièrement, aucun ne passe
+(cf. §0). Le profilage ne sert donc pas à *découvrir* des niveaux faciles, il sert à *choisir le
+régime* sur des niveaux qui résistent.
+
+#### ✅ 2026-07-29 — LA CARTE DES 33, PAR PROFILAGE BORNÉ (la voie (b), enfin faite)
+
+**Protocole** : `bench <niv> coupl-plongeon` pendant **120 s**, puis `kill`. On ne relève que ce qui
+part sur `stderr` **en continu** (jauge, lignes `[plongeon]`) — donc lisible même sur un run tué,
+contrairement aux stats de fin. **Les 15 résolus sont inclus comme TÉMOINS** : sans eux on ne sait
+pas lire les chiffres des autres, et c'est justement ce qui a réfuté le « détecteur de branche
+morte » (§6.3).
+
+⚠️ **Calibration du budget** : 0-9 et 17 finissent tous dans les 120 s. **Mais 10, 11, 21 et 32 —
+résolus — n'y arrivent PAS** (2,2 M à 13,9 M états). À deux minutes ils sont indiscernables d'un
+non-résolu : le 10 affiche `max 4/32`, soit 12 %. **La progression à budget borné ne prédit donc
+RIEN** à elle seule.
+
+**GROUPE A — ne démarre pas (`max ≤ 1`)** : **23** (0/18), **20** (1/18), **25** (1/19), **22**
+(1/27), **12** (1/15).
+> ⚠️ **Quatre des cinq sont exactement les niveaux dont l'ordre était MURÉ** (§6.2). La correction du
+> jour a levé le murage **sans débloquer l'acheminement** : ils ne posent toujours aucune caisse. Le
+> goal-ordering était nécessaire, il n'était pas leur verrou principal. Le 22 reste muré en plus.
+
+**GROUPE B — plafonne à mi-chemin** (progression / pente de la file / plongeons morts-budget) :
+
+| niv | progression | pente file | plongeons |
+|---|---|---|---|
+| 28 | 13/20 (65 %) | +1013 | 8M / 5b |
+| 27 | 13/20 (65 %) | +1632 | 2M / 11b |
+| **14** | 12/18 (67 %) | +2759 | **0 mort** / 10b |
+| 19 | 10/15 (67 %) | +1946 | 8M / 2b |
+| 15 | 10/15 (67 %) | +1190 | 2M / 5b |
+| **31** | 10/20 (50 %) | **+724** | **0 mort** / 10b |
+| 29 | 10/16 (62 %) | — | 2M / 2b |
+| 16 | 7/15 (47 %) | **+256** | 2M / 3b |
+| 30 | 4/18 (22 %) | **+83** | 2M / 2b |
+| 13 | 9/16 (56 %) | +1512 | 0M / 8b |
+| 18 | 8/11 (73 %) | +3263 | 1M / 5b |
+| 26 | 7/13 (54 %) | +1080 | 3M / 4b |
+| 24 | 5/22 (23 %) | — | 5M / 0b |
+
+**Témoins résolus, à comparer** : 32 → 14/15 et **+685** ; 21 → 6/13 et **+595** ; 11 → 6/14 et
+**+278** ; 10 → 4/32 et +2356.
+
+**Le signal le moins mauvais est la PENTE DE LA FILE** : les résolus tiennent entre +278 et +685 (le
+10 excepté). Les non-résolus à faible pente — **30 (+83), 16 (+256), 31 (+724)** — sont ceux dont
+l'espace n'explose pas.
+⚠️ **Mais elle est AMBIGUË et INSTABLE**, démontré sur le 31 le soir même (§6.3) : une pente basse
+peut venir d'une recherche qui converge **ou** d'un espace où presque aucune poussée n'est légale ; et
+elle a fait +724 → +1579 → +97 → +273 au cours d'un seul run. **Indice, pas prédicteur.**
+
+> **BILAN DU PROFILAGE, sans complaisance** : il a surtout servi à ÉLIMINER trois prédicteurs qu'on
+> croyait tenir — les **records morts** (banals, 7 sur le 4 qui tombe en 40 000 états), la
+> **progression à budget borné** (le 10 est à 12 % et il tombe), la **pente de la file** (ambiguë et
+> instable). Ce qui SURVIT : la partition **Groupe A / Groupe B**, qui recoupe le murage d'ordre.
+> Éliminer de faux signaux est un résultat — c'est moins que ce qu'on espérait.
+
+- [ ] **Candidats prioritaires** : **31** et **14** (zéro record mort, une dizaine de plongeons qui
+  n'échouent QUE par budget → branches non condamnées), puis **30** (pente la plus basse du corpus).
+- [ ] Ne pas relancer à l'aveugle 12/20/22/23/25 (Groupe A) : leur problème est l'acheminement, pas
+  le temps.
+
+**✅ PREMIÈRE BRIQUE POSÉE le 2026-07-29 — l'outil `ordre` (§6.2) est un prédicteur STATIQUE qui
+marche.** Il classe sans rien explorer, il sépare 16 niveaux qui passent de 11 qui échouent, et il
+dit **quelle famille** de défaut (locale = bug, globale = trajet de tirage). C'est exactement la voie
+(a) « indicateurs statiques au chargement », que le §6.6 avait rangée après la voie (b) faute de
+preuve qu'un indicateur statique corrèle avec le gain. **Celui-ci corrèle.** Les autres candidats
+statiques (composantes de buts, densité, degré moyen) restent à valider — mesurés le 2026-07-29, ils
+ne prédisent PAS le coût : le 4 a 20 caisses et 55 560 états (le corral le sert), le 8 a 1 seul point
+d'articulation et 4,4 M états. **La difficulté n'est pas une propriété du plateau, c'est
+plateau × leviers disponibles.**
+
 ---
 
 ## 7. Pièges d'implémentation à ne pas refaire
@@ -1348,6 +2822,32 @@ cles, meilleurG = 17 739 915, noeuds = 24 128 131, file = 9 759 745, capacite fi
   aux clones du solveur).
 - **`noeuds` et `meilleurG` doivent être réinitialisés** à chaque `run()` (sinon la racine
   n'est pas à l'indice 0 → `reconstruire()` boucle).
+- ⚠️ **`bench` teste `endsWith(".xsb")` — un fichier `.xsb.txt` retombe SILENCIEUSEMENT sur le
+  niveau 0** (2026-07-29). `arg1.toInt()` rend 0, aucune erreur n'est levée, et le harnais résout un
+  AUTRE niveau en affichant un résultat parfaitement plausible (4 poussées = le canari du 0). Deux
+  minutes perdues à interpréter le résultat du mauvais plateau. Renommer ou copier avant de mesurer.
+- ⚠️ **Charger une position de MILIEU DE PARTIE comme un niveau recalcule tout le statique**
+  (2026-07-30). `ordre <fixture.xsb>` sur un record du 13 affiche « ORDRE MURÉ au rang 14 » — mais
+  c'est l'ordre calculé **pour ce plateau-là**, dont les caisses de départ sont celles du milieu de
+  partie, pas celles du niveau. `ordreParPrecedence`, `casesMortes` et `distanceParBut` tournent dans
+  le ctor `Game(Level)` et ne connaissent que le plateau qu'on leur donne. **Ne rien conclure sur le
+  niveau d'origine à partir de l'ordre affiché sur une de ses fixtures** ; seules les mesures qui ne
+  dépendent que de la géométrie (murs) se transportent.
+- ⚠️ **Un bloc de statistiques recopié à côté d'un résultat n'en vient pas forcément** (2026-07-31).
+  La ligne du niveau 10 de [scores.md](scores.md) portait un bloc `[CORRAL-N]` — 22,3 M durs, 23,6 %
+  de morts, 55 M états de sous-solve — **étranger au run** : les deux plateformes rendent 3,47 M
+  durs et 0,4 % de morts pour ce même solve. Personne ne l'a vu pendant deux jours, et ce chiffre a
+  servi de « signal » pour ouvrir un chantier. **Vérifier la cohérence interne d'un relevé avant de
+  raisonner dessus** : ici, 22 M de durs pour 2,17 M d'états faisait 10 durs par état contre 1,6
+  mesurés, sur un plateau dont la géométrie est fixe — l'incohérence était lisible sans rien relancer.
+- ⚠️ **Un interrupteur d'ENVIRONNEMENT dans le solveur fait diverger l'APP du bench, en silence**
+  (2026-07-28). L'app lancée depuis un launcher (Finder, .desktop, Qt Creator) n'hérite pas de
+  l'environnement du shell où l'on tape les `bench` : toute feature gardée par un `qgetenv` tourne
+  donc en mesure et **pas** en jeu. Symptôme trompeur : un écart d'états qu'on attribue à la
+  MACHINE (« Mac contre PC ») alors qu'il vient du binaire d'à côté — c'est arrivé avec
+  `CORRAL_DETECT`. Un interrupteur ne doit vivre que le temps d'un chantier ; à la promotion, il
+  part. Ceux qui restent (`CORRAL=0`) ne servent qu'aux outils de mesure et **coupent**, jamais
+  n'ajoutent : un défaut coupé se voit tout de suite, un défaut manquant ne se voit jamais.
 
 ---
 
@@ -1368,4 +2868,8 @@ cles, meilleurG = 17 739 915, noeuds = 24 128 131, file = 9 759 745, capacite fi
 - **`cle.h`** — `Arene` (blocs), `Cle` (offset 4 o), `TableG` (adressage ouvert).
 - **`solveur.*`** — socle `QThread`, fabrique (`types()`/`creer()`), `reconstruire()`.
 - **`mesures/`** — harnais externes ; `mort.cpp` (neuf) et `mou.cpp` (corrigé) pour le taux de
-  deadlock.
+  deadlock ; **`ordre.cpp`** (neuf, 2026-07-29) pour la précédence de remplissage — il lit
+  `Game::getOrdreButs()`, accesseur const ajouté exprès plutôt que de remettre un `qgetenv` de debug
+  dans le chemin chaud (§7) ; **`precedencepaires.h`** (neuf, 2026-07-30) — BFS de tirage à rebours à
+  deux bloqueurs, en **exemplaire unique** partagé par `ordre` et `fp -3`. ⚠️ **Objet RÉFUTÉ comme
+  élagage** (§6.2) : conservé pour la LECTURE d'un état précis, jamais comme test.

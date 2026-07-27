@@ -68,7 +68,7 @@ if [ -n "${USOK_REF:-}" ]; then
     ref=$USOK_REF
     printf '1 USok = %ss   (réutilisé via USOK_REF, étalon non re-mesuré)\n' "$ref"
 else
-    r=$(chrono env CORRAL=0 LIVRAISON=0 "$BIN" "$ETALON_NIV" "$ETALON_MODE")
+    r=$(chrono env CORRAL=0 LIVRAISON=0 CORRAL_DETECT=0 "$BIN" "$ETALON_NIV" "$ETALON_MODE")
     ref=${r%%|*}
     printf '1 USok = %ss   [étalon : bench %s %s — %s, meilleur de %s]\n' \
            "$ref" "$ETALON_NIV" "$ETALON_MODE" "${r#*|}" "$N"

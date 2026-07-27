@@ -31,10 +31,24 @@ public:
         AstarMacro,
         // Même chose, mais la macro pousse en PRIORITÉ la caisse que le couplage
         // hongrois destine au but actif (cf. plan.md §6.3, 2026-07-24). Régime
-        // d'ESSAI, à comparer à AstarMacro sur le même niveau : sur le 12, 100 %
+        // ALTERNATIF — AstarMacro reste le défaut ; les deux se comparent sur le
+        // même binaire, sans variable d'environnement : sur le 12, 100 %
         // des enfants de macro partaient à f+2 parce que la caisse posée volait
         // son but à une autre. Repli sur les autres caisses si celle-là ne passe pas.
-        AstarMacroCouplage
+        AstarMacroCouplage,
+        // A* macro + PLONGEON SUR RECORD (§6.0, 2026-07-28). Dès qu'un état bat le
+        // max de caisses posées ET qu'il dépasse le seuil de remplissage, on tente
+        // de le COMPLÉTER par une recherche gloutonne bornée avant de reprendre
+        // l'A* normal. Renonce à l'optimalité — mais mesuré : l'optimum exact sur
+        // 7 des 8 niveaux testés, +2 poussées sur le 4, pour ×33 d'états sur le 4
+        // et ×4,2 sur le 9.
+        AstarMacroPlongeon,
+        // Les DEUX régimes d'essai ensemble : la macro vise la caisse du couplage,
+        // ET on plonge sur chaque record. Créé pour le 11 (2026-07-28) — c'est le
+        // couplage qui l'amène à 11/14 (le macro seul plafonne à 8/14), et le 11/14
+        // est prouvé complétable (fixture level0194, 9 états macro). Le plongeon a
+        // donc une cible réelle, avec un budget colossal vu le travail déjà consenti.
+        AstarMacroCouplagePlongeon
     };
 
     struct SType {

@@ -1,5 +1,9 @@
 #include <QtDebug>
 #include <QVarLengthArray>
+#include <QSet>
+#include <QHash>
+#include <QByteArray>
+#include <algorithm>
 #include <climits>
 #include <utility>
 #include <vector>
@@ -914,6 +918,411 @@ bool Game::corralUnitaireMort(int caisseArrivee) const {
     return false;
 }
 
+// INSTRUMENTATION DE CHANTIER (étage 0 de la réserve « la clé du cache d'enclos
+// ignore le JOUEUR », plan.md §6.1). Coupée par défaut. ⚠️ Elle n'AJOUTE et ne COUPE
+// aucun comportement — elle ne fait que compter, donc elle ne peut pas faire diverger
+// l'app du bench (le piège du §7) : les états rendus sont identiques à l'unité dans
+// les deux régimes, et c'est le premier contrôle à faire. À RETIRER une fois la
+// question tranchée, comme CORRAL_DETECT en son temps.
+// 0 = coupée (défaut) ; 1 = ÉTAGE 0 (compter les collisions de zone joueur, coût
+// nul : 0 % sur 17 macro, +0,13 % sur 9 macro) ; 2 = ÉTAGE 0 + ÉTAGE 1 (relancer le
+// sous-solve sur les seules collisions pour croiser les verdicts — cher, un
+// sous-solve par collision, jamais en régime).
+static const int mesureCacheJoueur = qgetenv("CACHE_JOUEUR").toInt();
+// Budget de l'ARBITRAGE des MORT→inconnu (étage 1). Large exprès : la question
+// n'est pas « prouve-t-on au tarif de la prod » mais « l'état est-il mort, oui ou
+// non ». Réglable pour vérifier qu'un « toujours inconnu » n'est pas un artefact
+// de ce réglage-ci.
+static const int budgetArbitrage =
+    qgetenv("CACHE_JOUEUR_BUDGET").isEmpty() ? 10000 : qgetenv("CACHE_JOUEUR_BUDGET").toInt();
+
+Game::EnclosInfo Game::detecteEnclosArrivee(int caisseArrivee, const QVector<bool>& zone,
+                                            QVector<bool>& visite,
+                                            QHash<QByteArray,VerdictEnclos>* cache,
+                                            int budget) const {
+    // Variante INCRÉMENTALE : un nouvel enclos ne peut apparaître qu'au contact de
+    // la caisse qui vient d'arriver (c'est elle qui a pu scinder l'espace libre) —
+    // même argument que le corral incrémental (game.h). On ne flood donc que depuis
+    // les voisins LIBRES de 'caisseArrivee' hors zone joueur. Coût : O(1) quand rien
+    // ne s'est scellé (le cas courant), O(région) sinon. 'visite' est maintenu
+    // TOUT-FAUX entre appels (reset O(région) via 'touched') → aucun fill O(size).
+    if (visite.size() != size) visite.fill(false, size);   // init unique
+    QVarLengthArray<int, 256> touched;
+    QVarLengthArray<int, 256> file;
+
+    EnclosInfo info;
+    const int ax = caisseArrivee % largeur, ay = caisseArrivee / largeur;
+
+    for (int d0 = 0; d0 < NB_DIRECTION; d0++) {
+        const int sx = ax + directions[d0].dx, sy = ay + directions[d0].dy;
+        if (sx < 0 || sx >= largeur || sy < 0 || sy >= hauteur) continue;
+        const int s = sx + sy * largeur;
+        if (!isLibre(s) || zone[s] || visite[s]) continue;   // en zone / occupée / déjà vue
+
+        // Flood cet enclos, en mesurant : cellules, buts vides, caisses-frontière et
+        // caisses-frontière HORS but (celles qui font de l'enclos un piège potentiel).
+        // On garde la LISTE des caisses-frontière pour le gate non-rouvrable.
+        file.clear();
+        QVarLengthArray<int, 16> frontBoxes;
+        file.append(s); visite[s] = true; touched.append(s);
+        int cells = 0, buts = 0, front = 0, frontHorsBut = 0;
+        int tete = 0;
+        while (tete < file.size()) {
+            const int c = file[tete++];
+            cells++;
+            if (cases[c] == Level::tcGoal) buts++;
+            const int cx = c % largeur, cy = c / largeur;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int vx = cx + directions[d].dx, vy = cy + directions[d].dy;
+                if (vx < 0 || vx >= largeur || vy < 0 || vy >= hauteur) continue;
+                const int v = vx + vy * largeur;
+                if (visite[v]) continue;
+                if (cases[v] == Level::tcMur) continue;
+                if (estCaisse(v)) {
+                    visite[v] = true; touched.append(v);
+                    front++;
+                    frontBoxes.append(v);
+                    if (cases[v] == Level::tcCaisse) frontHorsBut++;   // tcGoalCaisse = posée
+                    continue;
+                }
+                visite[v] = true; touched.append(v); file.append(v);
+            }
+        }
+
+        // PORTAIL BRUT : enclos scellé bordé d'au moins une caisse HORS but.
+        if (frontHorsBut == 0) continue;
+        info.candidats++;
+
+        // GATE 1 — Hall (sous-dotation) : les caisses-frontière hors but ne peuvent,
+        // si l'enclos est non-rouvrable, que se poser sur un but DANS l'enclos. S'il
+        // y a au moins autant de buts que de caisses hors but, rien n'est prouvé.
+        if (buts >= frontHorsBut) continue;
+
+        // GATE 2 — non-rouvrable. Quand le joueur pousse une caisse-frontière b
+        // (appui en zone), il finit SUR l'ancienne case de b, adjacent à l'enclos :
+        // il y entre → rouvert. SAUF si la poussée envoie b sur son UNIQUE case
+        // d'enclos (re-scellement, ex. la pince : les caisses ne peuvent que rentrer
+        // dans S). Donc b est « rouvrant » ssi une poussée faisable (appui en zone,
+        // dest libre) laisse à b un voisin d'enclos LIBRE ≠ dest. L'enclos est
+        // non-rouvrable ssi aucune caisse-frontière n'est rouvrante.
+        // (Case d'enclos = libre ET hors zone joueur.) ⚠️ Gate heuristique : exclure
+        // à tort un vrai mort ne coûte qu'un élagage manqué, jamais un FP — c'est le
+        // futur A* qui tranche. La pince PASSE ce gate (re-scellement).
+        // Appartenance à CETTE région : ses cellules sont dans 'file' (petit). ⚠️ Ne
+        // PAS utiliser « libre && hors zone » : ça inclurait des cases d'AUTRES
+        // enclos scellés, qui ne rouvrent pas CELUI-CI (bug corrigé le 2026-07-27,
+        // il faisait rater le corral bloquant du niveau 11).
+        auto dansRegion = [&](int n){ for (int i = 0; i < file.size(); i++) if (file[i] == n) return true; return false; };
+        bool rouvrable = false;
+        for (int bi = 0; bi < frontBoxes.size() && !rouvrable; bi++) {
+            const int b = frontBoxes[bi];
+            const int bx = b % largeur, by = b / largeur;
+            // Voisins de b DANS CETTE région.
+            int voisEnclos[NB_DIRECTION], nv = 0;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int nx = bx + directions[d].dx, ny = by + directions[d].dy;
+                if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+                const int n = nx + ny * largeur;
+                if (dansRegion(n)) voisEnclos[nv++] = n;
+            }
+            for (int d = 0; d < NB_DIRECTION && !rouvrable; d++) {
+                const int sx = bx - directions[d].dx, sy = by - directions[d].dy;  // appui
+                const int tx = bx + directions[d].dx, ty = by + directions[d].dy;  // dest
+                if (sx < 0 || sx >= largeur || sy < 0 || sy >= hauteur) continue;
+                if (tx < 0 || tx >= largeur || ty < 0 || ty >= hauteur) continue;
+                const int s = sx + sy * largeur, t = tx + ty * largeur;
+                if (!zone[s] || !isLibre(t)) continue;   // poussée infaisable depuis l'ouvert
+                // Après la poussée (b libérée, dest=t occupée), b garde-t-il un
+                // voisin d'enclos libre ≠ t ? Si oui, le joueur (arrivé en b) entre.
+                for (int k = 0; k < nv; k++)
+                    if (voisEnclos[k] != t) { rouvrable = true; break; }
+            }
+        }
+        if (rouvrable) continue;
+
+        // Candidat DUR : passe portail + Hall + non-rouvrable.
+        info.durs++;
+        info.cells      += cells;
+        info.frontiere  += front;
+        info.butsVides  += buts;
+
+        // PREUVE strip + BFS borné, mémoïsée par frontière triée (mode cache).
+        if (cache) {
+            QVarLengthArray<int, 32> fs;
+            for (int i = 0; i < frontBoxes.size(); i++) fs.append(frontBoxes[i]);
+            std::sort(fs.begin(), fs.end());
+            QByteArray key; key.resize(fs.size() * 2);
+            for (int i = 0; i < fs.size(); i++) {
+                key[2*i]   = (char)(fs[i] >> 8);
+                key[2*i+1] = (char)(fs[i] & 0xff);
+            }
+            int verdict;
+            auto it = cache->find(key);
+            if (it != cache->end()) {
+                verdict = it.value().verdict;
+                info.cacheHits++;
+                // ÉTAGE 0 (plan.md §6.1) — le verdict caché a été prouvé pour UNE
+                // position de joueur ; on le transfère ici à une autre. Combien de
+                // fois la zone diffère-t-elle vraiment ? On recalcule et on COMPTE,
+                // sans rien changer au verdict rendu : le solve reste identique à
+                // l'unité, seul le temps bouge (et ce surcoût EST le prix qu'aurait
+                // la clé corrigée — donc on le mesure du même coup).
+                if (mesureCacheJoueur >= 1 && it.value().zoneCanon >= 0) {
+                    info.hitsTestes++;
+                    if (zoneCanoniqueStrip(fs) != it.value().zoneCanon) {
+                        info.hitsZoneDiff++;
+                        if      (verdict == 0) info.diffMort++;
+                        else if (verdict == 1) info.diffVivant++;
+                        else                   info.diffInconnu++;
+                        // ÉTAGE 1 — la zone diffère : que vaudrait le verdict ICI ?
+                        // Seul juge possible de ce transfert (fp ne voit pas le cache,
+                        // le canari ne voit pas un FP qui épargne le chemin optimal).
+                        // ⚠️ 'verdict' n'est PAS réassigné : on rend le verdict caché,
+                        // exactement comme en prod, sinon on mesurerait un autre solveur.
+                        if (mesureCacheJoueur >= 2) {
+                            int dev = 0;
+                            const int vrai = sousSolveEnclos(fs, budget, &dev);
+                            info.etage1States += dev;
+                            auto idx = [](int v){ return v == 0 ? 0 : (v == 1 ? 1 : 2); };
+                            info.etage1[3 * idx(verdict) + idx(vrai)]++;
+                            // MORT caché mais INCONNU ici : le budget de prod ne
+                            // suffit pas à refaire la preuve depuis cette position.
+                            // Ni faux positif, ni transfert validé — on ARBITRE à
+                            // budget large, c'est le seul moyen de conclure.
+                            if (verdict == 0 && vrai == -1) {
+                                int dev2 = 0;
+                                const int arb = sousSolveEnclos(fs, budgetArbitrage, &dev2);
+                                info.arbitreStates += dev2;
+                                info.arbitre[idx(arb)]++;
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                int dev = 0, zc = -1;
+                verdict = sousSolveEnclos(fs, budget, &dev, &zc);
+                cache->insert(key, VerdictEnclos{verdict, mesureCacheJoueur ? zc : -1});
+                info.solveStates += dev;
+            }
+            if      (verdict == 0) info.dursMorts++;
+            else if (verdict == 1) info.dursVivants++;
+            else                   info.dursInconnus++;
+        }
+    }
+    for (int i = 0; i < touched.size(); i++) visite[touched[i]] = false;   // reset O(région)
+
+    return info;
+}
+
+bool Game::gateEnclosMort() const {
+    // FULL-SCAN du gate (portail + Hall + non-rouvrable un-pas). Offline (fp) : on
+    // s'autorise l'alloc de la zone et de 'visite'. Miroir du gate de
+    // detecteEnclosArrivee ; ici on NE marque PAS les caisses dans 'visite' (chaque
+    // enclos voit sa frontière complète, même si une caisse borde deux enclos).
+    QVector<bool> zone; getZoneJoueur(zone);
+    QVector<bool> visite(size, false);
+    QVector<bool> dansRegion(size, false);   // appartenance à la région COURANTE
+    QVarLengthArray<int, 512> file;
+
+    for (int c0 = 0; c0 < size; c0++) {
+        if (!isLibre(c0) || zone[c0] || visite[c0]) continue;
+
+        file.clear();
+        QVarLengthArray<int, 32> frontBoxes;
+        file.append(c0); visite[c0] = true; dansRegion[c0] = true;
+        int buts = 0, frontHorsBut = 0;
+        int tete = 0;
+        while (tete < file.size()) {
+            const int c = file[tete++];
+            if (cases[c] == Level::tcGoal) buts++;
+            const int cx = c % largeur, cy = c / largeur;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int vx = cx + directions[d].dx, vy = cy + directions[d].dy;
+                if (vx < 0 || vx >= largeur || vy < 0 || vy >= hauteur) continue;
+                const int v = vx + vy * largeur;
+                if (cases[v] == Level::tcMur) continue;
+                if (estCaisse(v)) {
+                    frontBoxes.append(v);
+                    if (cases[v] == Level::tcCaisse) frontHorsBut++;
+                    continue;
+                }
+                if (visite[v]) continue;
+                visite[v] = true; dansRegion[v] = true; file.append(v);
+            }
+        }
+
+        // Reset de dansRegion à TOUT point de sortie (la région suivante repart
+        // d'un tableau tout-faux). Lambda et non macro : même portée, même coût.
+        auto resetRegion = [&]{ for (int i = 0; i < file.size(); i++) dansRegion[file[i]] = false; };
+
+        if (frontHorsBut == 0) { resetRegion(); continue; }          // portail
+        if (buts >= frontHorsBut) { resetRegion(); continue; }       // Hall
+
+        bool rouvrable = false;                    // non-rouvrable (un pas)
+        for (int bi = 0; bi < frontBoxes.size() && !rouvrable; bi++) {
+            const int b = frontBoxes[bi];
+            const int bx = b % largeur, by = b / largeur;
+            // Voisins de b DANS CETTE région (pas « n'importe quelle case scellée » :
+            // une case d'un AUTRE enclos ne rouvre pas CELUI-CI).
+            int voisEnclos[NB_DIRECTION], nv = 0;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int nx = bx + directions[d].dx, ny = by + directions[d].dy;
+                if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+                const int n = nx + ny * largeur;
+                if (dansRegion[n]) voisEnclos[nv++] = n;
+            }
+            for (int d = 0; d < NB_DIRECTION && !rouvrable; d++) {
+                const int sx = bx - directions[d].dx, sy = by - directions[d].dy;
+                const int tx = bx + directions[d].dx, ty = by + directions[d].dy;
+                if (sx < 0 || sx >= largeur || sy < 0 || sy >= hauteur) continue;
+                if (tx < 0 || tx >= largeur || ty < 0 || ty >= hauteur) continue;
+                const int s = sx + sy * largeur, t = tx + ty * largeur;
+                if (!zone[s] || !isLibre(t)) continue;
+                for (int k = 0; k < nv; k++)
+                    if (voisEnclos[k] != t) { rouvrable = true; break; }
+            }
+        }
+        resetRegion();
+
+        if (rouvrable) continue;
+        return true;   // enclos DUR
+    }
+    return false;
+}
+
+int Game::zoneCanoniqueStrip(const QVarLengthArray<int, 32>& boxes) const {
+    // Flood du joueur sur {murs + 'boxes'} — toutes les AUTRES caisses sont du sol
+    // (c'est le strip). Rend le min des index atteints : deux positions de joueur de
+    // la même zone donnent la même valeur, deux zones distinctes des valeurs
+    // distinctes. Même définition, au bit près, que la lambda floodZone de
+    // sousSolveEnclos ci-dessous, qui appelle cette méthode pour son état initial.
+    const int n = boxes.size();
+    QVarLengthArray<bool, 512> occ(size);
+    for (int i = 0; i < size; i++) occ[i] = false;
+    for (int i = 0; i < n; i++) occ[boxes[i]] = true;
+
+    QVarLengthArray<bool, 512> vu(size);
+    for (int i = 0; i < size; i++) vu[i] = false;
+
+    const int joueur = playerPoint.x() + playerPoint.y() * largeur;
+    QVarLengthArray<int, 512> file;
+    file.append(joueur); vu[joueur] = true;
+    int mn = joueur, t = 0;
+    while (t < file.size()) {
+        const int c = file[t++]; if (c < mn) mn = c;
+        const int cx = c % largeur, cy = c / largeur;
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int nx = cx + directions[d].dx, ny = cy + directions[d].dy;
+            if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+            const int v = nx + ny * largeur;
+            if (vu[v] || cases[v] == Level::tcMur || occ[v]) continue;
+            vu[v] = true; file.append(v);
+        }
+    }
+    return mn;
+}
+
+int Game::sousSolveEnclos(const QVarLengthArray<int, 32>& boxesInit, int budget,
+                          int* developpesOut, int* zoneCanonOut) const {
+    const int n = boxesInit.size();
+    if (n == 0) {
+        if (developpesOut) *developpesOut = 0;
+        if (zoneCanonOut)  *zoneCanonOut  = -1;
+        return 1;
+    }
+
+    auto estMur = [&](int c){ return cases[c] == Level::tcMur; };
+    auto estBut = [&](int c){ return cases[c] == Level::tcGoal || cases[c] == Level::tcGoalCaisse
+                                    || cases[c] == Level::tcGoalPlayer; };
+
+    std::vector<int> start(boxesInit.begin(), boxesInit.end());
+    std::sort(start.begin(), start.end());
+
+    QVector<bool> occ(size, false), zone(size, false), zone2(size, false);
+    QVarLengthArray<int, 512> fileFlood;
+
+    // Zone joueur sur le board {murs + caisses 'boxes'} ; remplit 'zoneBuf' et rend
+    // la case CANONIQUE (min) de la zone (pour dédupliquer les positions joueur).
+    // ⚠️ zoneBuf est PARAMÉTRÉ : la zone de l'état courant (zone) et celle des
+    // successeurs (zone2) sont des buffers SÉPARÉS — sinon le flood d'un successeur
+    // écraserait la zone courante dont le test de poussée a encore besoin.
+    auto floodZone = [&](const std::vector<int>& boxes, int joueur, QVector<bool>& zoneBuf) -> int {
+        for (int i = 0; i < n; i++) occ[boxes[i]] = true;
+        zoneBuf.fill(false, size);
+        fileFlood.clear(); fileFlood.append(joueur); zoneBuf[joueur] = true;
+        int mn = joueur, t = 0;
+        while (t < fileFlood.size()) {
+            const int c = fileFlood[t++]; if (c < mn) mn = c;
+            const int cx = c % largeur, cy = c / largeur;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int nx = cx + directions[d].dx, ny = cy + directions[d].dy;
+                if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+                const int v = nx + ny * largeur;
+                if (zoneBuf[v] || estMur(v) || occ[v]) continue;
+                zoneBuf[v] = true; fileFlood.append(v);
+            }
+        }
+        for (int i = 0; i < n; i++) occ[boxes[i]] = false;
+        return mn;
+    };
+    auto cle = [&](const std::vector<int>& boxes, int joueurNorm) -> QByteArray {
+        QByteArray k; k.resize((n + 1) * 2);
+        for (int i = 0; i < n; i++) { k[2*i] = (char)(boxes[i] >> 8); k[2*i+1] = (char)(boxes[i] & 0xff); }
+        k[2*n] = (char)(joueurNorm >> 8); k[2*n+1] = (char)(joueurNorm & 0xff);
+        return k;
+    };
+    auto gagne = [&](const std::vector<int>& boxes){ for (int i=0;i<n;i++) if(!estBut(boxes[i])) return false; return true; };
+    auto estBoite = [&](int c, const std::vector<int>& boxes){ for (int i=0;i<n;i++) if(boxes[i]==c) return true; return false; };
+
+    QSet<QByteArray> vus;
+    std::vector<std::pair<std::vector<int>, int>> fileBFS;
+    // Exemplaire UNIQUE du calcul de zone canonique (game.h) : la mesure de l'étage 0
+    // recalcule EXACTEMENT ceci à un cache-hit, donc les deux ne peuvent pas diverger.
+    // (floodZone remplissait zone2 au passage, mais ce contenu était jeté — zone2 est
+    // réécrit par le premier successeur généré.)
+    const int jn0 = zoneCanoniqueStrip(boxesInit);
+    if (zoneCanonOut) *zoneCanonOut = jn0;
+    vus.insert(cle(start, jn0));
+    fileBFS.push_back({start, jn0});
+
+    int developpes = 0;
+    size_t tete = 0;
+    while (tete < fileBFS.size()) {
+        if (developpes >= budget) { if (developpesOut) *developpesOut = developpes; return -1; }
+        const std::vector<int> boxes = fileBFS[tete].first;   // copie : on modifie fileBFS
+        const int joueurNorm = fileBFS[tete].second;
+        tete++; developpes++;
+        if (gagne(boxes)) { if (developpesOut) *developpesOut = developpes; return 1; }
+
+        floodZone(boxes, joueurNorm, zone);                 // remplit zone[] pour CE state
+        // ⚠️ occ n'est PAS pré-marqué ici : floodZone(nb,...) plus bas gère occ en
+        // propre et le remettrait à faux, corrompant l'état. On teste l'occupation
+        // par appartenance directe (estBoite), n petit.
+        for (int i = 0; i < n; i++) {
+            const int b = boxes[i];
+            const int bx = b % largeur, by = b / largeur;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int dx = directions[d].dx, dy = directions[d].dy;
+                const int destX = bx + dx, destY = by + dy;
+                const int appX  = bx - dx, appY  = by - dy;
+                if (destX < 0 || destX >= largeur || destY < 0 || destY >= hauteur) continue;
+                if (appX  < 0 || appX  >= largeur || appY  < 0 || appY  >= hauteur) continue;
+                const int dest = destX + destY * largeur, app = appX + appY * largeur;
+                if (estMur(dest) || estBoite(dest, boxes)) continue;   // arrivée bloquée
+                if (!zone[app]) continue;                   // joueur ne peut pas pousser
+                if (casesMortes.at(dest)) continue;         // case morte statique (prune sûr)
+                std::vector<int> nb = boxes; nb[i] = dest; std::sort(nb.begin(), nb.end());
+                const int jn = floodZone(nb, b, zone2);            // joueur finit sur l'ancienne case b
+                const QByteArray k = cle(nb, jn);
+                if (!vus.contains(k)) { vus.insert(k); fileBFS.push_back({nb, jn}); }
+            }
+        }
+    }
+    if (developpesOut) *developpesOut = developpes;
+    return 0;   // file vidée sous budget → MORT
+}
+
 int Game::caseApres(int idxCase, EDirection dir) const {
     return idxCase + directions[dir].dx + directions[dir].dy * largeur;
 }
@@ -1043,70 +1452,165 @@ bool Game::estCaisse(int idx) const {
 // joueur est supposé pouvoir rejoindre n'importe quelle caisse de départ. Les deux
 // vont dans le sens optimiste — passage encore, pas interdiction abusive.
 QVector<int> Game::distanceLivraison(const QVector<bool>& bloque) const {
+    // JOUEUR-AWARE depuis le 2026-07-29 (§6.2). ⚠️ L'ancienne version ne retenait
+    // qu'UNE position de joueur par case atteinte (`joueurApres[a] = c`) et ne
+    // revisitait jamais une case déjà vue — exactement le défaut qui avait produit 86
+    // faux positifs au test « but orphelin » (§6.1, 2026-07-21) et que `distanceParBut`
+    // corrige depuis le §2.2 en indexant par RÉGION. Ici il rendait le test trop
+    // PESSIMISTE : il ratait des routes, déclarait des buts non livrables, et la garde
+    // anti-échouage de `ordreParPrecedence` refusait alors TOUT candidat — mesuré le
+    // 2026-07-29 : échec dès le rang 0 sur les niveaux 18, 20, 23 et 25.
+    //
+    // L'état du BFS est donc le COUPLE (case de la caisse, zone du joueur), la zone
+    // étant identifiée par sa case canonique (le plus petit index qu'elle contient) sur
+    // le plateau {murs + buts déjà posés + la caisse}. Une même case atteinte « par
+    // l'autre côté » est un état DIFFÉRENT et ouvre d'autres poussées.
     QVector<int> dist(size, -1);
-    QVector<int> joueurApres(size, -1);   // case où se tient le joueur une fois la caisse arrivée ici
-    QList<int> file;
 
     auto libreCase = [&](int c) -> bool { return cases[c] != Level::tcMur && !bloque[c]; };
-    auto libre = [&](int x, int y) -> bool {
-        if (x < 0 || x >= largeur || y < 0 || y >= hauteur) return false;
-        return libreCase(x + y * largeur);
-    };
 
-    // Le joueur atteint-il `cible` depuis `depart` en marchant sur du sol libre,
-    // sans traverser `caseCaisse` (la caisse qu'on est en train de déplacer y est) ?
-    auto joueurAtteint = [&](int depart, int cible, int caseCaisse) -> bool {
-        if (depart == cible) return true;
-        QVector<bool> vu(size, false);
-        QList<int> f;
-        f.append(depart);
+    // Flood du joueur depuis 'depart', la caisse en 'caisse' faisant obstacle. Rend la
+    // case CANONIQUE de la zone (min des index atteints), -1 si 'depart' est occupé ;
+    // remplit 'out' quand l'appelant a besoin de tester l'appartenance.
+    QVector<bool> vu(size, false);
+    QVarLengthArray<int, 512> pile;
+    auto zoneCanon = [&](int depart, int caisse, QVector<bool>* out) -> int {
+        if (depart < 0 || depart == caisse || !libreCase(depart)) return -1;
+        vu.fill(false);
+        pile.clear();
+        pile.append(depart);
         vu[depart] = true;
-        while (!f.isEmpty()) {
-            const int c = f.takeFirst();
-            if (c == cible) return true;
+        int mn = depart;
+        for (int t = 0; t < pile.size(); t++) {
+            const int c = pile[t];
+            if (c < mn) mn = c;
             const int cx = c % largeur, cy = c / largeur;
             for (int d = 0; d < NB_DIRECTION; d++) {
                 const int nx = cx + directions[d].dx, ny = cy + directions[d].dy;
                 if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
                 const int n = nx + ny * largeur;
-                if (vu[n] || n == caseCaisse || !libreCase(n)) continue;
+                if (vu[n] || n == caisse || !libreCase(n)) continue;
                 vu[n] = true;
-                f.append(n);
+                pile.append(n);
+            }
+        }
+        if (out) *out = vu;
+        return mn;
+    };
+
+    const int depart = playerPoint.x() + playerPoint.y() * largeur;
+
+    // Sources : les cases portant une caisse au chargement. Relaxation conservée — le
+    // joueur est supposé pouvoir rejoindre n'importe laquelle, donc on part de sa
+    // position réelle.
+    QVector<int> distEtat(size * size, -1);       // (caisse, zoneCanon) -> distance
+    QList<QPair<int,int>> file;                   // (caisse, zoneCanon)
+    for (int c = 0; c < size; c++) {
+        if (bloque[c]) continue;
+        if (cases[c] != Level::tcCaisse && cases[c] != Level::tcGoalCaisse) continue;
+        const int z = zoneCanon(depart, c, nullptr);
+        if (z < 0) continue;
+        dist[c] = 0;
+        if (distEtat[c * size + z] == -1) {
+            distEtat[c * size + z] = 0;
+            file.append({c, z});
+        }
+    }
+
+    QVector<bool> zone(size, false);
+    while (!file.isEmpty()) {
+        const QPair<int,int> etat = file.takeFirst();
+        const int c = etat.first, z = etat.second;
+        const int g = distEtat[c * size + z];
+        // 'z' appartient à la zone par construction : flooder depuis lui la reconstruit.
+        zoneCanon(z, c, &zone);
+
+        const int cx = c % largeur, cy = c / largeur;
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int ax = cx + directions[d].dx, ay = cy + directions[d].dy;   // arrivée
+            const int px = cx - directions[d].dx, py = cy - directions[d].dy;   // appui joueur
+            if (ax < 0 || ax >= largeur || ay < 0 || ay >= hauteur) continue;
+            if (px < 0 || px >= largeur || py < 0 || py >= hauteur) continue;
+            const int a = ax + ay * largeur, appui = px + py * largeur;
+            if (!libreCase(a) || !libreCase(appui)) continue;
+            if (!zone[appui]) continue;              // appui hors de portée du joueur
+            // Poussée faite : la caisse est en 'a', le joueur occupe l'ancienne case 'c'.
+            const int nz = zoneCanon(c, a, nullptr);
+            if (nz < 0) continue;
+            if (dist[a] == -1) dist[a] = g + 1;      // BFS : première visite = minimum
+            if (distEtat[a * size + nz] == -1) {
+                distEtat[a * size + nz] = g + 1;
+                file.append({a, nz});
+            }
+        }
+    }
+    return dist;
+}
+
+// PRÉCÉDENCE GLOBALE — le TRAJET DE TIRAGE complet (§6.2, famille B, 2026-07-30).
+//
+// La règle de 2026-07-20 (ci-dessous) ne regarde que l'approche FINALE : caisse en
+// G−d, joueur en G−2d. Elle rate le cas où cette approche est libre mais où AUCUNE
+// caisse ne peut ARRIVER sur la case d'approche. C'est la limite que le plan nommait
+// sans la corriger — « le rebours ne simule pas le trajet de tirage ». La règle :
+//
+//     G doit précéder B si, en traitant B comme OCCUPÉ, plus aucune caisse du
+//     départ n'atteint G.
+//
+// Test : BFS de TIRAGE à rebours depuis G (on remonte les poussées — la caisse était
+// en G−d, le joueur en G−2d), une fois par autre but B marqué occupé.
+//
+// ⚠️ RELAXATION OPTIMISTE (joueur supposé capable d'atteindre n'importe quel appui,
+// aucune autre caisse sur le plateau) : « inatteignable » est donc une PREUVE, et
+// « atteignable » ne promet rien. C'est une ARÊTE de précédence, pas un score — la
+// forme qui a marché le 2026-07-20, pas celle qui a échoué le 19 (distance de sortie
+// transformée en score, six variantes toutes réfutées).
+//
+// Statique (ne lit que les murs et les caisses de DÉPART), donc calculé une fois par
+// niveau, comme casesMortes. O(buts² × plateau).
+QVector<QVector<int>> Game::precedenceGlobale() const {
+    QVector<QVector<int>> requis(nbButs);
+
+    QVector<bool> vu(size, false);
+    QVarLengthArray<int, 512> file;
+    // Une caisse du départ peut-elle atteindre 'but', 'occupe' étant infranchissable
+    // (ni passage de caisse, ni appui du joueur) ? 'occupe' = -1 : aucun obstacle.
+    auto atteintUneCaisse = [&](int but, int occupe) -> bool {
+        vu.fill(false);
+        file.clear();
+        file.append(but);
+        vu[but] = true;
+        for (int t = 0; t < file.size(); t++) {
+            const int c = file[t];
+            // Le but lui-même ne compte pas comme point de départ : une caisse déjà
+            // dessus n'aurait aucun trajet à faire.
+            if (c != but && (cases[c] == Level::tcCaisse || cases[c] == Level::tcGoalCaisse))
+                return true;
+            const int cx = c % largeur, cy = c / largeur;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int px = cx - directions[d].dx,     py = cy - directions[d].dy;      // caisse avant
+                const int ax = cx - 2 * directions[d].dx, ay = cy - 2 * directions[d].dy;  // appui joueur
+                if (px < 0 || px >= largeur || py < 0 || py >= hauteur) continue;
+                if (ax < 0 || ax >= largeur || ay < 0 || ay >= hauteur) continue;
+                const int pp = px + py * largeur, aa = ax + ay * largeur;
+                if (cases[pp] == Level::tcMur || cases[aa] == Level::tcMur) continue;
+                if (pp == occupe || aa == occupe) continue;
+                if (!vu[pp]) { vu[pp] = true; file.append(pp); }
             }
         }
         return false;
     };
 
-    const int depart = playerPoint.x() + playerPoint.y() * largeur;
-
-    // Sources : les cases où une caisse se trouve au chargement du niveau. Le joueur
-    // est supposé pouvoir rejoindre n'importe laquelle (relaxation (b) ci-dessus).
-    for (int c = 0; c < size; c++) {
-        if (bloque[c]) continue;
-        if (cases[c] == Level::tcCaisse || cases[c] == Level::tcGoalCaisse) {
-            dist[c] = 0;
-            joueurApres[c] = depart;
-            file.append(c);
+    for (int g = 0; g < nbButs; g++) {
+        // Un but déjà inatteignable sans le moindre obstacle est un plateau douteux :
+        // aucune arête à en tirer (tout but « le condamnerait », ce qui ne dit rien).
+        if (!atteintUneCaisse(goals[g], -1)) continue;
+        for (int b = 0; b < nbButs; b++) {
+            if (b == g) continue;
+            if (!atteintUneCaisse(goals[g], goals[b])) requis[b].append(g);
         }
     }
-
-    while (!file.isEmpty()) {
-        const int c = file.takeFirst();
-        const int cx = c % largeur, cy = c / largeur;
-        for (int d = 0; d < NB_DIRECTION; d++) {
-            const int ax = cx + directions[d].dx, ay = cy + directions[d].dy;   // arrivée
-            const int px = cx - directions[d].dx, py = cy - directions[d].dy;   // appui joueur
-            if (!libre(ax, ay) || !libre(px, py)) continue;
-            const int a = ax + ay * largeur;
-            if (dist[a] != -1) continue;
-            const int appui = px + py * largeur;
-            if (!joueurAtteint(joueurApres[c], appui, c)) continue;   // appui inatteignable à pied
-            dist[a] = dist[c] + 1;
-            joueurApres[a] = c;   // la poussée faite, le joueur est là où était la caisse
-            file.append(a);
-        }
-    }
-    return dist;
+    return requis;
 }
 
 // Ordre de remplissage par PRÉCÉDENCE DE LIVRAISON (§6.2, session du 2026-07-20).
@@ -1157,6 +1661,29 @@ QVector<int> Game::ordreParPrecedence() const {
         return n;
     };
 
+    // PRÉCÉDENCE GLOBALE (§6.2 famille B) : combien de buts DOIVENT encore être posés
+    // avant b ? 0 = b respecte toutes ses arêtes, il est posable dès maintenant.
+    //
+    // Utilisée en clé de TÊTE du tie-break, et non comme filtre dur. Deux raisons :
+    //  - **Identité par construction** sur les niveaux dont l'ordre respecte déjà
+    //    toutes les arêtes (mesuré le 2026-07-30 : 28 niveaux sur 33, dont les 14
+    //    résolus, 190 et 191). Chez eux, le but élu à chaque rang a `attente == 0`,
+    //    donc il reste le minimum du comparateur : ordre inchangé, canari intact.
+    //  - **Dégradation gracieuse** : si aucun but sûr ne respecte ses arêtes, on en
+    //    pose un quand même (le moins en retard) au lieu de bloquer, et c'est le
+    //    backtracking qui tranche. Un ajout dont le cas d'échec n'est pas identique à
+    //    l'existant serait un remplacement, pas un ajout (leçon du 2026-07-29).
+    // ⚠️ La variante FILTRE DUR (retirer des `surs` tout but en dette, plus des couches
+    // de repli équivalentes) a été codée et mesurée le 2026-07-30 : **cartes de rangs
+    // identiques sur les 35 niveaux**, donc strictement INERTE. Retirée. Ne pas la
+    // reproposer sans un cas qui la distingue.
+    const QVector<QVector<int>> requis = precedenceGlobale();
+    auto attente = [&](int b) -> int {
+        int n = 0;
+        for (int g : requis[b]) if (!pose[g]) n++;
+        return n;
+    };
+
     // CONTIGUITÉ DE RUN (le tie-break retenu). Diagnostic (bench 191 macro,
     // oracle vs calculé) : l'ordre calculé ne diverge de l'ordre humain (28 états)
     // qu'à DEUX endroits, tous deux des mélanges LOCAUX dans une file droite de
@@ -1198,7 +1725,74 @@ QVector<int> Game::ordreParPrecedence() const {
     //   LIVR_DURE=0 (défaut) coupé ; 1 = pénalité en tête ; 2 = après la contiguité.
     const int livrDure = qEnvironmentVariableIntValue("LIVR_DURE");
 
-    for (int step = 0; step < nbButs; step++) {
+    // BACKTRACKING SUR LA GARDE (2026-07-29, §6.2 famille A). Le glouton pur se
+    // peignait dans un coin : quand plus AUCUN but n'était « sûr », l'ancien code
+    // RELÂCHAIT la garde (`surs = candidats`) et posait quand même — condamnant la
+    // partie. Mesuré : 7 relâchements sur le 27, 6 sur le 22, 6 sur le 32, 2 sur le
+    // 25, et **ZÉRO sur les 14 résolus, 190 et 191**. Le relâchement est donc le
+    // symptôme exact des ordres murés, pas un incident bénin.
+    //
+    // On empile désormais les candidats sûrs PAR ORDRE DE PRÉFÉRENCE (le tie-break
+    // ci-dessous) et on RECULE au lieu de forcer. Propriété qui rend l'ajout sûr :
+    // sur un niveau où la garde ne se relâchait jamais, la pile ne recule jamais et
+    // le premier candidat est toujours retenu → **ordre identique au glouton, canari
+    // intact PAR CONSTRUCTION**. C'est la même correction que
+    // `macroVersButBacktrack` (§6.3) : mémoriser les forks au lieu de les oublier.
+    //
+    // ⚠️ Ce n'est PAS la tentative n°5 du 2026-07-19 (« backtracking : rend le MÊME
+    // ordre que le greedy »). Celle-là portait sur le 191, où la garde ne se relâche
+    // jamais — la recherche n'avait donc rien à explorer. Ici on ne recule QUE sur un
+    // échec avéré du modèle.
+    struct Etage { QVector<int> choix; int essai = 0; };
+    QVector<Etage> pile;
+    QVector<int> meilleurOrdre;              // filet : le plus long ordre atteint
+    // Budget BALAYÉ le 2026-07-29 (méthode CORRAL_BUDGET : on ne fige pas une constante
+    // sans balayage). 50 = trop court, le 32 reste muré ; 200 = le 32 est corrigé ;
+    // 1000 et 5600 n'apportent RIEN de plus et coûtent cher — le chargement du 22 passe
+    // de 0,23 s à 0,91 s puis 4,67 s (ce calcul tourne dans le ctor Game(Level), donc à
+    // chaque ouverture de niveau dans l'app). Figé à 200.
+    // ⚠️ Un TEST EN DUR `numNiveau == 13 ? 100000 : 200` a vécu ici du 2026-07-30 au
+    // 2026-07-31 — RETIRÉ. Ce qu'il avait mesuré reste un repère utile : le 13 est muré
+    // au rang 14 à tout budget de 200 à 20 000 et devient SAIN à 100 000, donc un ordre
+    // sain EXISTE et son absence est un coût de RECHERCHE, pas une limite théorique.
+    // Mais il coûtait 64 s dans le ctor Game(Level) — donc à CHAQUE ouverture de niveau
+    // dans l'app — et un numéro de niveau en dur dans le solveur est pire que le coût :
+    // le canari ne dit rien d'un niveau traité à part, et la mesure d'à côté non plus.
+    // ⚠️ ESCALADE DE BUDGET essayée puis RETIRÉE le 2026-07-31 (relancer une fois à
+    // 100 000 quand la pile se vide budget à 0, c.-à-d. tronqué et non épuisé). Mesurée :
+    // le 13 devient sain mais en **65 s**, le 18 n'escalade même pas (son espace est
+    // RÉELLEMENT épuisé à 200 — aucun ordre sain n'existe dans ce modèle, aucun budget
+    // n'y changera rien), et le **22 n'a pas fini en 9 minutes**. On échangeait un numéro
+    // de niveau en dur contre un temps de chargement NON BORNÉ, dans le ctor Game(Level)
+    // donc à chaque ouverture de niveau. Ne pas la reproposer sans traiter d'abord le
+    // coût de `distanceLivraison`, rappelée pour chaque candidat de chaque rang.
+    int budget = 200;
+
+    while (ordre.size() < nbButs) {
+        // L'étage du rang courant existe déjà (on y est revenu par backtracking) :
+        // l'état pose/bloque a été restauré à l'identique, donc la liste de choix
+        // aussi — on la RÉUTILISE, sinon on perdrait l'index d'essai et on
+        // reboucterait indéfiniment sur le même candidat.
+        if (pile.size() == ordre.size() + 1) {
+            Etage& e = pile[pile.size() - 1];
+            if (e.essai < e.choix.size() && budget > 0) {
+                budget--;
+                const int b = e.choix[e.essai];
+                pose[b] = true;
+                bloque[goals[b]] = true;
+                ordre.append(b);
+                if (ordre.size() > meilleurOrdre.size()) meilleurOrdre = ordre;
+            } else {
+                pile.removeLast();                       // cet étage est épuisé
+                if (ordre.isEmpty() || pile.isEmpty()) break;   // plus rien à défaire
+                const int d = ordre.takeLast();          // on défait le choix précédent
+                pose[d] = false;
+                bloque[goals[d]] = false;
+                pile[pile.size() - 1].essai++;           // …et on essaie le suivant
+            }
+            continue;
+        }
+
         const QVector<int> dist = distanceLivraison(bloque);
 
         // (a) livrables maintenant
@@ -1259,41 +1853,137 @@ QVector<int> Game::ordreParPrecedence() const {
             bloque[goals[b]] = false;
             if (ok) surs.append(b);
         }
-        // Si la garde ne laisse rien passer, on la relâche plutôt que de rendre un ordre
-        // incomplet : `butActif()` doit toujours trouver un but, et un ordre imparfait
-        // ne fait que ralentir la macro (il ne peut pas produire de fausse solution).
-        if (surs.isEmpty()) surs = candidats;
-        if (surs.isEmpty()) break;
-
         // TIE-BREAK = CONTIGUITÉ DE RUN (mesuré, cf. l'entête). Parmi les buts sûrs :
         //  1. prolonger un segment déjà posé (garder les runs droits contigus) ;
         //  2. sinon partir d'un cul-de-sac mural (amorcer un run) ;
         //  3. sinon le plus encoigné (peu de voisins libres = ne coupe aucun passage) ;
         //  4. sinon le plus proche de l'entrée.
-        int choisi = surs.first();
-        for (int b : surs) {
-            const int da = dist[goals[b]], dc = dist[goals[choisi]];
-            const int ga = degre(b),       gc = degre(choisi);
-            const auto ca = contiguite(b), cc = contiguite(choisi);
-            const int pa = penalite[b],    pc = penalite[choisi];
-            bool mieux;
-            if ((livrDure == 1 || livrDure == 3) && pa != pc) mieux = (pa < pc);  // durci : ne pas stranguler un appui
-            else if (ca.first  != cc.first)     mieux = (ca.first  > cc.first);
-            else if (ca.second != cc.second)    mieux = (ca.second > cc.second);
-            else if (livrDure == 2 && pa != pc) mieux = (pa < pc);
-            else if (ga != gc)                  mieux = (ga < gc);
-            else                                mieux = (da < dc);
-            if (mieux) choisi = b;
-        }
+        // On TRIE désormais au lieu de ne garder que le meilleur : le backtracking a
+        // besoin des suivants. Le premier élément reste EXACTEMENT celui que l'ancien
+        // code élisait (comparateur inchangé), d'où l'identité sur les niveaux qui ne
+        // reculent jamais.
+        auto mieuxQue = [&](int a, int c) -> bool {
+            const int da = dist[goals[a]], dc = dist[goals[c]];
+            const int ga = degre(a),       gc = degre(c);
+            const auto ca = contiguite(a), cc = contiguite(c);
+            const int pa = penalite[a],    pc = penalite[c];
+            const int wa = attente(a),     wc = attente(c);
+            if (wa != wc)                  return (wa < wc);   // précédence GLOBALE : une preuve, prime tout
+            if ((livrDure == 1 || livrDure == 3) && pa != pc) return (pa < pc);  // durci : ne pas stranguler un appui
+            if (ca.first  != cc.first)     return (ca.first  > cc.first);
+            if (ca.second != cc.second)    return (ca.second > cc.second);
+            if (livrDure == 2 && pa != pc) return (pa < pc);
+            if (ga != gc)                  return (ga < gc);
+            if (da != dc)                  return (da < dc);
+            return a < c;                  // total, donc tri DÉTERMINISTE
+        };
+        std::stable_sort(surs.begin(), surs.end(), mieuxQue);
 
-        pose[choisi] = true;
-        bloque[goals[choisi]] = true;
-        ordre.append(choisi);
+        // ⚠️ `surs` VIDE = le modèle vient de constater que tout choix condamne un but.
+        // L'ancien code posait quand même (`surs = candidats`) ; on empile une liste
+        // vide, ce qui déclenche le retour arrière au tour suivant. Le filet
+        // `meilleurOrdre` garantit qu'on rendra malgré tout une permutation complète.
+        pile.append(Etage{surs, 0});
     }
 
-    // Les buts jamais livrables (îlots, niveaux dégénérés) finissent la liste : l'ordre
-    // doit rester une PERMUTATION complète, sinon butActif() rend n'importe quoi.
-    for (int b = 0; b < nbButs; b++) if (!pose[b]) ordre.append(b);
+    // ⚠️ BACKTRACKING ÉPUISÉ (budget, ou aucun ordre sain n'existe dans ce modèle).
+    // Le plus long préfixe atteint (`meilleurOrdre`) est un chemin d'EXPLORATION : le
+    // reprendre donnait des ordres PIRES que le glouton (mesuré le 2026-07-29 — le 27
+    // passait de sain à muré au rang 18, le 25 de muré au rang 10 à muré au rang 1).
+    // On refait donc exactement l'ANCIEN glouton relâché. Le backtracking est un
+    // BONUS : il ne peut qu'améliorer, jamais dégrader.
+    if (ordre.size() < nbButs) {
+        ordre.clear();
+        pose.fill(false);
+        bloque.fill(false);
+        for (int step = 0; step < nbButs; step++) {
+            const QVector<int> dist = distanceLivraison(bloque);
+            QVector<int> candidats;
+            for (int b = 0; b < nbButs; b++)
+                if (!pose[b] && dist[goals[b]] != -1) candidats.append(b);
+            QVector<int> surs;
+            QVector<int> penalite(nbButs, 0);
+            for (int b : candidats) {
+                bloque[goals[b]] = true;
+                const QVector<int> apres = distanceLivraison(bloque);
+                bool ok = true;
+                int  pen = 0;
+                for (int h = 0; h < nbButs; h++) {
+                    if (pose[h] || h == b) continue;
+                    if (apres[goals[h]] == -1)                 ok = false;
+                    else if (apres[goals[h]] > dist[goals[h]]) pen++;
+                }
+                penalite[b] = pen;
+                bloque[goals[b]] = false;
+                if (ok) surs.append(b);
+            }
+            if (surs.isEmpty()) surs = candidats;   // le relâchement d'origine
+            if (surs.isEmpty()) break;
+            int choisi = surs.first();
+            for (int b : surs) {
+                const int da = dist[goals[b]], dc = dist[goals[choisi]];
+                const int ga = degre(b),       gc = degre(choisi);
+                const auto ca = contiguite(b), cc = contiguite(choisi);
+                const int pa = penalite[b],    pc = penalite[choisi];
+                const int wa = attente(b),     wc = attente(choisi);
+                bool mieux;
+                if (wa != wc)                       mieux = (wa < wc);   // précédence GLOBALE
+                else if ((livrDure == 1 || livrDure == 3) && pa != pc) mieux = (pa < pc);
+                else if (ca.first  != cc.first)     mieux = (ca.first  > cc.first);
+                else if (ca.second != cc.second)    mieux = (ca.second > cc.second);
+                else if (livrDure == 2 && pa != pc) mieux = (pa < pc);
+                else if (ga != gc)                  mieux = (ga < gc);
+                else                                mieux = (da < dc);
+                if (mieux) choisi = b;
+            }
+            pose[choisi] = true;
+            bloque[goals[choisi]] = true;
+            ordre.append(choisi);
+        }
+    }
+
+    // `butActif()` exige une PERMUTATION complète : les buts jamais livrables (îlots,
+    // niveaux dégénérés) ferment la liste.
+    QVector<bool> dedans(nbButs, false);
+    for (int b : ordre) dedans[b] = true;
+    for (int b = 0; b < nbButs; b++) if (!dedans[b]) ordre.append(b);
+
+    // POST-PASSE : TRI TOPOLOGIQUE STABLE sur les arêtes de précédence globale.
+    //
+    // Pourquoi elle est nécessaire, mesuré sur le 27 : ses buts (2,1)/(3,1)/(4,1) ne
+    // sont JAMAIS livrables selon `distanceLivraison` (modèle avant, joueur-aware), le
+    // glouton ne les choisit donc jamais et la boucle ci-dessus les colle en FIN de
+    // liste — aux rangs 17-19, alors que (6,2), leur passage obligé, est posé au rang
+    // 16. Leurs rangs n'étaient pas un choix, c'était un résidu. C'est le défaut nommé
+    // au §6.2 : « l'ordre remplit de bas en haut ; il fallait l'inverse. »
+    //
+    // Le tri est STABLE au sens fort : on émet toujours le PREMIER but de l'ordre
+    // courant dont tous les prédécesseurs obligatoires sont déjà émis. Donc si l'ordre
+    // respecte déjà toutes ses arêtes, chaque but est prêt à son tour et la séquence
+    // ressort INCHANGÉE — l'identité, et donc le canari, sont préservés par
+    // construction sur les niveaux sains (28 sur 33 le 2026-07-30).
+    {
+        QVector<bool> emis(nbButs, false);
+        QVector<int>  trie;
+        trie.reserve(nbButs);
+        while (trie.size() < nbButs) {
+            int choisi = -1;
+            for (int b : ordre) {
+                if (emis[b]) continue;
+                bool pret = true;
+                for (int g : requis[b]) if (!emis[g]) { pret = false; break; }
+                if (pret) { choisi = b; break; }
+            }
+            // CYCLE (aucun but prêt) : le modèle optimiste se contredit — on émet le
+            // premier restant plutôt que de boucler. Dégradation gracieuse, jamais un
+            // blocage : `butActif()` exige une permutation complète.
+            if (choisi < 0)
+                for (int b : ordre) if (!emis[b]) { choisi = b; break; }
+            emis[choisi] = true;
+            trie.append(choisi);
+        }
+        ordre = trie;
+    }
     return ordre;
 }
 
