@@ -210,6 +210,19 @@
         </widget>
        </item>
        <item>
+        <widget class="QCheckBox" name="cbHybride">
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
+         </property>
+         <property name="text">
+          <string>Mode hybride</string>
+         </property>
+         <property name="toolTip">
+          <string>Affiche l'ordre de remplissage sur les buts et, à chaque coup joué à la main, les goal macros que le solveur pourrait engager. Clic sur une caisse surlignée = jouer sa macro.</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QCheckBox" name="cbEtatMax">
          <property name="enabled">
           <bool>false</bool>

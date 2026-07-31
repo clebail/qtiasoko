@@ -450,3 +450,74 @@ ligne `user` — le mural est inexploitable, cf. `plan.md` §1), USok avec 1 USo
 - Ce qui reste monotone sur les huit : **états épargnés ÷ états de sous-solve dépensés**, avec un
   seuil qui est le rapport de coût entre les deux sortes d'états (0,14 à 0,34 mesuré). Détail,
   limites et suite dans `plan.md` §6.1, session du 2026-07-31.
+
+## Le joueur n'est plus un obstacle (correctif promu à `80d95ca`)
+
+`avanceVersBut` refusait toute poussée dont la destination était la case du joueur — donc **tout
+demi-tour**, puisqu'après une poussée le joueur est par construction sur la case d'où la caisse
+vient. `getCaissesDeplacable` avait l'exemption depuis toujours ; la macro non
+(cf. `journal-macro.md`, 2026-08-07). Mesure binaire contre binaire, `1308642` reconstruit par
+`git worktree`, mode `macro`, macOS arm64.
+
+| Niveau | Nb État avant (`1308642`) | Nb État après | Nb Poussé | Coups avant → après | Méthode | Date | N° de commit |
+|---|---|---|---|---|---|---|---|
+| **17** | 24 786 | **18 636** | 213 | 569 → **561** | A* macro | 2026-08-07 | `80d95ca` |
+| **2** | 412 | **364** | 131 | 541 → **523** | A* macro | 2026-08-07 | `80d95ca` |
+| **9** | 354 623 | **325 250** | 237 | 678 | A* macro | 2026-08-07 | `80d95ca` |
+| **4** | 55 560 | **55 095** | 355 | 945 → **943** | A* macro | 2026-08-07 | `80d95ca` |
+| 0 | 4 | 4 | 4 | 16 | A* macro | 2026-08-07 | `80d95ca` |
+| 1 | 14 | 14 | 97 | 264 | A* macro | 2026-08-07 | `80d95ca` |
+| 3 | 499 | 499 | 134 | 376 | A* macro | 2026-08-07 | `80d95ca` |
+| 5 | 9 123 | 9 123 | 143 | 441 | A* macro | 2026-08-07 | `80d95ca` |
+| 6 | 570 | 570 | 110 | 330 | A* macro | 2026-08-07 | `80d95ca` |
+| 7 | 24 376 | 24 376 | 90 | 347 | A* macro | 2026-08-07 | `80d95ca` |
+| 190 | 145 368 | 145 368 | 220 | 846 | A* macro | 2026-08-07 | `80d95ca` |
+| 191 | 15 | 15 | 250 | 582 | A* macro | 2026-08-07 | `80d95ca` |
+
+**Poussées identiques sur les douze — canari intact.** Aucun niveau dégradé, quatre améliorés. Les
+**coups** baissent à poussées égales sur 17, 2 et 4 : même solution, moins de marche — c'est le
+demi-tour joué en macro au lieu d'être reconstruit en poussées simples.
+
+## 🎉 Niveaux 12, 27 et 26 — 16ᵉ, 17ᵉ et 18ᵉ résolus (2026-08-09), régime `ordre-look`
+
+| Niveau | Nb État | Nb Poussé | Coups | Méthode | Date | N° de commit |
+|---|---|---|---|---|---|---|
+| **12** | **2 097 523** | **212** | 873 | `ordre-look` | 2026-08-09 | `5aeae01` |
+| **27** | **377 948** | **363** | 1 504 | `ordre-look` | 2026-08-09 | `5aeae01` |
+| **26** | **103 640 691** | **197** | 639 | `ordre-look` | 2026-08-09 | `5aeae01` |
+
+**Ce que fait le régime** : au rang 0 du calcul de l'ordre, et parmi les buts de la SALLE que la règle
+existante a élue, préférer celui qui laisse le plus de candidats sûrs au rang suivant. Détail et les
+trois restrictions dans `journal-ordre.md`, 2026-08-08.
+
+- Sur le **12**, l'ordre régénéré est **exactement l'ordre humain de juillet**, les 15 buts — le même
+  qui, injecté par fichier, donnait déjà `2 097 523 / 212`. Les deux runs coïncident à l'état près.
+- Sur le **27**, l'ordre produit n'est **ni celui du défaut ni celui de l'humain** : c'est un
+  troisième ordre, et il résout. À comparer au run sous ordre humain injecté (`332 359 / 363 / 1 536`,
+  2026-08-06) : **mêmes 363 poussées**, +13,7 % d'états, **32 coups de moins**. Le même niveau, sans
+  aucun fichier à la racine.
+- Le **26** est **le plus gros solve du projet** — 103,6 M états, contre 6,6 M pour le 32 qui détenait
+  le record. Pic mémoire ~7 Go (`footprint`), 18 Go de RAM, environ 1 h 30 de CPU. Le corral y a
+  dépensé **362 M états de sous-solve** pour 2,65 M configurations distinctes (amorti **×25,8** par le
+  cache) et élagué **26,8 M enfilages** : le sous-solve coûte 3,5 fois la recherche principale.
+  ⚠️ **Diagnostic lisible EN COURS DE RUN, et il a été juste** : `file/vus = 22 %` avec une pente
+  stagnante, contre **88 % et +2 600** pour le 14 lancé au même moment sur la même machine. Le 26 se
+  refermait, le 14 divergeait. Deux cas ne font pas une loi (§11.4), mais le ratio file/vus a séparé
+  proprement là où la pente seule est réfutée comme prédicteur (§6.6).
+- ⚠️ **Le 27 en `coupl-plongeon` sans injection ne rend toujours RIEN** (arrêté à 10 min sans verdict) :
+  c'est bien le régime qui le débloque, pas le correctif du demi-tour de `80d95ca`.
+
+**Réserves, à porter avec la ligne :**
+- ⚠️ **212 poussées n'est PAS un canari** : régime plongeon, donc sous-optimal par construction — même
+  statut que les 363 du 27 ou les ±18 du 21.
+- ⚠️ **Ce régime fait DÉCROCHER le 32** (110 733 000 dépilements, 188 957 278 états vus, `max 14/15`,
+  aucune solution — contre 6 591 365 états pour le résoudre en `coupl-plongeon`). Il ne doit **jamais**
+  devenir le défaut ; le 32 garde son `coupl-plongeon`.
+- Le défaut est inchangé **par construction** : le drapeau vaut `false` et seul le nouveau cas de
+  fabrique l'arme. Vérifié sur 0, 1, 2, 3, 5, 6, 7, 17, 190, 191 en `macro` et sur le 10 en
+  `coupl-plongeon` — tous identiques.
+
+**Non éligibles, pour mémoire** : les parties gagnées **à la main** en mode hybride ne comptent pas,
+non plus que les solves obtenus avec un `ordre_niveau_XXXX.txt` injecté — non reproductibles avec le
+binaire par défaut. Le **27 sortait de cette catégorie jusqu'à aujourd'hui** ; il en sort par le
+régime, pas par l'injection.

@@ -155,7 +155,34 @@ public:
     bool remplissageOrdonne() const;
     // Index du but ACTIF (§10.5) : le plus profond (ordreButs) pas encore rempli,
     // ou -1 si tous le sont (état gagnant). C'est la cible de la goal macro.
+    //
+    // ORDRE DYNAMIQUE (§6.2, chantier 2026-07-31) — quand `ordreDynamique` est armé,
+    // on ne rend plus aveuglément le premier but non rempli : on rend le premier but
+    // non rempli **encore LIVRABLE depuis l'état courant** (`distanceLivraison`, qui
+    // amorce son BFS sur les caisses RÉELLEMENT présentes). L'ordre statique reste la
+    // préférence ; il cesse d'être une camisole. C'est ce qui contourne les trois
+    // murages connus (13 rang 14, 18 rang 10, 22 rang 25) au lieu de les combattre :
+    // la question « existe-t-il un ordre sain COMPLET, décidé avant le premier coup ? »
+    // ne se pose plus, elle devient « quel but ensuite, depuis CET état ? ».
+    //
+    // ⚠️ CADENCE AU JALON, et c'est un choix de COÛT : `distanceLivraison` est chère
+    // (BFS de poussées joueur-aware, table (case × zone)), donc on ne rechoisit que
+    // lorsque le but actif vient d'être REMPLI — au plus nbButs fois par chemin, jamais
+    // par état. `butCourant` est le cache qui porte ce jalon, et il se propage par copie
+    // aux états enfants. Limite assumée du premier jet : si le but choisi cesse d'être
+    // livrable SANS avoir été rempli, on reste dessus jusqu'au prochain jalon.
     int butActif() const;
+    // Arme l'ordre dynamique ci-dessus. Posé sur l'état de départ du solveur, il se
+    // propage par copie à toute la recherche. Régime d'ESSAI (§6.2) : jamais le défaut.
+    void setOrdreDynamique(bool on) { ordreDynamique = on; butCourant = -1; }
+    // RÉGIME `ordre-look` (§6.2, 2026-08-08) : au rang 0 du calcul de l'ordre, et
+    // parmi les buts de la SALLE que la règle existante a élue, préférer celui qui
+    // laisse le plus de candidats sûrs au rang suivant. Recalcule `ordreButs` sur
+    // place — donc à poser sur l'état de DÉPART, avant de lancer la recherche.
+    // Mesuré : le 12 tombe sans injection (2 097 523 états), le 32 décroche, tout le
+    // reste est INCHANGÉ — 26 ordres sur 35 sont bit-à-bit identiques. D'où le
+    // régime séparé : le canari des résolus ne doit pas en dépendre.
+    void setOrdreLookahead(bool actif);
     // Case (index plat) du but d'indice 'indexBut' — même indexation que
     // butActif()/ordreButs. Pour l'UI, qui a besoin d'une position à surligner.
     int getCaseBut(int indexBut) const { return goals[indexBut]; }
@@ -165,6 +192,99 @@ public:
     // macro se mure sur un niveau donné, sans remettre d'interrupteur d'env dans le
     // chemin chaud (piège §7).
     const QVector<int>& getOrdreButs() const { return ordreButs; }
+
+    // ── LOI DE L'ORDRE (§6.2, 2026-08-03 — idée utilisateur) ────────────────────
+    // « Vu du solveur, seul le but ACTIF existe ; les autres buts ne sont que du
+    // SOL. » D'où une table de cases mortes PAR BUT au lieu d'une seule :
+    //
+    //   morte pour le but B  ssi  aucune caisse posée là ne peut être poussée
+    //                             jusqu'à B, quelle que soit la région du joueur,
+    //   SAUF si la case est ALIGNÉE avec B (même ligne ou même colonne) — auquel
+    //   cas elle redevient du sol.
+    //
+    // ⚠️ CE N'EST PAS UN ÉLAGAGE PROUVÉ, et il ne doit jamais entrer dans
+    // `checkDefaite`. Poser une caisse sur un but hors de son tour reste LÉGAL au
+    // Sokoban : la règle repose sur la justesse de l'ORDRE, pas sur la géométrie.
+    // Elle a été jugée sur 24 parties humaines gagnantes — 0 faux positif sur 19
+    // niveaux, et les trois seuls fautifs (12, 14, 15) sont exactement ceux dont on
+    // savait déjà l'ordre calculé faux, tous trois guéris par l'ordre humain injecté.
+    // C'est donc un test de COHÉRENCE entre un ordre et une partie, pas un test
+    // d'ordre absolu : le niveau 6 admet deux ordres valides, et la loi condamne
+    // celui des deux qu'on ne lui a pas donné. Régime SÉPARÉ, comme le plongeon.
+    //
+    // ⚠️ La table n'est pas un sur-ensemble de `casesMortes` : l'exemption
+    // d'alignement peut rendre au sol une case globalement morte. C'est sans
+    // conséquence — la loi s'AJOUTE à `checkDefaite`, elle ne le remplace pas.
+    //
+    // Gratuit : `distanceParBut` fait déjà le BFS à rebours par but, sur les murs
+    // seuls (aucune caisse, aucun autre but en obstacle) — soit exactement la vue
+    // « murs seuls » sous laquelle la loi a été jugée. Il ne reste qu'une réduction
+    // booléenne, calculée une fois au chargement comme `casesMortes`.
+    bool caseMorteLoi(int idxBut, int cell) const {
+        return mortesLoi.at((qsizetype)idxBut * size + cell);
+    }
+    // La tranche du but 'idxBut', pour l'affichage. Vide si 'idxBut' < 0 (état gagné).
+    // ⚠️ Ne rend que le SURPLUS de la loi — les cases déjà mortes dans la table
+    // ordinaire en sont retirées. C'est ce qui se lit et se dessine : le reste,
+    // `checkDefaite` le coupe depuis toujours, l'afficher en gris ne dirait rien de
+    // la loi et noierait le plateau sous le remplissage hors contour.
+    QVector<bool> casesMortesLoi(int idxBut) const;
+    // Case morte au sens ORDINAIRE (table unique, tous buts confondus) — exposée
+    // pour que le juge de la loi puisse en isoler le surplus.
+    bool caseMorteOrdinaire(int cell) const { return casesMortes.at(cell); }
+
+    // ── GEL HORS TOUR (§6.2, 2026-08-04) — LA SECONDE MOITIÉ DE LA LOI ──────────
+    // Même principe qu'au-dessus, poussé jusqu'au bout : si seul le but ACTIF
+    // existe, une caisse posée sur un but de rang SUPÉRIEUR est une caisse sur du
+    // SOL. Or une caisse gelée sur du sol est morte — c'est le tout premier élagage
+    // du projet, et il n'a jamais tourné ici.
+    //
+    // Rien de neuf n'est calculé : `caisseGelee`/`bloqueeSurAxe` travaillent déjà
+    // sur `estCaisse()`, qui couvre `tcCaisse` ET `tcGoalCaisse`. Le seul obstacle
+    // était la boucle de `checkDefaite`, qui ne présente que les `tcCaisse` — pour
+    // une raison juste au niveau de la CAISSE (« une caisse gelée sur un but est un
+    // morceau de la solution ») et fausse au niveau de la RÉGION : quatre caisses
+    // posées trop tôt, collées en carré, scellent onze buts derrière elles. C'est le
+    // plateau du 2026-08-04, prouvé mort en 10 états par réduction à une caisse.
+    //
+    // ⚠️ CE N'EST PAS UNE PREUVE, et le sens de l'erreur est connu : une caisse
+    // gelée sur un but de rang supérieur REMPLIT quand même ce but, donc la partie
+    // reste gagnable dans l'absolu. On coupe des états réellement gagnables. Même
+    // statut que la loi — une exigence d'ORDRE, pas un théorème de géométrie —
+    // donc régime SÉPARÉ, et le canari des résolus pour juge.
+    //
+    // ⚠️ Les buts de rang INFÉRIEUR sont exemptés, comme dans la table : ceux-là
+    // sont rangés à leur tour, une caisse gelée dessus est une caisse posée.
+    bool geleHorsTour(int idxButActif) const;
+
+    // ── PRÉCÉDENCE CAISSE → BUT (§6.2, 2026-08-04) ──────────────────────────────
+    // Toutes les précédences du projet sont but → but. Celle-ci est d'une autre
+    // espèce, et elle sort du niveau 16 :
+    //
+    //   Soit A(C) les cases d'appui dont le joueur a besoin pour pousser la caisse C
+    //   quelque part d'UTILE. Si remplir un but G prive le joueur de TOUT A(C),
+    //   alors C doit avoir été déplacée AVANT que G ne soit rempli.
+    //
+    // `porteBloquee(G)` dit qu'une caisse occupe encore l'une de ces cases, donc que
+    // G n'est pas mûr. Sur le 16 : la caisse (10,6) n'a qu'une poussée utile — vers
+    // l'ouest, appui (11,6) — et (11,6) ne s'atteint qu'en descendant la colonne de
+    // buts x=12 ; donc (12,7), rang 0, n'est pas mûr tant que (10,6) est occupée.
+    //
+    // ⚠️ « UTILE » fait tout le travail : une poussée dont la DESTINATION est une case
+    // morte n'est pas une issue, c'est un suicide. Sans ce test la règle est muette
+    // sur le 16 — la caisse (10,6) peut aussi être poussée vers l'est, appui (9,6)
+    // trivialement atteignable, mais elle atterrit en (11,6) d'où rien ne ressort.
+    //
+    // ⚠️ N'EST PAS UN ÉLAGAGE et ne doit jamais le devenir : c'est de l'ORDONNANCEMENT
+    // (§6.2, 2026-07-30 — la précédence par paires, prise pour un test de mort, a fait
+    // 9 niveaux sur 10 en faute au juge `fp`). Ici elle ne fait que retarder un but.
+    //
+    // ⚠️ Relaxation OPTIMISTE (le BFS de marche ignore les autres caisses) : une
+    // contrainte est une PREUVE, un silence ne promet rien. Mesuré à sa création :
+    // 0 contrainte sur les 15 résolus, 2 sur 18 non résolus (16 et 30).
+    bool porteBloquee(int idxBut) const;
+    // Rang de remplissage du but 'idxBut' dans `ordreButs` (l'inverse de celui-ci).
+    int rangDuBut(int idxBut) const { return rangDeBut.at(idxBut); }
     // Champ de distances vers le BUT ACTIF, SPARSE : une valeur uniquement sur
     // les caisses réellement posées (leur dCur) et sur celles de leurs cases
     // voisines vers lesquelles une poussée est LÉGALE dans l'état courant
@@ -189,6 +309,15 @@ public:
     // humain (getZoneJoueur() + un balayage de 'size' cases), jamais dans le
     // solveur.
     QVector<int> champDistanceButActif() const;
+    // Champ de distance BRUT vers 'indexBut' : distanceParBut[but][case][région
+    // du joueur COURANT vis-à-vis de cette case], sur TOUTES les cases non-mur.
+    // C'est la table précalculée telle quelle, sans le filtre de jouabilité de
+    // champDistanceButActif() ci-dessus — donc le trajet que la macro CROIT
+    // devoir suivre, y compris là où aucun coup légal ne l'y mène.
+    // Lire les deux ensemble est le seul moyen de séparer « la table se trompe »
+    // de « la table a raison mais la descente monotone ne sait pas l'exécuter ».
+    // Accesseur de mesure, comme getOrdreButs() : jamais appelé par le solveur.
+    QVector<int> champDistanceBrut(int indexBut) const;
     // Trajet COMPLET de la goal macro pour la caisse 'idxCaisse' vers le but
     // actif : rejoue macroVersBut sur une COPIE (ne modifie pas *this) et
     // rend un champ sparse, une valeur (distance restante) sur CHAQUE case
@@ -207,6 +336,25 @@ public:
     // exploration bornée (budget de nœuds) sur des copies jetables ; à
     // n'appeler que pour l'affichage humain, jamais dans le solveur.
     QVector<bool> arbreMacro(int idxCaisse, qint64 budgetNoeuds = 5000) const;
+    // POURQUOI LA MACRO NE DÉMARRE PAS (§6.2, 2026-08-01). macroPeutDemarrer rend
+    // un booléen ; le journal du mode hybride confondait donc sous « ECHEC AU
+    // PAS 0 » deux causes que rien ne permettait de départager (29 des 55 clics
+    // droits de la campagne) :
+    //   - le JOUEUR est du mauvais côté : une direction ferait bien baisser la
+    //     distance, mais l'appui n'est pas dans sa zone ;
+    //   - il faudrait un DÉTOUR non-monotone : aucune direction ne baisse la
+    //     distance, où que le joueur se place. La descente est strictement
+    //     décroissante (avanceVersBut), donc elle ne sait pas le faire.
+    // La distinction est obtenue en RELÂCHANT la seule condition de zone — on
+    // rappelle avanceVersBut avec une zone totale. Aucune logique dupliquée :
+    // c'est le même exemplaire unique de la condition de descente.
+    // 'dirsAppui' reçoit, pour Pas0JoueurMauvaisCote, les couples (direction,
+    // case d'appui) en cause — l'appelant les nomme, Game ne le fait pas.
+    // Affichage humain uniquement, jamais dans le solveur.
+    enum ECausePas0 { Pas0Demarre, Pas0DejaSurBut, Pas0HorsRegion,
+                      Pas0ButInatteignable, Pas0JoueurMauvaisCote, Pas0DetourRequis };
+    ECausePas0 diagnosticPas0(int idxCaisse, int indexBut, const QVector<bool>& zone,
+                              QVector<QPair<int,int>>* dirsAppui = nullptr) const;
     // GOAL MACRO (§10.5) : pousse la caisse en 'idxCaisse' jusqu'au but d'index
     // 'indexBut', le long de son trajet solo, en vérifiant à CHAQUE pas que la
     // poussée est réellement jouable dans l'état courant (case d'arrivée libre,
@@ -468,6 +616,17 @@ private:
     int nbDep = 0;
     int nbDepCaisse = 0;
     int numNiveau = 1;
+    // ORDRE DYNAMIQUE (cf. butActif). `butCourant` est un CACHE de jalon, pas un état
+    // de jeu : d'où `mutable`, pour que butActif() reste const comme tous ses appelants.
+    // ⚠️ Les DEUX doivent être copiés dans les ctors de copie/déplacement (piège §7) —
+    // sans `butCourant`, chaque état rechoisirait son but, et la cadence au jalon
+    // (nbButs fois par chemin) redeviendrait une passe distanceLivraison PAR ÉTAT.
+    bool ordreDynamique = false;
+    // cf. setOrdreLookahead. Copié dans les ctors de copie/déplacement (§7).
+    bool ordreLookahead = false;
+    // Exemplaire unique de l'installation de l'ordre (repli rebours compris).
+    void installeOrdreParPrecedence();
+    mutable int butCourant = -1;
     int nbCaisses = 0;
     bool gagne = false;
     bool perdu = false;
@@ -503,6 +662,20 @@ private:
     // poussée depuis la caisse la plus proche. Statique, partagé par COW.
     QVector<int> ordreButs;
 
+    // LOI DE L'ORDRE (cf. caseMorteLoi) : mortesLoi[BUT * size + CASE], et
+    // rangDeBut[BUT] = rang de ce but dans ordreButs (l'inverse de celui-ci).
+    // ⚠️ Une seule table PLATE, pas un QVector<QVector<bool>> : le solveur copie
+    // Game par candidate, et un vecteur de vecteurs coûterait nbButs incréments de
+    // compteur par copie là où la table plate n'en coûte qu'un (COW).
+    QVector<bool> mortesLoi;
+    QVector<int>  rangDeBut;
+
+    // PRÉCÉDENCE CAISSE → BUT (cf. porteBloquee) : les cases à dégager avant chaque
+    // but, en CSR — `porteCases` concaténées, `porteDebut` les offsets (nbButs+1).
+    // Deux vecteurs plats et non un vecteur de vecteurs : même raison que mortesLoi,
+    // le solveur copie Game par candidate.
+    QVector<int> porteCases, porteDebut;
+
     bool move(EDirection dir);
     bool moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction);
     void checkVictoire();
@@ -512,6 +685,8 @@ private:
     short getMinIdx(const QVector<bool>& zone) const;
     bool isLibre(int idx) const;
     void calculCaseMorte();
+    void calculCasesMortesLoi();
+    void calculPorteRequis();
     // Test de gel : une caisse est gelée si elle est bloquée sur LES DEUX axes.
     // 'enCours' est la garde de récursion (cf. game.cpp).
     bool caisseGelee(int idxCaisse, QVector<bool>& enCours) const;
@@ -533,6 +708,19 @@ QVector<int> distanceLivraison(const QVector<bool>& bloque) const;
 // PRÉCÉDENCE GLOBALE (§6.2 famille B) : requis[B] = les buts qui doivent être
 // remplis AVANT B, parce que sans eux plus aucune caisse n'atteint B. Statique.
 QVector<QVector<int>> precedenceGlobale() const;
+
+public:
+// Le fichier `ordre_niveau_XXXX.txt` du répertoire courant s'il existe, sinon "".
+// Injecte un ordre de remplissage à la main DANS L'APP (une variable d'environnement
+// n'y arrive pas, §7), pour le jouer en mode hybride et voir où il coince.
+// ⚠️ OUTIL DE CHANTIER, à retirer avec la campagne hybride.
+static QString cheminOrdreInjecte(int numNiveau);
+private:
+
+// LES SALLES : composantes connexes des cases-buts en 4-connexité (cf. game.cpp).
+// salle[b] = index de la salle du but b. Sert au groupement salle par salle du tri
+// topologique — la macro ne peut pas enchaîner si l'ordre saute d'une salle à l'autre.
+QVector<int> sallesDeButs() const;
 
 // Ordre de remplissage déduit de la PRÉCÉDENCE DE LIVRAISON (§6.2, 2026-07-20) :
 // glouton avant + garde anti-échouage. Rend une permutation des indices de buts.

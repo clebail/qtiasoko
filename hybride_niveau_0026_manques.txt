@@ -1,0 +1,154 @@
+
+=== niveau 26 — partie du 2026-08-01 19:18:31 ===
+[manque] SIGNALE (7,7) | but actif (9,2) rang 3/13
+[manque]   cause : DESCENTE BLOQUEE en (9,4), il restait 2 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    #######       
+[manque]    #  #  #####   
+[manque]   ##  #$ #..*### 
+[manque]   #  $#  #...  # 
+[manque]   # $ #   ...  # 
+[manque]   #  $#  #**. .# 
+[manque]   #   #  ########
+[manque]   ##$  $ $ @  $ #
+[manque]    #  #   $ #   #
+[manque]    ######  ## $ #
+[manque]         #      ##
+[manque]         ######## 
+[manque] SIGNALE (12,7) | but actif (8,2) rang 4/13
+[manque]   cause : DESCENTE BLOQUEE en (9,4), il restait 3 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    #######       
+[manque]    #  #  #####   
+[manque]   ##  #$ #.**### 
+[manque]   #  $#  #...  # 
+[manque]   # $ #   ...  # 
+[manque]   #  $#  #**. .# 
+[manque]   #   #  ########
+[manque]   ##$  $      $@#
+[manque]    #  #   $ #   #
+[manque]    ######  ## $ #
+[manque]         #      ##
+[manque]         ######## 
+[manque] SIGNALE (8,8) | but actif (8,3) rang 5/13
+[manque]   cause : DESCENTE BLOQUEE en (9,4), il restait 2 de distance (2 branches essayees)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    #######       
+[manque]    #  #  #####   
+[manque]   ##  #$ #***### 
+[manque]   #  $#  #...  # 
+[manque]   # $ #   ...  # 
+[manque]   #  $#  #**. .# 
+[manque]   #   #  ########
+[manque]   ##$  $        #
+[manque]    #  #   $ #   #
+[manque]    ###### @## $ #
+[manque]         #      ##
+[manque]         ######## 
+[manque] SIGNALE (12,9) | but actif (9,3) rang 6/13
+[manque]   cause : DESCENTE BLOQUEE en (9,4), il restait 1 de distance (3 branches essayees)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    #######       
+[manque]    #  #  #####   
+[manque]   ##  #$ #***### 
+[manque]   #  $#  #*..  # 
+[manque]   # $ #   ...  # 
+[manque]   #  $#  #**. .# 
+[manque]   #   #  ########
+[manque]   ##$  $        #
+[manque]    #  #     #   #
+[manque]    ######  ## $ #
+[manque]         #     @##
+[manque]         ######## 
+
+=== niveau 26 — partie du 2026-08-01 19:26:05 ===
+[manque] SIGNALE (7,8) | but actif (9,2) rang 3/13
+[manque]   cause : DESCENTE BLOQUEE en (9,4), il restait 2 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    #######       
+[manque]    #  #  #####   
+[manque]   ##  #$ #..*### 
+[manque]   #  $#  #...  # 
+[manque]   # $ #   ...  # 
+[manque]   #  $#  #**. .# 
+[manque]   #   #$ ########
+[manque]   ##$           #
+[manque]    #  #  $  # $ #
+[manque]    ######@$##$  #
+[manque]         #      ##
+[manque]         ######## 
+[manque] SIGNALE (12,8) | but actif (8,2) rang 4/13
+[manque]   cause : DESCENTE BLOQUEE en (9,4), il restait 3 de distance (2 branches essayees)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    #######       
+[manque]    #  #  #####   
+[manque]   ##  #$ #.**### 
+[manque]   #  $#  #...  # 
+[manque]   # $ #   ...  # 
+[manque]   #  $#  #**. .# 
+[manque]   #   #$ ########
+[manque]   ##$           #
+[manque]    #  #     # $ #
+[manque]    ###### $##$@ #
+[manque]         #      ##
+[manque]         ######## 
+[manque] SIGNALE (8,9) | but actif (8,3) rang 5/13
+[manque]   cause : DESCENTE BLOQUEE en (9,4), il restait 2 de distance (2 branches essayees)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    #######       
+[manque]    #  #  #####   
+[manque]   ##  #$ #***### 
+[manque]   #  $#  #...  # 
+[manque]   # $ #   ...  # 
+[manque]   #  $#  #**. .# 
+[manque]   #   #$ ########
+[manque]   ##$           #
+[manque]    #  #     #   #
+[manque]    ###### $##$  #
+[manque]         # @    ##
+[manque]         ######## 
+[manque] SIGNALE (11,9) | but actif (9,3) rang 6/13
+[manque]   cause : DESCENTE BLOQUEE en (9,4), il restait 1 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    #######       
+[manque]    #  #  #####   
+[manque]   ##  #$ #***### 
+[manque]   #  $#  #*..  # 
+[manque]   # $ #   ...  # 
+[manque]   #  $#  #**. .# 
+[manque]   #   #$ ########
+[manque]   ##$           #
+[manque]    #  #     #   #
+[manque]    ######  ##$  #
+[manque]         #    @ ##
+[manque]         ######## 
+[manque] SIGNALE (3,7) | but actif (10,3) rang 7/13
+[manque]   cause : DESCENTE BLOQUEE en (10,4), il restait 1 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    #######       
+[manque]    #  #  #####   
+[manque]   ## $#$ #***### 
+[manque]   #   #  #**.  # 
+[manque]   # $$#   ...  # 
+[manque]   #   #  #**. .# 
+[manque]   #   #$ ########
+[manque]   ##@$          #
+[manque]    #  #     #   #
+[manque]    ######  ##   #
+[manque]         #      ##
+[manque]         ######## 
+[manque] SIGNALE (3,4) | but actif (10,5) rang 8/13
+[manque]   cause : DESCENTE BLOQUEE en (10,4), il restait 1 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    #######       
+[manque]    #  #  #####   
+[manque]   ## $#$ #***### 
+[manque]   #  @#  #***  # 
+[manque]   # $$#   ...  # 
+[manque]   #   #  #**. .# 
+[manque]   #   #$ ########
+[manque]   ##            #
+[manque]    #  #     #   #
+[manque]    ######  ##   #
+[manque]         #      ##
+[manque]         ######## 

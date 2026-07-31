@@ -1,0 +1,4 @@
+
+=== niveau 21 — partie du 2026-08-01 18:22:14 ===
+[hybride] ordre de remplissage calcule : 0:(10,10) 1:(11,12) 2:(11,11) 3:(12,12) 4:(12,11) 5:(11,10) 6:(13,12) 7:(13,11) 8:(13,10) 9:(13,9) 10:(12,9) 11:(11,9) 12:(10,9)
+[hybride] posees 0/13 | but actif (10,10) rang 0/13 | 0 macro jouable -> POUSSEES SIMPLES

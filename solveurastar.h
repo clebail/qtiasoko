@@ -60,6 +60,65 @@ struct StatsDeltaF {
 StatsDeltaF& statsDeltaF();
 #endif
 
+// Corral : ACTIF par défaut (promu, cf. §6.1) — les DEUX étages, le corral
+// unitaire (motifs 1 et 2) et le corral-N (strip + A* borné). Trappe `CORRAL=0`
+// pour tout couper — réservée aux OUTILS DE MESURE (`fp`, `mort`) qui doivent
+// collecter/rejouer des états SANS que le corral les élague d'abord, sinon le
+// juge est aveugle aux faux positifs qu'il est censé chercher. La prod ne touche
+// jamais cette variable (défaut = actif).
+//
+// Fonction et non variable de fichier : le mode hybride en a besoin depuis
+// mainwindow.cpp (cf. CORRAL_BUDGET ci-dessous). Lue une seule fois.
+inline bool corralActif() {
+    static const bool actif = (qgetenv("CORRAL") != "0");
+    return actif;
+}
+
+// Budget du sous-solve d'enclos (corral-N). Balayage mesuré le 2026-07-27 : le
+// gain d'états SATURE dès ~150, tandis que le coût des sous-solves explose (×6)
+// au-delà — en « inconnus » qui ne prouvent rien et qu'on paie plein tarif.
+// Figé après verdict, comme les autres réglages promus.
+//
+// Dans l'en-tête et non dans le .cpp : le mode hybride rejoue l'enfilage du
+// solveur dans l'UI (mainwindow.cpp, mesureRangCoup) pour classer le coup joué à
+// la main. Deux copies de ce 150 dériveraient sans que rien ne le signale, et le
+// rang mesuré ne vaudrait plus pour le solveur réel. Exemplaire unique.
+static constexpr int CORRAL_BUDGET = 150;
+
+// ── PAQUET NON LIVRABLE — INTERRUPTEUR DE CHANTIER (2026-08-03) ───────────────
+// ⚠️ Celui-ci AJOUTE un élagage, il n'en coupe pas — l'inverse de CORRAL et de
+// l'ancien CORRAL_N. C'est la direction dangereuse du §7 (« un défaut coupé se
+// voit tout de suite, un défaut manquant ne se voit jamais ») : mesurer avec
+// PAQUET=1 en croyant lire le défaut fausserait tout. Deux garde-fous :
+//   - défaut = INACTIF, donc l'app et le bench ne bougent pas d'un état ;
+//   - quand il est actif il le DIT sur stderr, une fois, au premier appel.
+// À retirer avec le verdict : soit promu en dur, soit supprimé.
+//
+// Le test : le paquet 8-connexe de caisses HORS BUT contenant la caisse qui vient
+// de bouger, toutes les autres caisses retirées, tous les buts conservés. File
+// vidée sous budget ⇒ ces caisses-là ne peuvent pas toutes être posées ⇒ l'état
+// est MORT. Sound par relaxation (moins de caisses = joueur plus libre) + exhaustion.
+//
+// Pourquoi tester le seul paquet de 'arrivee' suffit : le verdict d'un paquet ne
+// dépend QUE de ses caisses (les autres sont retirées). Il ne peut donc changer
+// que si l'une d'elles bouge — et celle qui bouge, c'est 'arrivee'. Un paquet
+// scindé par un départ ne donne que des SOUS-ensembles d'un paquet déjà jugé
+// vivant, qui restent vivants (retirer une caisse ne fait que libérer).
+inline bool paquetActif() {
+    static const bool actif = (qgetenv("PAQUET").toInt() == 1);
+    return actif;
+}
+// Budget du sous-solve de paquet. RÉGLABLE le temps du balayage (2026-08-03),
+// exactement comme CORRAL_BUDGET l'a été avant d'être figé à 150 le 2026-07-27 :
+// on ne fige un réglage qu'après l'avoir balayé, jamais sur une intuition.
+// ⚠️ À REFIGER en constante dès le verdict — un défaut qui dépend d'une variable
+// d'environnement est le piège du §7.
+inline int paquetBudget() {
+    static const int b = qgetenv("PAQUET_BUDGET").isEmpty() ? 2000
+                                                            : qgetenv("PAQUET_BUDGET").toInt();
+    return b;
+}
+
 // A* sur les poussées : f = g + poids * h.
 //
 // poids = 1 : A* classique. h est admissible ET cohérente, donc la solution est
@@ -113,9 +172,39 @@ public:
     // une recherche gloutonne bornée (best-first sur h seul) avant de revenir à
     // l'A* normal. Renonce à l'optimalité — mesuré : +2 poussées sur le 4, l'optimum
     // exact sur 2/3/5/6/7/9/17.
+    // 'ordreCoins' (régime d'essai, §6.2, 2026-08-03 — idée utilisateur) : une
+    // caisse ne peut PAS se poser sur un but EN COIN dont le rang dépasse le but
+    // actif. Fondement, énoncé par l'utilisateur : un but pas encore à son tour
+    // n'est, du point de vue du solveur, que du SOL — et une caisse sur du sol en
+    // coin est un corner deadlock, le tout premier élagage du projet.
+    //
+    // POURQUOI SEULEMENT LES COINS, et c'est ce qui sauve le niveau 1. Le §4 a
+    // réfuté « interdire de remplir dans le désordre » : sur le 1, atteindre
+    // (17,6) exige de faire ÉTAPE sur (16,6), qui est un but — l'interdire rend
+    // le niveau insoluble. Mais **une case terminale ne peut pas être une case de
+    // transit** (aucune poussée n'en sort, donc rien ne la traverse) : restreindre
+    // aux coins ne peut donc JAMAIS casser un acheminement. Mesuré : 98 buts
+    // terminaux sur 511 (19,2 %), dont 68 de rang > 0 ; sur le 1 ce sont (17,6)
+    // rang 0 — actif d'emblée — et (17,8) rang 2, où rien ne transite.
+    //
+    // ⚠️ CE N'EST PAS UN ÉLAGAGE PROUVÉ. Il interdit de FINIR une caisse sur un
+    // but en coin avant son tour, ce qui reste légal en Sokoban : la règle repose
+    // sur la justesse de l'ORDRE, pas sur la géométrie. D'où le régime séparé —
+    // le canari des résolus ne doit jamais en dépendre. Même statut que le
+    // plongeon et le pondéré.
+    // ⚠️ Sans effet sur 3 niveaux (0, 13, 29) : aucun but en coin.
+    //
+    // 'loiOrdre' (régime d'essai, §6.2, 2026-08-03) : LA LOI DE L'ORDRE, la
+    // formulation qui a survécu là où celle des coins ci-dessus tombe (le niveau 6
+    // y passe de résolu à AUCUNE). Une caisse ne peut pas se tenir sur une case
+    // MORTE VUE DU BUT ACTIF — les autres buts étant du sol, et l'alignement avec
+    // l'actif rendant la case au sol. La règle et sa portée sont dans game.h ; ici
+    // ne vit que son câblage. Même statut que 'ordreCoins' : régime séparé, jamais
+    // le défaut, le canari des résolus ne doit pas en dépendre.
     explicit SolveurAStar(const Game& etatDepart, int poids = 1, bool macro = false,
                           QObject* parent = nullptr, bool macroCouplage = false,
-                          bool plongeon = false);
+                          bool plongeon = false, bool ordreCoins = false,
+                          bool loiOrdre = false);
 
 protected:
     void run() override;
@@ -127,12 +216,34 @@ private:
     // GAGNANT dans 'noeuds' (utilisable tel quel par reconstruire()), ou -1 si le
     // budget est épuisé sans victoire — auquel cas 'noeuds' est rendu à sa taille
     // d'avant, pour que l'échec ne laisse aucune trace.
+    // ⚠️ 'cachePaquet' passé comme 'cacheEnclos' et pour la MÊME raison : le
+    // plongeon est un SECOND point d'enfilage, et tout élagage câblé au premier
+    // seul le laisse explorer des états déjà prouvés morts. Constaté en direct le
+    // 2026-08-03 — un record 7/15 du niveau 16 exporté depuis l'UI avec PAQUET=1
+    // portait un paquet mort que la recherche principale aurait refusé.
     int plonge(const Game& etatDepart, int gDepart, int idxNoeudDepart,
-               QHash<QByteArray,Game::VerdictEnclos>& cacheEnclos, int budget, qint64* etatsOut);
+               QHash<QByteArray,Game::VerdictEnclos>& cacheEnclos,
+               QHash<QByteArray,int>& cachePaquet, int budget, qint64* etatsOut);
 
     const int poids;
     const bool macro;
     const bool macroCouplage;
+    const bool ordreCoins;
+    const bool loiOrdre;
+    // Tables remplies une fois au début de run() depuis l'API publique de Game :
+    // rien n'est ajouté à Game, rien n'est maintenu en double.
+    // rangDeCase[cell] = rang de remplissage du but occupant cette case, -1 sinon.
+    // PARTAGÉE par 'ordreCoins' et 'loiOrdre' : les deux ont besoin de comparer le
+    // rang d'une case au rang du but actif, et deux copies dériveraient (§7).
+    QVector<int>  rangDeCase;
+    QVector<bool> coinDeCase;
+    void construitRangDeCase(const Game& g);
+    void construitTablesCoins(const Game& g);
+    bool coinTropTot(const Game& e, int arrivee) const;
+    // LOI DE L'ORDRE : vrai si une caisse se tient sur une case morte vue du but
+    // actif. Appelée aux DEUX points d'enfilage — la leçon du 2026-08-03 sur le
+    // paquet, où le plongeon explorait ce que la recherche refusait.
+    bool loiTropTot(const Game& e, int arrivee) const;
     const bool plongeon;
 };
 

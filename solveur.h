@@ -48,7 +48,50 @@ public:
         // couplage qui l'amène à 11/14 (le macro seul plafonne à 8/14), et le 11/14
         // est prouvé complétable (fixture level0194, 9 états macro). Le plongeon a
         // donc une cible réelle, avec un budget colossal vu le travail déjà consenti.
-        AstarMacroCouplagePlongeon
+        AstarMacroCouplagePlongeon,
+        // Idem + ORDRE DYNAMIQUE (§6.2, chantier 2026-07-31). `butActif()` ne rend plus
+        // le premier but non rempli de l'ordre statique, mais le premier qui soit encore
+        // LIVRABLE depuis l'état courant. Motivation : trois niveaux (13, 18, 22) ont un
+        // ordre MURÉ calculé au chargement, et le 18 prouve qu'aucun budget de recherche
+        // n'y changera rien — aucun ordre sain complet n'existe dans ce modèle statique.
+        // Décider le but suivant DEPUIS L'ÉTAT fait disparaître la question. Régime
+        // d'ESSAI, jamais le défaut : le canari reste sur les régimes existants.
+        AstarMacroCouplagePlongeonOrdre,
+        // Régime d'essai (§6.2, 2026-08-03 — idée utilisateur) : ordre strict sur
+        // les seuls buts EN COIN. Cf. solveurastar.h pour le fondement et la limite.
+        AstarMacroCouplagePlongeonCoins,
+        // Régime d'essai (§6.2, 2026-08-03) : LA LOI DE L'ORDRE — cases mortes
+        // recalculées but par but, exemptées par alignement. C'est la formulation
+        // qui a survécu au juge là où celle des coins ci-dessus perd le niveau 6.
+        // Règle dans game.h, câblage dans solveurastar.h.
+        AstarMacroCouplagePlongeonLoi,
+        // ❌ RÉGIME RÉFUTÉ LE JOUR MÊME DE SA CRÉATION (2026-08-04) — conservé pour
+        // qu'il ne soit pas reproposé. Les deux moitiés du travail du jour ensemble :
+        // ordre dynamique + contrainte de porte (QUAND remplir) ET loi de l'ordre +
+        // gel hors tour (OÙ ne pas gaspiller ses caisses pendant ce temps).
+        //
+        // Canari : **les niveaux 5, 6 et 17 passent de résolus à `AUCUNE`**, le 2
+        // dérive de 131 à 141 poussées et le 7 de 88 à 92. Chacune des deux moitiés
+        // prise SEULE est saine (la loi seule ne perd que le 6, pour une raison
+        // documentée ; l'ordre dynamique seul résout les 8).
+        //
+        // La cause, mesurée : sur le 17, **233 prunes dont 2 seulement de gel** ; sur
+        // le 5, 6 565 dont 9. C'est la LOI qui coupe. Et c'est logique après coup —
+        // ses cases mortes sont indexées par le but ACTIF, or la loi n'a jamais été
+        // validée que contre l'ordre STATIQUE (le gabarit du 16 a été dessiné avec ces
+        // rangs-là, `juge_loi.py` a jugé avec eux). L'ordre dynamique rechoisit depuis
+        // l'état courant et peut revenir en arrière : une case légitimement utilisée
+        // comme garage devient morte dès que le but actif change. **Le « 0 faux
+        // positif » de la loi ne se transporte pas à un ordre qui bouge.**
+        AstarMacroCouplagePlongeonOrdreLoi,
+        // ORDRE-LOOK (§6.2, 2026-08-08) : au rang 0 du calcul de l'ordre, et parmi
+        // les buts de la SALLE que la règle existante a élue, préférer celui qui
+        // laisse le plus de candidats SÛRS au rang suivant. Régime SÉPARÉ, jamais le
+        // défaut — il fait tomber le 12 sans injection (2 097 523 états, l'ordre
+        // régénéré est exactement l'ordre humain de juillet) mais fait DÉCROCHER le
+        // 32, qui est résolu. Tout le reste est inchangé : 26 ordres sur 35 sont
+        // bit-à-bit identiques, donc le canari est préservé par construction.
+        AstarMacroCouplagePlongeonLook
     };
 
     struct SType {
@@ -85,6 +128,17 @@ signals:
     // AStar de marche de reconstruire() est négligeable.
     void nouveauMaxCaisses(Game etatMax, int nbRangees, QList<Game::EDirection> chemin);
 
+public:
+    // Offset de la case d'APPUI relative à la caisse — l'opposé du vecteur de
+    // déplacement, pas le vecteur lui-même : pour pousser vers 'd', le joueur se
+    // tient derrière la caisse.
+    //
+    // PUBLIC depuis le mode hybride (2026-08-01) : l'UI descend elle aussi des
+    // poussées en coups de marche (MainWindow::joueMacro, même recette que
+    // reconstruire()). Exemplaire unique — recopier cette table ailleurs, c'est
+    // se garantir qu'un jour les deux ne diront plus la même chose.
+    static const Game::SDirection appuis[NB_DIRECTION];
+
 protected:
     void run() override = 0;
 
@@ -117,11 +171,6 @@ protected:
         quint16 idxCaisse;
         quint8 dir;
     };
-
-    // Offset de la case d'APPUI relative à la caisse — l'opposé du vecteur de
-    // déplacement, pas le vecteur lui-même : pour pousser vers 'd', le joueur se
-    // tient derrière la caisse.
-    static const Game::SDirection appuis[NB_DIRECTION];
 
     Game depart;
     QVector<Noeud> noeuds;

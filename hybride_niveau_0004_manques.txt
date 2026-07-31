@@ -1,0 +1,106 @@
+
+=== niveau 4 — partie du 2026-08-01 05:16:30 ===
+[manque] SIGNALE (6,6) | but actif (16,4) rang 10/20
+[manque]   cause : DESCENTE BLOQUEE en (3,5), il restait 16 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]              ########
+[manque]              #  .***#
+[manque]   ############  .***#
+[manque]   #    #        .***#
+[manque]   #    #     #@ ...*#
+[manque]   #          #  ....#
+[manque]   #    #$    ########
+[manque]   #  $ #     #       
+[manque]   ## #########       
+[manque]   #    #    #        
+[manque]   # $     $ ##       
+[manque]   # $$$#$$$  #       
+[manque]   #    #    ##       
+[manque]   ###########        
+[manque] SIGNALE (3,5) | but actif (16,4) rang 10/20
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]              ########
+[manque]              #  .***#
+[manque]   ############  .***#
+[manque]   #    #        .***#
+[manque]   #    #     #  ...*#
+[manque]   #  $@      #  ....#
+[manque]   #    #     ########
+[manque]   #  $ #     #       
+[manque]   ## #########       
+[manque]   #    #    #        
+[manque]   # $     $ ##       
+[manque]   # $$$#$$$  #       
+[manque]   #    #    ##       
+[manque]   ###########        
+[manque] SIGNALE (2,11) | but actif (15,4) rang 11/20
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]              ########
+[manque]              #  .***#
+[manque]   ############  .***#
+[manque]   #    #        .***#
+[manque]   #    #     #  ..**#
+[manque]   #          #  ....#
+[manque]   #    #     ########
+[manque]   #  $ #     #       
+[manque]   ## #########       
+[manque]   #    #    #        
+[manque]   # @$    $ ##       
+[manque]   # $$$#$$$  #       
+[manque]   #    #    ##       
+[manque]   ###########        
+[manque] SIGNALE (4,11) | but actif (14,4) rang 18/20
+[manque]   cause : DESCENTE BLOQUEE en (7,10), il restait 25 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]              ########
+[manque]              #  ****#
+[manque]   ############  ****#
+[manque]   #    #       @****#
+[manque]   #    #     #  .***#
+[manque]   #          #  .***#
+[manque]   #    #     ########
+[manque]   #  $ #     #       
+[manque]   ## #########       
+[manque]   #    #    #        
+[manque]   #         ##       
+[manque]   #   $#     #       
+[manque]   #    #    ##       
+[manque]   ###########        
+[manque] SIGNALE (3,7) | but actif (14,4) rang 18/20
+[manque]   cause : DESCENTE BLOQUEE en (2,10), il restait 20 de distance (1 branche essayee)
+[manque] SIGNALE (2,10) | but actif (14,4) rang 18/20
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]              ########
+[manque]              #  ****#
+[manque]   ############  ****#
+[manque]   #    #        ****#
+[manque]   #    #     #  .***#
+[manque]   #          #  .***#
+[manque]   #    #     ########
+[manque]   #    #     #       
+[manque]   ## #########       
+[manque]   # @  #    #        
+[manque]   # $       ##       
+[manque]   #   $#     #       
+[manque]   #    #    ##       
+[manque]   ###########        
+[manque] SIGNALE (7,10) | but actif (14,5) rang 19/20
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]              ########
+[manque]              #  ****#
+[manque]   ############  ****#
+[manque]   #    #        ****#
+[manque]   #    #     #  ****#
+[manque]   #          #  .***#
+[manque]   #    #     ########
+[manque]   #    #     #       
+[manque]   ## #########       
+[manque]   #    #    #        
+[manque]   #     @$  ##       
+[manque]   #    #     #       
+[manque]   #    #    ##       
+[manque]   ###########        

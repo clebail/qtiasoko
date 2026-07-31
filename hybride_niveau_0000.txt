@@ -1,0 +1,12 @@
+
+=== niveau 0 — partie du 2026-08-01 05:11:39 ===
+[hybride] ordre de remplissage calcule : 0:(5,5) 1:(3,3) 2:(5,2)
+[hybride] posees 0/3 | but actif (5,5) rang 0/3 | 1 macro jouable : caisse (6,5) en 1 poussees (1 branche)
+
+=== niveau 0 — partie du 2026-08-01 05:52:11 ===
+[hybride] ordre de remplissage calcule : 0:(5,5) 1:(3,3) 2:(5,2)
+[hybride] posees 0/3 | but actif (5,5) rang 0/3 | 1 macro jouable : caisse (6,5) en 1 poussees (1 branche)
+
+=== niveau 0 — partie du 2026-08-01 06:07:04 ===
+[hybride] ordre de remplissage calcule : 0:(5,5) 1:(3,3) 2:(5,2)
+[hybride] posees 0/3 | but actif (5,5) rang 0/3 | 1 macro jouable : caisse (6,5) en 1 poussees (1 branche)

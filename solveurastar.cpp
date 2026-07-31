@@ -26,9 +26,118 @@ static bool compare(const SolveurAStar::SElement& a, const SolveurAStar::SElemen
 }
 
 SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, bool macro, QObject *parent,
-                           bool macroCouplage, bool plongeon)
+                           bool macroCouplage, bool plongeon, bool ordreCoins, bool loiOrdre)
     : Solveur(etatDepart, parent), poids(poids), macro(macro), macroCouplage(macroCouplage),
-      plongeon(plongeon) {
+      ordreCoins(ordreCoins), loiOrdre(loiOrdre), plongeon(plongeon) {
+}
+
+// rangDeCase[cell] : rang de remplissage du but occupant cette case, -1 si ce n'est
+// pas un but. Une seule table pour les deux régimes qui en ont besoin.
+void SolveurAStar::construitRangDeCase(const Game& g) {
+    if (!rangDeCase.isEmpty()) return;                  // déjà construite
+    rangDeCase.fill(-1, g.getLargeur() * g.getHauteur());
+    const QVector<int>& ordre = g.getOrdreButs();
+    for (int k = 0; k < ordre.size(); k++)
+        rangDeCase[g.getCaseBut(ordre[k])] = k;
+}
+
+// ── BUTS EN COIN (régime 'ordreCoins', cf. solveurastar.h) ────────────────────
+// Deux tables statiques, calculées UNE fois par solve depuis l'API publique de
+// Game (murs + ordreButs) : rien à ajouter dans Game, rien à maintenir en double.
+//   rangDeCase[cell]  : rang de remplissage du but occupant cette case, sinon -1
+//   coinDeCase[cell]  : ce but est-il TERMINAL (aucune poussée sortante) ?
+// « Terminal » se lit sur les murs seuls : pour sortir une caisse d'une case il
+// faut la case d'arrivée ET la case d'appui libres de mur, sur le même axe.
+void SolveurAStar::construitTablesCoins(const Game& g) {
+    const int L = g.getLargeur(), H = g.getHauteur(), N = L * H;
+    construitRangDeCase(g);
+    coinDeCase.fill(false, N);
+    const QVector<int>& ordre = g.getOrdreButs();
+    static const int dxx[4] = {1, -1, 0, 0}, dyy[4] = {0, 0, 1, -1};
+    for (int k = 0; k < ordre.size(); k++) {
+        const int cell = g.getCaseBut(ordre[k]);
+        const int x = cell % L, y = cell / L;
+        bool sortie = false;
+        for (int d = 0; d < 4 && !sortie; d++) {
+            const int ax = x + dxx[d], ay = y + dyy[d];    // arrivée de la caisse
+            const int bx = x - dxx[d], by = y - dyy[d];    // appui du joueur
+            if (ax < 0 || ax >= L || ay < 0 || ay >= H) continue;
+            if (bx < 0 || bx >= L || by < 0 || by >= H) continue;
+            if (g.getCase(ax + ay * L) != Level::tcMur && g.getCase(bx + by * L) != Level::tcMur)
+                sortie = true;
+        }
+        coinDeCase[cell] = !sortie;
+    }
+    int n = 0; for (bool b : coinDeCase) if (b) n++;
+    fprintf(stderr, "[COINS] regime ordreCoins ACTIF — %d buts en coin sur %d.\n",
+            n, (int)ordre.size());
+    fflush(stderr);
+}
+
+// Le test lui-même, aux DEUX points d'enfilage (le plongeon en est un — leçon du
+// 2026-08-03). Vrai = la poussée dépose une caisse sur un but en coin qui n'est
+// pas encore à son tour → on coupe.
+bool SolveurAStar::coinTropTot(const Game& e, int arrivee) const {
+    if (!ordreCoins || arrivee < 0) return false;
+    if (arrivee >= rangDeCase.size() || rangDeCase[arrivee] < 0) return false;
+    if (!coinDeCase[arrivee]) return false;
+    const int actif = e.butActif();
+    if (actif < 0) return false;                       // plus de but : état gagnant
+    const int cellActif = e.getCaseBut(actif);
+    return rangDeCase[arrivee] > rangDeCase[cellActif];
+}
+
+// ── LOI DE L'ORDRE (régime 'loiOrdre') ────────────────────────────────────────
+// Stats de chantier, mêmes raisons que StatsCorral/StatsPaquet : runtime, lues sans
+// recompiler. 'balayages' compte les passes complètes — c'est lui qui dit si le coût
+// est resté là où on l'a voulu.
+struct StatsLoi { qint64 enfilages = 0, prunes = 0, balayages = 0, gel = 0; };
+static StatsLoi& statsLoi() { static StatsLoi s; return s; }
+
+// Vrai = une caisse se tient sur une case morte vue du but actif → on coupe.
+//
+// QUELLES CAISSES SONT JUGÉES. Toutes, sans exception ici : l'exemption des buts
+// déjà remplis (« buts déjà remplis = obstacles ») est portée par la TABLE, qui les
+// rend vivants d'office. Elle a d'abord été écrite à cet endroit-ci, en double — le
+// juge du gabarit a montré que la table devait la porter de toute façon, sans quoi
+// l'overlay de l'UI ne montrait pas la même règle que le solveur appliquait. Un seul
+// exemplaire, dans game.cpp.
+//
+// POURQUOI ON NE BALAIE PAS TOUTES LES CAISSES À CHAQUE FOIS. Si le parent
+// satisfaisait déjà la règle, seule la caisse déplacée peut la violer — sauf si le
+// BUT ACTIF a changé, auquel cas toutes changent de juge d'un coup. Or l'actif ne
+// change que lorsqu'un but vient d'être rempli, c'est-à-dire quand la caisse arrivée
+// se pose sur un but. Ce test-là est local et gratuit, donc le balayage complet ne
+// se paie qu'une poignée de fois par chemin au lieu d'une fois par enfilage.
+bool SolveurAStar::loiTropTot(const Game& e, int arrivee) const {
+    if (!loiOrdre) return false;
+    const int actif = e.butActif();
+    if (actif < 0) return false;                        // plus de but : état gagnant
+    StatsLoi& s = statsLoi();
+    s.enfilages++;
+
+    auto condamne = [&](int cell) { return e.caseMorteLoi(actif, cell); };
+
+    if (arrivee >= 0 && condamne(arrivee)) { s.prunes++; return true; }
+
+    if (arrivee >= 0 && e.getCase(arrivee) == Level::tcGoalCaisse) {
+        s.balayages++;
+        const int N = e.getLargeur() * e.getHauteur();
+        for (int c = 0; c < N; c++) {
+            const Level::ETypeCase t = e.getCase(c);
+            if (t != Level::tcCaisse && t != Level::tcGoalCaisse) continue;
+            if (condamne(c)) { s.prunes++; return true; }
+        }
+    }
+
+    // SECONDE MOITIÉ DE LA LOI — le gel hors tour (cf. game.h). Testé à CHAQUE
+    // enfilage et pas seulement quand le but actif change : une caisse posée hors
+    // tour peut geler à tout moment, dès qu'une AUTRE caisse vient se coller à elle.
+    // C'est le cas du bloc 2×2 du 2026-08-04, dont les quatre caisses étaient libres
+    // une par une et mortes ensemble.
+    if (e.geleHorsTour(actif)) { s.gel++; s.prunes++; return true; }
+
+    return false;
 }
 
 #ifdef DUMP_DEV
@@ -90,19 +199,11 @@ StatsDeltaF& statsDeltaF() {
 // Interrupteur de mesure, à retirer avec le verdict.
 static const bool livraisonSurEnfants = (qgetenv("LIVRAISON").toInt() == 5);
 
-// Corral : ACTIF par défaut (promu, cf. §6.1) — les DEUX étages, le corral
-// unitaire (motifs 1 et 2) et le corral-N (strip + A* borné). Trappe `CORRAL=0`
-// pour tout couper — réservée aux OUTILS DE MESURE (`fp`, `mort`) qui doivent
-// collecter/rejouer des états SANS que le corral les élague d'abord, sinon le
-// juge est aveugle aux faux positifs qu'il est censé chercher. La prod ne touche
-// jamais cette variable (défaut = actif).
-static const bool corralActif = (qgetenv("CORRAL") != "0");
+// corralActif() : déclaré dans solveurastar.h, même raison que CORRAL_BUDGET.
 
-// Budget du sous-solve d'enclos (corral-N). Balayage mesuré le 2026-07-27 : le
-// gain d'états SATURE dès ~150, tandis que le coût des sous-solves explose (×6)
-// au-delà — en « inconnus » qui ne prouvent rien et qu'on paie plein tarif.
-// Figé après verdict, comme les autres réglages promus.
-static const int CORRAL_BUDGET = 150;
+// CORRAL_BUDGET : déclaré dans solveurastar.h depuis le 2026-08-01 — le mode
+// hybride rejoue l'enfilage dans l'UI et doit passer le MÊME budget, sinon les
+// deux régimes divergeraient en silence (§7).
 
 // Stats du corral-N, agrégées sur tout le solve puis imprimées sur stderr en fin
 // de run(). Runtime, pas de #ifdef : la fraction de durs prouvés morts est ce qui
@@ -125,7 +226,60 @@ struct StatsCorral {
     qint64 arbitreStates = 0;
 };
 static StatsCorral& statsCorral() { static StatsCorral s; return s; }
+
+// Stats du PAQUET NON LIVRABLE (chantier). Mêmes raisons que StatsCorral :
+// runtime, imprimées en fin de run(), lues sans recompiler.
+struct StatsPaquet {
+    qint64 enfilages = 0, testes = 0;
+    qint64 morts = 0, vivants = 0, inconnus = 0;
+    qint64 cacheHits = 0, solveStates = 0, prunes = 0;
+};
+static StatsPaquet& statsPaquet() { static StatsPaquet s; return s; }
+
+// Le paquet 8-connexe de caisses HORS BUT contenant 'depart'. Rendu TRIÉ : c'est
+// la clé de mémoïsation, et deux ordres différents casseraient le cache en silence.
+// Vide si 'depart' ne porte pas une caisse hors but (caisse posée sur un but : elle
+// est légitimement immobile, cf. checkDefaite qui ne teste que les tcCaisse).
+static void paquetHorsBut(const Game& g, int depart, QVarLengthArray<int, 32>& out) {
+    out.clear();
+    if (g.getCase(depart) != Level::tcCaisse) return;
+    const int L = g.getLargeur(), H = g.getHauteur();
+    QVarLengthArray<int, 32> pile;
+    pile.append(depart); out.append(depart);
+    while (!pile.isEmpty()) {
+        const int i = pile.last(); pile.removeLast();
+        const int x = i % L, y = i / L;
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++) {
+                if (!dx && !dy) continue;
+                const int nx = x + dx, ny = y + dy;
+                if (nx < 0 || nx >= L || ny < 0 || ny >= H) continue;
+                const int n = nx + ny * L;
+                if (g.getCase(n) != Level::tcCaisse) continue;
+                if (out.contains(n)) continue;      // out reste petit (≤ nbCaisses)
+                out.append(n); pile.append(n);
+            }
+    }
+    std::sort(out.begin(), out.end());
+}
+static void imprimeStatsPaquet() {
+    const StatsPaquet& s = statsPaquet();
+    if (!s.enfilages) return;
+    fprintf(stderr,
+        "[PAQUET] ⚠️ ELAGAGE DE CHANTIER ACTIF (PAQUET=1) — ce run n'est PAS le defaut.\n"
+        "   enfilages=%lld  testes=%lld (%.1f%%)  |  MORTS=%lld  vivants=%lld  inconnus=%lld\n"
+        "   PRUNES=%lld  |  cache-hits=%lld (amortissement %.1fx)  etats de sous-solve=%lld\n",
+        (long long)s.enfilages, (long long)s.testes,
+        100.0 * (double)s.testes / (double)s.enfilages,
+        (long long)s.morts, (long long)s.vivants, (long long)s.inconnus,
+        (long long)s.prunes, (long long)s.cacheHits,
+        (s.testes - s.cacheHits) ? (double)s.testes / (double)(s.testes - s.cacheHits) : 0.0,
+        (long long)s.solveStates);
+    fflush(stderr);
+}
+
 static void imprimeStatsCorral() {
+    imprimeStatsPaquet();
     const StatsCorral& s = statsCorral();
     if (!s.enfilages) return;   // corral coupé (CORRAL=0), ou run sans enfilage
     fprintf(stderr,
@@ -249,7 +403,8 @@ static void imprimeStatsCorral() {
 static const int PLONGEON_DIVISEUR = 50;
 
 int SolveurAStar::plonge(const Game& etatDepart, int gDepart, int idxNoeudDepart,
-                         QHash<QByteArray,Game::VerdictEnclos>& cacheEnclos, int budget, qint64* etatsOut) {
+                         QHash<QByteArray,Game::VerdictEnclos>& cacheEnclos,
+                         QHash<QByteArray,int>& cachePaquet, int budget, qint64* etatsOut) {
     // Un échec ne doit RIEN laisser derrière lui : on rend 'noeuds' à sa taille
     // d'avant. Sans ça, chaque plongeon raté enflerait définitivement l'arbre de
     // reconstruction de la recherche principale.
@@ -286,12 +441,38 @@ int SolveurAStar::plonge(const Game& etatDepart, int gDepart, int idxNoeudDepart
     auto ajoute = [&](Game& c, int gC, const QVector<QPair<int,int>>& chaine, int parent) {
         const int arrivee = chaine.isEmpty() ? -1
             : c.caseApres(chaine.last().first, (Game::EDirection)chaine.last().second);
-        if (corralActif && arrivee >= 0) {
+        if (corralActif() && arrivee >= 0) {
             if (c.corralUnitaireMort(arrivee)) return;
             c.getZoneJoueur(zoneEnfant);
             const Game::EnclosInfo inf = c.detecteEnclosArrivee(arrivee, zoneEnfant, visiteCorral,
                                                                 &cacheEnclos, CORRAL_BUDGET);
             if (inf.dursMorts > 0) return;
+        }
+        if (coinTropTot(c, arrivee)) return;
+        if (loiTropTot(c, arrivee)) return;
+        // PAQUET NON LIVRABLE — même test qu'à l'enfilage principal, même cache.
+        // Sans lui le plongeon explorait des états que la recherche refusait.
+        if (paquetActif() && arrivee >= 0) {
+            StatsPaquet& sp = statsPaquet();
+            sp.enfilages++;
+            QVarLengthArray<int, 32> grp;
+            paquetHorsBut(c, arrivee, grp);
+            if (grp.size() >= 2) {
+                sp.testes++;
+                const QByteArray k(reinterpret_cast<const char*>(grp.constData()),
+                                   grp.size() * (int)sizeof(int));
+                auto it = cachePaquet.constFind(k);
+                int v;
+                if (it != cachePaquet.constEnd()) { v = *it; sp.cacheHits++; }
+                else {
+                    int dev = 0;
+                    v = c.sousSolveEnclos(grp, paquetBudget(), &dev);
+                    sp.solveStates += dev;
+                    cachePaquet.insert(k, v);
+                }
+                if (v == 0)  { sp.morts++; sp.prunes++; return; }
+                if (v == -1) sp.inconnus++; else sp.vivants++;
+            }
         }
         const QByteArray cle = c.getEtat();
         if (vus.contains(cle)) return;
@@ -435,7 +616,26 @@ void SolveurAStar::run() {
     // et le même corral revient des centaines de fois. C'est ce qui rend le coût
     // soutenable malgré 10-21 % d'enfilages qui déclenchent une preuve. Local au
     // run : rien à réinitialiser d'un solve à l'autre.
+    if (ordreCoins) construitTablesCoins(etat);
+    if (loiOrdre) {
+        // La densité de la table DÉCIDE si le régime peut rapporter quoi que ce
+        // soit : à 0 case morte par but il ne coupera rien, et il vaut mieux le lire
+        // au démarrage que de l'apprendre après une heure de solve.
+        qint64 total = 0;
+        const int N = etat.getLargeur() * etat.getHauteur();
+        for (int j = 0; j < etat.getNbButs(); j++)
+            for (int c = 0; c < N; c++) if (etat.caseMorteLoi(j, c)) total++;
+        fprintf(stderr, "[LOI] regime loiOrdre ACTIF — %.1f cases mortes par but "
+                        "en moyenne (%d buts, %d cases).\n",
+                etat.getNbButs() ? (double)total / etat.getNbButs() : 0.0,
+                etat.getNbButs(), N);
+        fflush(stderr);
+    }
     QHash<QByteArray,Game::VerdictEnclos> cacheEnclos;
+    // Mémoïsation du paquet non livrable (chantier PAQUET=1). Même argument que
+    // cacheEnclos : le verdict ne dépend que du paquet trié. Mesuré ×223 à ×1040
+    // d'amortissement par l'outil `paquet`.
+    QHash<QByteArray,int> cachePaquet;
 
     while(file.size()) {
         // Arrêt demandé depuis l'UI : on sort AVANT de dépiler, de sorte que le
@@ -500,7 +700,7 @@ void SolveurAStar::run() {
             const int budgetPlongeon = plongeon ? (int)(compteur / PLONGEON_DIVISEUR) : 0;
             if (budgetPlongeon > 0) {
                 qint64 devPlongeon = 0;
-                const int idxGagnant = plonge(etat, cur.g, cur.idxNoeud, cacheEnclos,
+                const int idxGagnant = plonge(etat, cur.g, cur.idxNoeud, cacheEnclos, cachePaquet,
                                               budgetPlongeon, &devPlongeon);
                 // Ces états sont RÉELLEMENT développés : les compter, sinon le
                 // compteur du régime plongeon ne serait pas comparable au défaut.
@@ -550,6 +750,36 @@ void SolveurAStar::run() {
                 << " | vus " << meilleurG.size()
                 << " | f " << cur.f << " h(reste) " << (cur.f - cur.g)
                 << " | rangees " << rangees << " (max " << maxRangees << ")/" << etat.getNbButs();
+            // ⚠️ Les stats de chantier partent AVEC la jauge et pas seulement en fin
+            // de run() : un run tué (c'est le cas de tous les non-résolus, donc de
+            // toutes les cibles) n'en rendait aucune. Même trou que [CORRAL-N] et que
+            // le profilage du §6.6 — seul ce qui part en continu se relève.
+            if (loiOrdre) {
+                const StatsLoi& l = statsLoi();
+                fprintf(stderr, "[LOI] enfilages=%lld PRUNES=%lld (%.2f%%)"
+                                " dont GEL hors tour=%lld"
+                                " | balayages complets=%lld (%.2f%% des enfilages)\n",
+                        (long long)l.enfilages, (long long)l.prunes,
+                        l.enfilages ? 100.0 * (double)l.prunes / (double)l.enfilages : 0.0,
+                        (long long)l.gel,
+                        (long long)l.balayages,
+                        l.enfilages ? 100.0 * (double)l.balayages / (double)l.enfilages : 0.0);
+                fflush(stderr);
+            }
+            if (paquetActif()) {
+                const StatsPaquet& p = statsPaquet();
+                const qint64 calculs = p.testes - p.cacheHits;   // vrais sous-solves
+                fprintf(stderr, "[PAQUET] testes=%lld MORTS=%lld PRUNES=%lld inconnus=%lld"
+                                " | PAQUETS DISTINCTS=%lld (amorti %.1fx, %.0f etats/calcul)"
+                                " | sous-solve=%lld etats (%.1f par depilement)\n",
+                        (long long)p.testes, (long long)p.morts, (long long)p.prunes,
+                        (long long)p.inconnus, (long long)calculs,
+                        calculs ? (double)p.testes / (double)calculs : 0.0,
+                        calculs ? (double)p.solveStates / (double)calculs : 0.0,
+                        (long long)p.solveStates,
+                        compteur ? (double)p.solveStates / (double)compteur : 0.0);
+                fflush(stderr);
+            }
         }
 
 #ifdef DUMP_DEV
@@ -614,7 +844,7 @@ void SolveurAStar::run() {
             // c'est son RÉSULTAT qu'on juge. Forme incrémentale (équivalence prouvée
             // au balayage complet, cf. game.h) : seule la case de repos de la caisse
             // déplacée peut avoir nouvellement scellé une voisine.
-            if (corralActif && arrivee >= 0) {
+            if (corralActif() && arrivee >= 0) {
                 if (e.corralUnitaireMort(arrivee)) return;
             }
             // getEtat(cle) referait le flood-fill en interne, dans un QVector
@@ -636,7 +866,7 @@ void SolveurAStar::run() {
             // ×9,9 sur le 4, ×7,7 sur le 17, ×3,4 sur le 9. Sound par construction
             // (on ne prune que sur une mort PROUVÉE), canari intact sur les 11
             // résolus. La zone du joueur vient d'être calculée : réutilisée gratis.
-            if (corralActif && arrivee >= 0) {
+            if (corralActif() && arrivee >= 0) {
                 const Game::EnclosInfo inf = e.detecteEnclosArrivee(arrivee, zoneEnfant,
                                                                     visiteCorral, &cacheEnclos,
                                                                     CORRAL_BUDGET);
@@ -670,6 +900,36 @@ void SolveurAStar::run() {
                 sd.arbitreStates += inf.arbitreStates;
                 // PRUNE : une mort PROUVÉE (strip + exhaustion) est sound → on coupe.
                 if (inf.dursMorts > 0) { sd.enfilagesPrunes++; return; }
+            }
+            if (coinTropTot(e, arrivee)) return;
+            if (loiTropTot(e, arrivee)) return;
+            // PAQUET NON LIVRABLE (chantier, PAQUET=1 — cf. solveurastar.h).
+            // Vient APRÈS le corral : ce qu'il attrape est précisément ce que le
+            // corral laisse passer, et le mesurer derrière lui donne le surplus.
+            if (paquetActif() && arrivee >= 0) {
+                StatsPaquet& sp = statsPaquet();
+                sp.enfilages++;
+                QVarLengthArray<int, 32> grp;
+                paquetHorsBut(e, arrivee, grp);
+                // Un paquet d'UNE caisse est déjà couvert par casesMortes et le
+                // corral unitaire : le tester ne ferait que payer un sous-solve
+                // pour un verdict connu.
+                if (grp.size() >= 2) {
+                    sp.testes++;
+                    const QByteArray k(reinterpret_cast<const char*>(grp.constData()),
+                                       grp.size() * (int)sizeof(int));
+                    auto it = cachePaquet.constFind(k);
+                    int v;
+                    if (it != cachePaquet.constEnd()) { v = *it; sp.cacheHits++; }
+                    else {
+                        int dev = 0;
+                        v = e.sousSolveEnclos(grp, paquetBudget(), &dev);
+                        sp.solveStates += dev;
+                        cachePaquet.insert(k, v);
+                    }
+                    if (v == 0)  { sp.morts++; sp.prunes++; return; }
+                    if (v == -1) sp.inconnus++; else sp.vivants++;
+                }
             }
             e.getEtat(arene.reserve(), zoneEnfant);
             Cle cle{arene.dernier()};

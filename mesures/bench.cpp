@@ -68,6 +68,11 @@ int main(int argc, char** argv) {
         (md == "couplage")? Solveur::AstarMacroCouplage :
         (md == "plongeon")? Solveur::AstarMacroPlongeon :
         (md == "coupl-plongeon")? Solveur::AstarMacroCouplagePlongeon :
+        (md == "coins")   ? Solveur::AstarMacroCouplagePlongeonCoins :
+        (md == "loi")     ? Solveur::AstarMacroCouplagePlongeonLoi :
+        (md == "ordre-loi")? Solveur::AstarMacroCouplagePlongeonOrdreLoi :
+        (md == "ordre-look")? Solveur::AstarMacroCouplagePlongeonLook :
+        (md == "ordre-dyn")? Solveur::AstarMacroCouplagePlongeonOrdre :
         (md == "pondere" || md == "2") ? Solveur::AstarPondere :
         (md == "bfs")     ? Solveur::Bfs          : Solveur::Astar;
 
@@ -128,6 +133,17 @@ int main(int argc, char** argv) {
                                     .arg(nbRangees, 2, 10, QChar('0'))
                                     .arg(g.getNbDepCaisse(), 4, 10, QChar('0'));
             const bool ok = ecritXsb(etatMax, nom);
+
+            // Le CHEMIN, à côté du .xsb : le `.xsb` ne donne que l'état d'arrivée,
+            // or ce qu'on veut annoter c'est la trajectoire qui y mène. Une lettre
+            // par coup (H/D/B/G, ordre de EDirection), marche et poussées mêlées —
+            // le rejeu les sépare tout seul, et le format reste diffable.
+            QFile fc(QString(nom).replace(".xsb", ".chemin"));
+            if (fc.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                QByteArray t;
+                for (Game::EDirection d : chemin) t += "HDBG"[(int)d];
+                fc.write(t); fc.write("\n");
+            }
 
             // stderr, comme la jauge de progression : les deux flux s'entrelacent,
             // donc le dernier point de jauge DATE le record en dépilements — sans
