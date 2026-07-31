@@ -39,6 +39,13 @@ public:
     // gagné, ou champ non recalculé).
     void setChampButActif(const QVector<int>& champ, int caseBut);
     void showChampButActif(bool show);
+    // ORDRE DE REMPLISSAGE VISIBLE (2026-07-31) : quand c'est armé, le but ACTIF
+    // reste bleu et tous les autres buts vides passent en SABLE. Sert à lire d'un
+    // coup d'œil, sur l'état-max d'un run qui n'aboutit pas, si l'ordre de pose est
+    // celui qu'on croit — c'est comme ça qu'on a vu sur le 13 que la colonne x=14
+    // se remplissait à l'envers. Ne dépend PAS de la case « champ de distances » :
+    // les deux surcouches sont indépendantes.
+    void setMontreOrdreButs(bool on);
 
     // Toutes les cases visitées par AU MOINS UNE branche de l'arbre de
     // macro d'une caisse (Game::arbreMacro) : surlignage plat, une seule
@@ -110,6 +117,7 @@ private:
     QVector<int> champButActif;
     int caseButActif = -1;
     bool showChamp = false;
+    bool montreOrdreButs = false;
     QVector<bool> arbreMacro;
 
     // Cases atteignables par le joueur en ignorant les caisses : l'intérieur du

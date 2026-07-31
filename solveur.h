@@ -48,7 +48,15 @@ public:
         // couplage qui l'amène à 11/14 (le macro seul plafonne à 8/14), et le 11/14
         // est prouvé complétable (fixture level0194, 9 états macro). Le plongeon a
         // donc une cible réelle, avec un budget colossal vu le travail déjà consenti.
-        AstarMacroCouplagePlongeon
+        AstarMacroCouplagePlongeon,
+        // Idem + ORDRE DYNAMIQUE (§6.2, chantier 2026-07-31). `butActif()` ne rend plus
+        // le premier but non rempli de l'ordre statique, mais le premier qui soit encore
+        // LIVRABLE depuis l'état courant. Motivation : trois niveaux (13, 18, 22) ont un
+        // ordre MURÉ calculé au chargement, et le 18 prouve qu'aucun budget de recherche
+        // n'y changera rien — aucun ordre sain complet n'existe dans ce modèle statique.
+        // Décider le but suivant DEPUIS L'ÉTAT fait disparaître la question. Régime
+        // d'ESSAI, jamais le défaut : le canari reste sur les régimes existants.
+        AstarMacroCouplagePlongeonOrdre
     };
 
     struct SType {

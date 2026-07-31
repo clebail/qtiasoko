@@ -18,7 +18,8 @@ QVector<Solveur::SType> Solveur::types() {
         {AstarMacro, "A* macro (rapide)"},
         {AstarMacroCouplage, "A* macro — but du couplage"},
         {AstarMacroPlongeon, "A* macro — plongeon sur record (essai)"},
-        {AstarMacroCouplagePlongeon, "A* macro — couplage + plongeon (essai)"}
+        {AstarMacroCouplagePlongeon, "A* macro — couplage + plongeon (essai)"},
+        {AstarMacroCouplagePlongeonOrdre, "A* macro — couplage + plongeon + ordre dynamique (essai)"}
     };
 }
 
@@ -39,6 +40,14 @@ Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
         // bat le record de caisses posées et dépasse le seuil de remplissage.
         case AstarMacroPlongeon: return new SolveurAStar(etatDepart, 1, true, parent, false, true);
         case AstarMacroCouplagePlongeon: return new SolveurAStar(etatDepart, 1, true, parent, true, true);
+        // ORDRE DYNAMIQUE (§6.2, 2026-07-31) : le flag vit dans le Game, pas dans le
+        // solveur — posé ici sur l'état de départ, il se propage par copie à toute la
+        // recherche (et au plongeon, qui copie les mêmes états).
+        case AstarMacroCouplagePlongeonOrdre: {
+            Game depart(etatDepart);
+            depart.setOrdreDynamique(true);
+            return new SolveurAStar(depart, 1, true, parent, true, true);
+        }
     }
     return nullptr;
 }

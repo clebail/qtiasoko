@@ -1,6 +1,7 @@
 #include <QtDebug>
 #include <QVarLengthArray>
 #include <QSet>
+#include <QRegularExpression>
 #include <QHash>
 #include <QByteArray>
 #include <algorithm>
@@ -69,6 +70,7 @@ Game::Game(const Game& other)
     : largeur(other.largeur), hauteur(other.hauteur), size(other.size),
       playerPoint(other.playerPoint),
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
+      ordreDynamique(other.ordreDynamique), butCourant(other.butCourant),
       nbCaisses(other.nbCaisses),
     gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes),
     regions(other.regions), nbRegions(other.nbRegions), distancePoussee(other.distancePoussee),
@@ -92,6 +94,8 @@ Game& Game::operator=(const Game& other) {
     nbDep = other.nbDep;
     nbDepCaisse = other.nbDepCaisse;
     numNiveau = other.numNiveau;
+    ordreDynamique = other.ordreDynamique;
+    butCourant = other.butCourant;
     nbCaisses = other.nbCaisses;
     gagne = other.gagne;
     perdu = other.perdu;
@@ -121,6 +125,7 @@ Game::Game(Game&& other) noexcept
       playerPoint(other.playerPoint),
       cases(other.cases),
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
+      ordreDynamique(other.ordreDynamique), butCourant(other.butCourant),
       nbCaisses(other.nbCaisses),
       gagne(other.gagne), perdu(other.perdu),
       goals(std::move(other.goals)), casesMortes(std::move(other.casesMortes)),
@@ -142,6 +147,8 @@ Game& Game::operator=(Game&& other) noexcept {
     nbDep = other.nbDep;
     nbDepCaisse = other.nbDepCaisse;
     numNiveau = other.numNiveau;
+    ordreDynamique = other.ordreDynamique;
+    butCourant = other.butCourant;
     nbCaisses = other.nbCaisses;
     gagne = other.gagne;
     perdu = other.perdu;
@@ -2184,6 +2191,55 @@ void Game::calculDistancePoussee() {
     // une permutation complète (jamais observé, mais butActif() exige un ordre plein).
     const QVector<int> parPrecedence = ordreParPrecedence();
     if (parPrecedence.size() == nbButs) ordreButs = parPrecedence;
+
+    // ── INJECTION D'UN ORDRE À LA MAIN — OUTIL DE CHANTIER, JETABLE ──────────────
+    // Remet ce que faisait `ORACLE_HUMAIN`, retiré à la promotion du 2026-07-20.
+    // Raison d'être : on sait produire des ordres à la main (11 en juillet, 12 le
+    // 2026-07-31) et on n'a aucun moyen de les MESURER sans en tirer d'abord une
+    // règle. Or l'histoire du projet dit l'inverse — sur le 11, l'ordre est venu de
+    // la main d'abord, la règle six approches plus tard.
+    //
+    //   ORDRE_HUMAIN="(15,9) (15,8) (15,7) …"   (coordonnées x,y, dans l'ordre)
+    //
+    // ⚠️ Variable d'ENVIRONNEMENT, donc invisible depuis l'app lancée par un
+    // launcher (§7) : c'est un outil de BENCH. Et elle ne fait qu'ÉCRASER un ordre,
+    // jamais en ajouter un — sans elle, rien ne change.
+    const QByteArray inj = qgetenv("ORDRE_HUMAIN");
+    if (!inj.isEmpty()) {
+        QVector<int> voulu;
+        const QRegularExpression re("\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)");
+        auto it = re.globalMatch(QString::fromLocal8Bit(inj));
+        while (it.hasNext()) {
+            const QRegularExpressionMatch m = it.next();
+            const int cell = m.captured(1).toInt() + m.captured(2).toInt() * largeur;
+            int b = -1;
+            for (int k = 0; k < nbButs; k++) if (goals[k] == cell) { b = k; break; }
+            if (b < 0) {
+                fprintf(stderr, "[ORDRE_HUMAIN] (%s,%s) n'est pas un but de ce niveau — IGNORÉ\n",
+                        qPrintable(m.captured(1)), qPrintable(m.captured(2)));
+                voulu.clear();
+                break;
+            }
+            if (voulu.contains(b)) {
+                fprintf(stderr, "[ORDRE_HUMAIN] but (%s,%s) cité DEUX FOIS — IGNORÉ\n",
+                        qPrintable(m.captured(1)), qPrintable(m.captured(2)));
+                voulu.clear();
+                break;
+            }
+            voulu.append(b);
+        }
+        // ⚠️ Tout ou rien : `butActif()` exige une PERMUTATION COMPLÈTE. Un ordre
+        // partiel laisserait des buts hors liste et ferait rendre n'importe quoi —
+        // on préfère refuser bruyamment et garder l'ordre calculé.
+        if (voulu.size() == nbButs) {
+            ordreButs = voulu;
+            fprintf(stderr, "[ORDRE_HUMAIN] ordre injecté : %d buts\n", nbButs);
+        } else if (!inj.isEmpty()) {
+            fprintf(stderr, "[ORDRE_HUMAIN] %d buts lus pour %d attendus — ordre calculé CONSERVÉ\n",
+                    (int)voulu.size(), nbButs);
+        }
+        fflush(stderr);
+    }
 }
 
 bool Game::remplissageOrdonne() const {
@@ -2206,9 +2262,98 @@ int Game::nbCaissesSurBut() const {
 }
 
 int Game::butActif() const {
+    if (!ordreDynamique) {
+        for (int k = 0; k < nbButs; k++)
+            if (cases[goals[ordreButs[k]]] != Level::tcGoalCaisse)
+                return ordreButs[k];
+        return -1;
+    }
+
+    // ORDRE DYNAMIQUE (§6.2, cf. game.h). Le JALON : tant que le but choisi n'est pas
+    // rempli, on le rend tel quel — aucun calcul. C'est ce qui borne le coût à nbButs
+    // passes par chemin au lieu d'une par état.
+    if (butCourant >= 0 && cases[goals[butCourant]] != Level::tcGoalCaisse)
+        return butCourant;
+
+    // Jalon atteint (ou premier appel) : on rechoisit depuis l'ÉTAT COURANT.
+    // `bloque` = les buts déjà rangés, qui font obstacle — même convention que
+    // `ordreParPrecedence`. distanceLivraison amorce son BFS sur les caisses
+    // réellement présentes et la position réelle du joueur, donc son verdict porte
+    // bien sur cet état-ci et pas sur le plateau de départ.
+    QVector<bool> bloque(size, false);
+    int nbPosees = 0;
+    for (int b = 0; b < nbButs; b++)
+        if (cases[goals[b]] == Level::tcGoalCaisse) { bloque[goals[b]] = true; nbPosees++; }
+    const QVector<int> dist = distanceLivraison(bloque);
+
+    // TRACE de l'ordre RÉELLEMENT suivi (diagnostic, §6.2). On n'imprime qu'à la
+    // PREMIÈRE apparition d'un couple (but choisi, nb de caisses posées) : la sortie
+    // est donc bornée par nbButs² lignes au pire, là où tracer chaque appel noierait
+    // le terminal sous des millions de lignes. stderr, comme la jauge et les lignes
+    // [record]/[plongeon] — les flux s'entrelacent, donc chaque ligne est DATÉE en
+    // dépilements sans qu'on ait à toucher à une seule signature. Purement passive :
+    // elle n'ajoute ni ne coupe aucun comportement, donc elle ne peut pas faire
+    // diverger l'app du bench (§7), et elle marche dans l'UI sans variable d'env.
+    auto choisit = [&](int b, const char* voie) -> int {
+        static QSet<int> vus;
+        const int cle = b * 1000 + nbPosees;
+        if (!vus.contains(cle)) {
+            vus.insert(cle);
+            int rang = -1;
+            for (int k = 0; k < nbButs; k++) if (ordreButs[k] == b) { rang = k; break; }
+            fprintf(stderr, "[ordre] posees %2d/%d -> but (%d,%d) rang %d %s\n",
+                    nbPosees, nbButs, goals[b] % largeur, goals[b] / largeur, rang, voie);
+            fflush(stderr);
+        }
+        butCourant = b;
+        return b;
+    };
+
+    // ⚠️ GARDE ANTI-ÉCHOUAGE — la moitié du critère qui manquait au premier jet
+    // (2026-07-31, diagnostic utilisateur sur `plateau_niveau13.xsb`). Se contenter de
+    // « ce but est-il livrable ? » laisse SAUTER un but dont le remplissage en condamne
+    // un autre : sur le 13, le solveur a posé (14,5), (14,6) et (14,7) en laissant
+    // (14,8) vide — or (14,8) est enclavé entre les murs (13,8)/(15,8), sa seule
+    // approche est une caisse en (14,7) poussée vers le bas avec le joueur en (14,6),
+    // et (14,10) est un mur. Les deux cases d'appui se retrouvent occupées.
+    // ⚠️ Position MAUVAISE, pas prouvée morte : les caisses de (14,5) et (14,7) peuvent
+    // sortir latéralement ((13,5)/(15,5)/(13,7)/(15,7) sont libres), et un A* pur lancé
+    // dessus place encore 3 caisses en 2,3 M états avant d'être coupé sans verdict.
+    // `ordreParPrecedence` ne commet pas cette faute parce qu'il exige,
+    // EN PLUS de la livrabilité, que poser un but laisse tous les autres livrables.
+    // On reprend donc ici exactement sa garde — même modèle, même `bloque`.
+    int premierLivrable = -1;
+    for (int k = 0; k < nbButs; k++) {
+        const int b = ordreButs[k];
+        if (cases[goals[b]] == Level::tcGoalCaisse) continue;   // déjà rangé
+        if (dist[goals[b]] == -1) continue;                     // plus livrable d'ici : on PASSE
+        if (premierLivrable < 0) premierLivrable = b;            // filet, cf. plus bas
+
+        bloque[goals[b]] = true;
+        const QVector<int> apres = distanceLivraison(bloque);
+        bloque[goals[b]] = false;
+        bool sur = true;
+        for (int h = 0; h < nbButs && sur; h++) {
+            if (h == b || cases[goals[h]] == Level::tcGoalCaisse) continue;
+            if (apres[goals[h]] == -1) sur = false;              // b condamnerait h
+        }
+        if (sur) return choisit(b, "");
+    }
+
+    // Aucun but SÛR : on relâche sur le premier livrable, exactement comme le glouton
+    // statique (`surs.isEmpty() → surs = candidats`). Le modèle est OPTIMISTE, donc son
+    // « tout choix condamne un but » n'est pas une preuve — mieux vaut avancer que
+    // rendre un but que plus aucune caisse n'atteint.
+    if (premierLivrable >= 0) return choisit(premierLivrable, "(RELACHE : aucun but sur)");
+
+    // Aucun but restant n'est livrable selon ce modèle (qui est OPTIMISTE, §6.2 : il
+    // ignore les autres caisses comme obstacles de marche). On ne peut donc rien
+    // conclure de sa négation — on retombe sur l'ordre statique plutôt que de rendre
+    // -1, qui signifierait « gagné » à l'appelant.
     for (int k = 0; k < nbButs; k++)
         if (cases[goals[ordreButs[k]]] != Level::tcGoalCaisse)
-            return ordreButs[k];
+            return choisit(ordreButs[k], "(REPLI STATIQUE : aucun but livrable)");
+    butCourant = -1;
     return -1;
 }
 

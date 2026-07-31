@@ -155,7 +155,26 @@ public:
     bool remplissageOrdonne() const;
     // Index du but ACTIF (§10.5) : le plus profond (ordreButs) pas encore rempli,
     // ou -1 si tous le sont (état gagnant). C'est la cible de la goal macro.
+    //
+    // ORDRE DYNAMIQUE (§6.2, chantier 2026-07-31) — quand `ordreDynamique` est armé,
+    // on ne rend plus aveuglément le premier but non rempli : on rend le premier but
+    // non rempli **encore LIVRABLE depuis l'état courant** (`distanceLivraison`, qui
+    // amorce son BFS sur les caisses RÉELLEMENT présentes). L'ordre statique reste la
+    // préférence ; il cesse d'être une camisole. C'est ce qui contourne les trois
+    // murages connus (13 rang 14, 18 rang 10, 22 rang 25) au lieu de les combattre :
+    // la question « existe-t-il un ordre sain COMPLET, décidé avant le premier coup ? »
+    // ne se pose plus, elle devient « quel but ensuite, depuis CET état ? ».
+    //
+    // ⚠️ CADENCE AU JALON, et c'est un choix de COÛT : `distanceLivraison` est chère
+    // (BFS de poussées joueur-aware, table (case × zone)), donc on ne rechoisit que
+    // lorsque le but actif vient d'être REMPLI — au plus nbButs fois par chemin, jamais
+    // par état. `butCourant` est le cache qui porte ce jalon, et il se propage par copie
+    // aux états enfants. Limite assumée du premier jet : si le but choisi cesse d'être
+    // livrable SANS avoir été rempli, on reste dessus jusqu'au prochain jalon.
     int butActif() const;
+    // Arme l'ordre dynamique ci-dessus. Posé sur l'état de départ du solveur, il se
+    // propage par copie à toute la recherche. Régime d'ESSAI (§6.2) : jamais le défaut.
+    void setOrdreDynamique(bool on) { ordreDynamique = on; butCourant = -1; }
     // Case (index plat) du but d'indice 'indexBut' — même indexation que
     // butActif()/ordreButs. Pour l'UI, qui a besoin d'une position à surligner.
     int getCaseBut(int indexBut) const { return goals[indexBut]; }
@@ -468,6 +487,13 @@ private:
     int nbDep = 0;
     int nbDepCaisse = 0;
     int numNiveau = 1;
+    // ORDRE DYNAMIQUE (cf. butActif). `butCourant` est un CACHE de jalon, pas un état
+    // de jeu : d'où `mutable`, pour que butActif() reste const comme tous ses appelants.
+    // ⚠️ Les DEUX doivent être copiés dans les ctors de copie/déplacement (piège §7) —
+    // sans `butCourant`, chaque état rechoisirait son but, et la cadence au jalon
+    // (nbButs fois par chemin) redeviendrait une passe distanceLivraison PAR ÉTAT.
+    bool ordreDynamique = false;
+    mutable int butCourant = -1;
     int nbCaisses = 0;
     bool gagne = false;
     bool perdu = false;

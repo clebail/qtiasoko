@@ -253,7 +253,10 @@ void WGame::paintEvent(QPaintEvent *event) {
                                       : static_cast<const Sprite *>(&caisse);
                 s->dessine(painter, coin);
             } else if (aBut) {
-                but.dessine(painter, coin);
+                // BLEU pour le but actif, SABLE pour les autres (cf. wgame.h). Hors
+                // de ce mode, tous les buts restent bleus comme avant.
+                but.dessine(painter, coin,
+                            (montreOrdreButs && idx != caseButActif) ? 1 : 0);
             }
 
             // Arbre de macro (Game::arbreMacro) : toutes les cases visitées
@@ -495,6 +498,11 @@ void WGame::showPassage(bool show) {
 
 void WGame::showChampButActif(bool show) {
     showChamp = show;
+    update();
+}
+
+void WGame::setMontreOrdreButs(bool on) {
+    montreOrdreButs = on;
     update();
 }
 

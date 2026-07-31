@@ -258,6 +258,7 @@ void MainWindow::majBoutonResoudre() {
 void MainWindow::resetEtatMax() {
     maxRangeesVu = 0;
     cbEtatMax->setChecked(false);
+    wGame->setMontreOrdreButs(false);
     cbEtatMax->setEnabled(false);
     cbEtatMax->setText(texteEtatMax);
 }
@@ -708,6 +709,9 @@ void MainWindow::onNouveauMax(Game etatMax, int nbRangees, QList<Game::EDirectio
 }
 
 void MainWindow::onToggleEtatMax(int state) {
+    // L'ordre de remplissage n'a de sens à lire que sur l'état-max : c'est là qu'on
+    // regarde POURQUOI un run n'aboutit pas (cf. wgame.h).
+    wGame->setMontreOrdreButs(state == Qt::Checked);
     if (state == Qt::Checked) {
         timerRejeu.stop();               // fige l'affichage sur l'état-max
         wGame->setGame(&gameMax);

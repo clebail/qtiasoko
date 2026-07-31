@@ -1248,6 +1248,42 @@ pourrait faire G d'un coup n'importe quand ») — ce qui compte, c'est **ne pas
   coupe l'accès à l'autre). Si l'un résiste, c'est le signal → repli anytime (§6.3), pas une
   règle gravée.
 
+- [x] 🎉 **Référence à conserver — ordre humain du 12, et IL RÉSOUT LE NIVEAU** (donné par
+  l'utilisateur le 2026-07-31 après lecture de l'ordre calculé, mesuré dans la foulée).
+  Salle de 15 buts, trois colonnes x=13/14/15 sur y=5..9 :
+  ```
+  (15,9) (15,8) (15,7) (15,6) (15,5)   ← colonne 15, BAS→HAUT
+  (13,5) (13,6) (13,7) (13,8) (13,9)   ← colonne 13, HAUT→BAS
+  (14,9) (14,8) (14,7) (14,6) (14,5)   ← colonne 14 (centrale), BAS→HAUT, en dernier
+  ```
+  ⚠️ **Les deux colonnes latérales se remplissent en sens OPPOSÉS** — c'est le point que la règle
+  calculée rate. Elle les fait toutes deux de haut en bas et les entrelace :
+  `(13,5)(13,6)(13,7) (15,5)(15,6)(15,7)(15,8) (13,8)(15,9)(13,9)`, puis récupère correctement la
+  colonne centrale bas→haut. ⚠️ Réserve du §6.2 : « humain et gagnant » ne veut pas dire « bon pour
+  la macro » — l'ordre humain du 11 de juillet coûtait 460 000 états sur le 191 là où le calculé en
+  coûte 27. **Mesuré ici, et la réserve ne s'applique pas : cet ordre-là est bon.**
+
+  **Le résultat, même binaire, `coupl-plongeon`, 120 s de budget chacun :**
+
+  | ordre | résultat |
+  |---|---|
+  | calculé (défaut) | 1 808 000 états, **`max 1/15`** — pas une deuxième caisse posée |
+  | **humain (injecté)** | ✅ **RÉSOLU — 2 097 527 états, 212 poussées**, plongeon gagnant depuis 6/15 |
+
+  ⚠️ **L'ORDRE ÉTAIT LE VERROU DU 12, et le plan affirmait le contraire.** Le §6.2 écrivait « le 12
+  l'illustre — ordre parfaitement sain, et il échoue quand même (son problème est ailleurs) ». Son
+  ordre était sain **au sens des tests** et mauvais en pratique ; le corriger suffit à le faire
+  tomber. ⚠️ Obtenu avec `ORDRE_HUMAIN` (variable d'environnement, outil de chantier) : **non
+  reproductible avec le binaire par défaut**, donc pas encore une ligne de [scores.md](scores.md).
+  Les 212 poussées viennent du plongeon et ne valent pas comme canari.
+- ⚠️ **LE 12 EST LE CONTRE-EXEMPLE QUI MANQUAIT AUX OUTILS** (2026-07-31). `ordre 12` rend **0
+  violation locale, 0 violation globale, 0 arête-paire violée, aucun murage** — et l'ordre est
+  quand même mauvais, de l'avis de l'utilisateur qui sait jouer le niveau. Les trois tests
+  attrapent donc les ordres **INFAISABLES**, pas les ordres **MAL JOUÉS**. C'est la réserve que
+  l'outil imprime lui-même (« ce test ignore l'ACHEMINEMENT ») enfin illustrée par un cas concret :
+  jusqu'ici on savait que le 12 était « sain et échouait quand même », sans savoir qu'il était
+  **sain à tort**.
+
 **Deuxième facette — un MUR INTERNE à la salle (niveau 11, salle unique).** Le 11 n'est PAS un
 multi-salle : une seule salle de buts, mais avec un **mur en (4,12)** en plein milieu. Ce mur
 impose l'ordre de remplissage, et le rebours le rate — parce qu'il vérifie qu'une caisse peut
@@ -1840,6 +1876,73 @@ répondable. Le 18 cesse d'être un problème par disparition de la question.
 - [ ] **Juge le moins cher, à passer avant de toucher au solveur** : vérifier hors ligne, sur les
   fixtures **r08/r09 du 13** (déjà produites), qu'un ordre révélé dynamiquement existe bien depuis
   ces états réels. S'il se mure aussi en dynamique, la piste tombe sans une ligne de solveur.
+
+#### ⏸️ Session du 2026-07-31 (soir) — ORDRE DYNAMIQUE, MASQUAGE, INJECTION : où on en est
+
+**Ce qui est ACQUIS :**
+1. 🎉 **Le 12 tombe avec l'ordre humain** (ci-dessus). Premier niveau dont on prouve que l'ordre
+   était le verrou — et le plan disait l'inverse.
+2. ❌ **Les trois tests de précédence n'attrapent pas les ordres MAL JOUÉS.** Sur le 12, l'ordre
+   calculé et l'ordre humain passent tous deux à 0 violation locale / globale / par paires et
+   « aucun murage » — l'un résout, l'autre n'atteint pas 2 caisses posées. Les tests séparent
+   *infaisable* de *faisable*, pas *mauvais* de *bon*.
+3. ⚠️ **`ordreButs` n'est appliqué QUE par la macro** (FAIT 3, reconfirmé au code) : les poussées
+   simples ne sont générées que si `macrosOk == 0` (`solveurastar.cpp:812`) et **ne lisent jamais
+   l'ordre**. Un ordre parfait ne sert donc à rien tant qu'il n'est pas *appliqué*.
+4. ⚠️ **Le masquage « un seul but visible » n'a AUCUN effet là où on l'attendait** — vérifié dans le
+   code : `getHeuristique` apparie déjà toutes les caisses à tous les buts, `butActif` rend déjà le
+   premier non rempli, `checkVictoire` est identique en fin de partie. **Ses seules dents sont dans
+   le chemin DEADLOCK** : `game.cpp:213` ne teste `staticDeadlock`/`dynamicDeadlock` que sur
+   `tcCaisse`, jamais sur `tcGoalCaisse` — une caisse posée sur un but n'est jamais jugée. Idem pour
+   `nOffGoal` du corral (`game.cpp:862`). Masquer = lever cette exemption. **Non fait, décision à
+   prendre** (c'est de la détection de deadlock : coupes fausses vis-à-vis du vrai problème, donc
+   régime incomplet et LOUD).
+5. **Les ordres calculés, jugés par l'utilisateur** : **10 OK** (trois colonnes contiguës bas→haut,
+   satellite éclatée aux rangs 0/14/29/31), **11 OK** (à deux transpositions près de la référence
+   de juillet), **12 MAUVAIS** (colonnes latérales toutes deux haut→bas et entrelacées, au lieu de
+   x=15 bas→haut puis x=13 haut→bas), **13 MURÉ** au rang 14.
+6. **Le défaut du 13 est localisé** : la colonne x=16 (7 buts) est attaquée **par les deux bouts** —
+   rangs 7,8,9 par le bas, puis rangs 12,13 par le haut — et (16,5)/(16,6) restent en sandwich. Le
+   même motif est parcouru contigument sur le 10, donc la règle sait le faire. Les 4 variantes de
+   `LIVR_DURE` murent toutes (0 → rang 14 ; 1/2/3 → rang 15, autre but).
+7. **Géométrie du 13, utile pour la partie à la main** : deux buts n'ont qu'**une seule approche** —
+   **(14,8)** (caisse en (14,7) poussée vers le bas, joueur en (14,6) ; (14,10) est un mur) et
+   **(16,4)** (caisse en (16,5) poussée vers le haut, joueur en (16,6) ; (16,2) est un mur et x=18
+   interdit l'approche depuis le couloir droit). Ce sont des **théorèmes** : (14,8) avant (14,7) et
+   (14,6) ; (16,4) avant (16,5) et (16,6). L'ordre calculé respecte le premier et se piège sur le
+   second. **(16,5) est le plus contraint malgré ses 3 approches** — ses trois appuis (16,3), (16,7)
+   et (14,5) sont eux-mêmes des buts, et l'ordre calculé les remplit tous les trois avant lui.
+
+**QUESTIONS EN SUSPENS, à reprendre :**
+- [ ] **Pousser le masquage jusque dans le chemin deadlock ?** (point 4). Gain : les états où une
+  caisse est garée/gelée sur un but hors ordre deviennent élagables. Risque : coupes **fausses**
+  vis-à-vis du vrai problème — régime séparé obligatoire, canari des 15 résolus comme juge.
+  ⚠️ Ne réglerait PAS le cas vu sur le 13 : la caisse coincée en (14,6) n'a aucune direction
+  poussable, donc `dynamicDeadlock` (qui exige `nbPoussable > 0`) ne la voit pas, et
+  `staticDeadlock` regarde `casesMortes` où (14,6) est un but. Il faudrait le test de **gel**.
+- [ ] **Faire respecter l'ordre aux poussées simples (R1)** — toujours pas fait, et c'est ce qui
+  manque pour que le 12 tombe **sans** injection. Deux variantes : sèche (interdire toute pose hors
+  ordre dans le repli) ou avec exemption de transit. ⚠️ Le cas du 13 penche pour la sèche : la
+  caisse fautive de (14,7) peut encore bouger latéralement, donc une exemption la laisserait passer.
+- [ ] **Corriger la contiguïté de run** pour que le 12 et le 13 sortent le bon ordre tout seuls.
+  Le 12 donne enfin une **cible mesurable** (son ordre humain résout), le 13 une cible localisée
+  (colonne x=16). Diagnostic manquant : les candidats et leurs clés de tri au rang décisif — c'est
+  la trace `ORDRE_TRACE` retirée le 2026-07-20, une dizaine de lignes à remettre.
+- [ ] **Ordre à la main du 13** — l'utilisateur le reprend à tête reposée. « Ça va pas être simple
+  d'en sortir une règle » : c'est le chemin normal ici, l'ordre du 11 est venu de la main d'abord
+  et la règle six approches plus tard.
+- [ ] **Régime `ordre-dyn` : à garder ou à jeter ?** Il coûte plus cher que `coupl-plongeon` partout
+  où il a été mesuré (6 : ×87, 7 : ×9, 5 : ×8,3 ; 17 : −11 %), résout les 8 niveaux testés, et n'a
+  débloqué ni le 13 (8/16 contre 9/16 à 120 s) ni rien d'autre. Sa garde anti-échouage est
+  **relâchée presque en permanence** (trace `[ordre]`), donc elle ne sert quasiment à rien.
+- [ ] **Le 18 restera muré quoi qu'on fasse** au modèle statique : son espace de recherche est
+  réellement épuisé à budget 200 (il n'escalade pas). Aucun ordre sain complet n'y existe.
+
+**État du code, non commité** (branche `ordre-dynamique`) : `butActif` dynamique + garde
+anti-échouage + trace `[ordre]` (`game.cpp`/`game.h`) ; régime d'essai `ordre-dyn` (`solveur.*`,
+`mesures/bench.cpp`) ; **injection `ORDRE_HUMAIN`** (`game.cpp`, outil de chantier, jetable) ;
+affichage UI du but actif en bleu et des autres en sable sur l'état-max (`goal.cpp`, `wgame.*`,
+`mainwindow.cpp`).
 
 ### 6.3 Robustesse / temps
 
