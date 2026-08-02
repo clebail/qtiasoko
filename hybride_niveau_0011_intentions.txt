@@ -1,0 +1,38 @@
+
+=== niveau 11 — annotation du 2026-08-02 20:21:38 — 1059 coups (803 par macro) ===
+[intention] coup 18/1059 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (8,9)
+[intention] coup 28/1059 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (11,8)
+[intention] coup 34/1059 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (10,9)
+[intention] coup 35/1059 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (11,9)
+[intention] coup 54/1059 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (11,2)
+[intention] coup 84/1059 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (10,3)
+[intention] coup 131/1059 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (8,4)
+[intention] coup 163/1059 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (8,6)
+[intention] coup 178/1059 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (7,6)
+[manque] SIGNALE (5,7) | but actif (5,13) rang 0/14 | coup 186/1059
+[manque]   cause : ECHEC AU PAS 0 / LE JOUEUR EST DU MAUVAIS COTE — Bas (appui (5,6)) ferait baisser la distance, mais l'appui est HORS de sa zone
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]             ####     
+[manque]        #### #  #     
+[manque]      ###  ###$ #     
+[manque]     ##     $   #     
+[manque]    ##  $ $$## ##     
+[manque]    #  #$##     #     
+[manque]    # # $   $#$###    
+[manque]    #  @$ #  # $ #####
+[manque]   ####    # $ $ #   #
+[manque]   #### ##         $ #
+[manque]   #.    ###  ########
+[manque]   #.. ..# ####       
+[manque]   #...#.#            
+[manque]   #.....#            
+[manque]   #######            
+[intention] coup 187/1059 | RAPPROCHER (du but) | posees 0/14 | joueur (5,7)
+[intention] coup 232/1059 | ECARTER (du chemin d'une autre caisse) | posees 1/14 | joueur (5,6)
+[intention] coup 246/1059 | ECARTER (du chemin d'une autre caisse) | posees 1/14 | joueur (5,4)
+[intention] coup 365/1059 | ECARTER (du chemin d'une autre caisse) | posees 4/14 | joueur (9,3)
+[intention] coup 381/1059 | ECARTER (du chemin d'une autre caisse) | posees 4/14 | joueur (8,4)
+[intention] coup 382/1059 | ECARTER (du chemin d'une autre caisse) | posees 4/14 | joueur (7,4)
+[intention] coup 393/1059 | ECARTER (du chemin d'une autre caisse) | posees 4/14 | joueur (5,3)
+
+=== niveau 11 — annotation du 2026-08-02 20:30:44 — 1059 coups (803 par macro) ===

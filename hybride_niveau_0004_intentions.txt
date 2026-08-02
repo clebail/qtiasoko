@@ -1,0 +1,117 @@
+
+=== niveau 4 — annotation du 2026-08-01 20:01:53 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:11:30 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:23:28 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:23:40 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:23:41 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:23:41 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:23:41 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:23:41 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:23:41 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:28:20 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:30:43 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:32:01 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:33:03 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:33:37 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:34:09 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:37:10 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:39:55 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:50:49 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 20:51:20 — 1151 coups (918 par macro) ===
+
+=== niveau 4 — annotation du 2026-08-01 22:06:22 — 1151 coups (918 par macro) ===
+[intention] coup 9/1151 | OUVRIR (un passage pour le joueur) | posees 0/20 | joueur (6,10)
+[intention] coup 33/1151 | OUVRIR (un passage pour le joueur) | posees 0/20 | joueur (3,11)
+[intention] coup 33/1151 | ECARTER (du chemin d'une autre caisse) | posees 0/20 | joueur (3,11)
+[intention] coup 53/1151 | ECARTER (du chemin d'une autre caisse) | posees 0/20 | joueur (2,6)
+[intention] coup 71/1151 | ECARTER (du chemin d'une autre caisse) | posees 0/20 | joueur (2,4)
+[intention] coup 83/1151 | OUVRIR (un passage pour le joueur) | posees 0/20 | joueur (3,5)
+[intention] coup 100/1151 | OUVRIR (un passage pour le joueur) | posees 0/20 | joueur (3,6)
+[intention] coup 119/1151 | OUVRIR (un passage pour le joueur) | posees 0/20 | joueur (6,4)
+[intention] coup 132/1151 | OUVRIR (un passage pour le joueur) | posees 0/20 | joueur (9,4)
+[intention] coup 488/1151 | GARER (pour plus tard) | posees 10/20 | joueur (6,5)
+[intention] coup 1040/1151 | GARER (pour plus tard) | posees 18/20 | joueur (2,7)
+[intention] coup 1103/1151 | GARER (pour plus tard) | posees 19/20 | joueur (4,10)
+
+=== niveau 4 — annotation du 2026-08-02 19:34:55 — 1151 coups (918 par macro) ===
+[intention] coup 9/1151 | OUVRIR (un passage pour le joueur) | posees 0/20 | joueur (6,10)
+[intention] coup 33/1151 | OUVRIR (un passage pour le joueur) | posees 0/20 | joueur (3,11)
+[intention] coup 53/1151 | OUVRIR (un passage pour le joueur) | posees 0/20 | joueur (2,6)
+[intention] coup 71/1151 | OUVRIR (un passage pour le joueur) | posees 0/20 | joueur (2,4)
+[intention] coup 83/1151 | OUVRIR (un passage pour le joueur) | posees 0/20 | joueur (3,5)
+[intention] coup 100/1151 | ECARTER (du chemin d'une autre caisse) | posees 0/20 | joueur (3,6)
+[intention] coup 119/1151 | ECARTER (du chemin d'une autre caisse) | posees 0/20 | joueur (6,4)
+[intention] coup 132/1151 | GARER (pour plus tard, je reviendrai) | posees 0/20 | joueur (9,4)
+[manque] SIGNALE (6,6) | but actif (16,4) rang 10/20 | coup 484/1151
+[manque]   cause : DESCENTE BLOQUEE en (3,5), il restait 16 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]              ########
+[manque]              #  .***#
+[manque]   ############  .***#
+[manque]   #    #        .***#
+[manque]   #    #     #  ...*#
+[manque]   #          #  ....#
+[manque]   #    #$    ########
+[manque]   #  $ #@    #       
+[manque]   ## #########       
+[manque]   #    #    #        
+[manque]   # $     $ ##       
+[manque]   # $$$#$$$  #       
+[manque]   #    #    ##       
+[manque]   ###########        
+[intention] coup 485/1151 | RETOURNER (sortir pour reprendre dans l'autre sens) | posees 10/20 | joueur (6,6)
+[intention] coup 541/1151 | ECARTER (du chemin d'une autre caisse) | posees 11/20 | joueur (2,10)
+[manque] SIGNALE (3,7) | but actif (14,4) rang 18/20 | coup 1036/1151
+[manque]   cause : DESCENTE BLOQUEE en (2,10), il restait 20 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]              ########
+[manque]              #  ****#
+[manque]   ############  ****#
+[manque]   #    #        ****#
+[manque]   #    #     #  .***#
+[manque]   #          #  .***#
+[manque]   #    #     ########
+[manque]   #  $@#     #       
+[manque]   ## #########       
+[manque]   #    #    #        
+[manque]   #         ##       
+[manque]   #   $#     #       
+[manque]   #    #    ##       
+[manque]   ###########        
+[intention] coup 1037/1151 | RETOURNER (sortir pour reprendre dans l'autre sens) | posees 18/20 | joueur (3,7)
+[manque] SIGNALE (4,11) | but actif (14,5) rang 19/20 | coup 1099/1151
+[manque]   cause : DESCENTE BLOQUEE en (7,10), il restait 26 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]              ########
+[manque]              #  ****#
+[manque]   ############  ****#
+[manque]   #    #        ****#
+[manque]   #    #     #  ****#
+[manque]   #          #  .***#
+[manque]   #    #     ########
+[manque]   #    #     #       
+[manque]   ## #########       
+[manque]   #    #    #        
+[manque]   #         ##       
+[manque]   #   $#     #       
+[manque]   #   @#    ##       
+[manque]   ###########        
+[intention] coup 1100/1151 | RETOURNER (sortir pour reprendre dans l'autre sens) | posees 19/20 | joueur (4,11)

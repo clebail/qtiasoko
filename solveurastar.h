@@ -60,6 +60,31 @@ struct StatsDeltaF {
 StatsDeltaF& statsDeltaF();
 #endif
 
+// Corral : ACTIF par défaut (promu, cf. §6.1) — les DEUX étages, le corral
+// unitaire (motifs 1 et 2) et le corral-N (strip + A* borné). Trappe `CORRAL=0`
+// pour tout couper — réservée aux OUTILS DE MESURE (`fp`, `mort`) qui doivent
+// collecter/rejouer des états SANS que le corral les élague d'abord, sinon le
+// juge est aveugle aux faux positifs qu'il est censé chercher. La prod ne touche
+// jamais cette variable (défaut = actif).
+//
+// Fonction et non variable de fichier : le mode hybride en a besoin depuis
+// mainwindow.cpp (cf. CORRAL_BUDGET ci-dessous). Lue une seule fois.
+inline bool corralActif() {
+    static const bool actif = (qgetenv("CORRAL") != "0");
+    return actif;
+}
+
+// Budget du sous-solve d'enclos (corral-N). Balayage mesuré le 2026-07-27 : le
+// gain d'états SATURE dès ~150, tandis que le coût des sous-solves explose (×6)
+// au-delà — en « inconnus » qui ne prouvent rien et qu'on paie plein tarif.
+// Figé après verdict, comme les autres réglages promus.
+//
+// Dans l'en-tête et non dans le .cpp : le mode hybride rejoue l'enfilage du
+// solveur dans l'UI (mainwindow.cpp, mesureRangCoup) pour classer le coup joué à
+// la main. Deux copies de ce 150 dériveraient sans que rien ne le signale, et le
+// rang mesuré ne vaudrait plus pour le solveur réel. Exemplaire unique.
+static constexpr int CORRAL_BUDGET = 150;
+
 // A* sur les poussées : f = g + poids * h.
 //
 // poids = 1 : A* classique. h est admissible ET cohérente, donc la solution est

@@ -1,0 +1,17 @@
+
+=== niveau 10 — annotation du 2026-08-02 20:02:22 — 1619 coups (1529 par macro) ===
+[intention] coup 1/1619 | OUVRIR (un passage pour le joueur) | posees 0/32 | joueur (2,2)
+[intention] coup 2/1619 | OUVRIR (un passage pour le joueur) | posees 0/32 | joueur (3,2)
+[intention] coup 112/1619 | OUVRIR (un passage pour le joueur) | posees 3/32 | joueur (9,10)
+[intention] coup 116/1619 | OUVRIR (un passage pour le joueur) | posees 3/32 | joueur (9,8)
+[intention] coup 125/1619 | OUVRIR (un passage pour le joueur) | posees 3/32 | joueur (13,9)
+[intention] coup 132/1619 | OUVRIR (un passage pour le joueur) | posees 3/32 | joueur (11,8)
+[intention] coup 141/1619 | INCONNU (je ne sais pas encore le dire) | posees 3/32 | joueur (11,3)
+[intention] coup 148/1619 | INCONNU (je ne sais pas encore le dire) | posees 3/32 | joueur (10,3)
+[intention] coup 155/1619 | INCONNU (je ne sais pas encore le dire) | posees 3/32 | joueur (8,4)
+[intention] coup 158/1619 | INCONNU (je ne sais pas encore le dire) | posees 3/32 | joueur (8,3)
+[intention] coup 159/1619 | OUVRIR (un passage pour le joueur) | posees 3/32 | joueur (9,3)
+[intention] coup 164/1619 | OUVRIR (un passage pour le joueur) | posees 3/32 | joueur (7,2)
+[intention] coup 167/1619 | ECARTER (du chemin d'une autre caisse) | posees 3/32 | joueur (4,2)
+
+=== niveau 10 — annotation du 2026-08-02 20:30:26 — 1619 coups (1529 par macro) ===

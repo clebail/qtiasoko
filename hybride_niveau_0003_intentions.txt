@@ -1,0 +1,267 @@
+
+=== niveau 3 — annotation du 2026-08-01 19:56:55 — 376 coups (302 par macro) ===
+[intention] coup 3/376 | OUVRIR (un passage pour le joueur) | posees 0/11 | joueur (13,3)
+
+=== niveau 3 — annotation du 2026-08-01 19:57:53 — 376 coups (302 par macro) ===
+[intention] coup 3/376 | OUVRIR (un passage pour le joueur) | posees 0/11 | joueur (13,3)
+[intention] coup 67/376 | GARER (pour plus tard) | posees 2/11 | joueur (14,6)
+[intention] coup 68/376 | GARER (pour plus tard) | posees 2/11 | joueur (13,6)
+
+=== niveau 3 — annotation du 2026-08-02 19:07:55 — 376 coups (302 par macro) ===
+[intention] coup 3/376 | OUVRIR (un passage pour le joueur) | posees 0/11 | joueur (13,3)
+[intention] coup 36/376 | OUVRIR (un passage pour le joueur) | posees 1/11 | joueur (13,6)
+[intention] coup 67/376 | INCONNU (je ne sais pas encore le dire) | posees 2/11 | joueur (14,6)
+[intention] coup 67/376 | ECARTER (du chemin d'une autre caisse) | posees 2/11 | joueur (14,6)
+[manque] SIGNALE (12,6) | but actif (2,7) rang 3/11 | coup 108/376
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#$ ## 
+[manque]           # $   #  
+[manque]           ##$ $ #  
+[manque]   ######### $ # ###
+[manque]   #***.  ## $ $@  #
+[manque]   ##...           #
+[manque]   #....  ##########
+[manque]   ########         
+[manque] SIGNALE (12,4) | but actif (3,7) rang 4/11 | coup 142/376
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#$ ## 
+[manque]           # $   #  
+[manque]           ##$ $@#  
+[manque]   ######### $ # ###
+[manque]   #***.  ## $     #
+[manque]   ##*..           #
+[manque]   #....  ##########
+[manque]   ########         
+[manque] SIGNALE (12,2) | but actif (1,8) rang 5/11 | coup 174/376
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #   @  # 
+[manque]           # $#$ ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   ######### $ # ###
+[manque]   #***.  ## $     #
+[manque]   ##**.           #
+[manque]   #....  ##########
+[manque]   ########         
+[intention] coup 211/376 | RAPPROCHER (du but) | posees 6/11 | joueur (10,6)
+[manque] SIGNALE (10,6) | but actif (2,8) rang 6/11 | coup 210/376
+[manque]   cause : ECHEC AU PAS 0 / LE JOUEUR EST DU MAUVAIS COTE — Bas (appui (10,5)) ferait baisser la distance, mais l'appui est HORS de sa zone
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   ######### $ # ###
+[manque]   #***.  ##@$     #
+[manque]   ##**.           #
+[manque]   #*...  ##########
+[manque]   ########         
+[intention] coup 211/376 | RAPPROCHER (du but) | posees 6/11 | joueur (10,6)
+[manque] SIGNALE (10,5) | but actif (3,8) rang 7/11 | coup 247/376
+[manque]   cause : ECHEC AU PAS 0 / LE JOUEUR EST DU MAUVAIS COTE — Bas (appui (10,4)) ferait baisser la distance, mais l'appui est HORS de sa zone
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   #########@$ # ###
+[manque]   #***.  ##       #
+[manque]   ##**.           #
+[manque]   #**..  ##########
+[manque]   ########         
+[intention] coup 248/376 | RAPPROCHER (du but) | posees 7/11 | joueur (10,5)
+[manque] SIGNALE (10,3) | but actif (4,6) rang 8/11 | coup 293/376
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           #@$   #  
+[manque]           ##$   #  
+[manque]   #########   # ###
+[manque]   #***.  ##       #
+[manque]   ##**.           #
+[manque]   #***.  ##########
+[manque]   ########         
+[intention] coup 294/376 | RAPPROCHER (du but) | posees 8/11 | joueur (10,3)
+[manque] SIGNALE (10,3) | but actif (4,6) rang 8/11 | coup 293/376
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           #@$   #  
+[manque]           ##$   #  
+[manque]   #########   # ###
+[manque]   #***.  ##       #
+[manque]   ##**.           #
+[manque]   #***.  ##########
+[manque]   ########         
+[intention] coup 294/376 | ECARTER (du chemin d'une autre caisse) | posees 8/11 | joueur (10,3)
+[manque] SIGNALE (12,3) | but actif (4,7) rang 9/11 | coup 327/376
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#@ ## 
+[manque]           #   $ #  
+[manque]           ##    #  
+[manque]   #########   # ###
+[manque]   #****  ##       #
+[manque]   ##**.           #
+[manque]   #***.  ##########
+[manque]   ########         
+[manque] SIGNALE (10,2) | but actif (4,8) rang 10/11 | coup 358/376
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           # @    # 
+[manque]           # $#  ## 
+[manque]           #     #  
+[manque]           ##    #  
+[manque]   #########   # ###
+[manque]   #****  ##       #
+[manque]   ##***           #
+[manque]   #***.  ##########
+[manque]   ########         
+
+=== niveau 3 — annotation du 2026-08-02 19:11:41 — 376 coups (302 par macro) ===
+[intention] coup 3/376 | OUVRIR (un passage pour le joueur) | posees 0/11 | joueur (13,3)
+[intention] coup 36/376 | OUVRIR (un passage pour le joueur) | posees 1/11 | joueur (13,6)
+[intention] coup 67/376 | ECARTER (du chemin d'une autre caisse) | posees 2/11 | joueur (14,6)
+[intention] coup 211/376 | ECARTER (du chemin d'une autre caisse) | posees 6/11 | joueur (10,6)
+[manque] SIGNALE (10,6) | but actif (2,8) rang 6/11 | coup 210/376
+[manque]   cause : ECHEC AU PAS 0 / LE JOUEUR EST DU MAUVAIS COTE — Bas (appui (10,5)) ferait baisser la distance, mais l'appui est HORS de sa zone
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   ######### $ # ###
+[manque]   #***.  ##@$     #
+[manque]   ##**.           #
+[manque]   #*...  ##########
+[manque]   ########         
+[intention] coup 211/376 | ECARTER (du chemin d'une autre caisse) | posees 6/11 | joueur (10,6)
+[manque] SIGNALE (10,6) | but actif (2,8) rang 6/11 | coup 210/376
+[manque]   cause : ECHEC AU PAS 0 / LE JOUEUR EST DU MAUVAIS COTE — Bas (appui (10,5)) ferait baisser la distance, mais l'appui est HORS de sa zone
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   ######### $ # ###
+[manque]   #***.  ##@$     #
+[manque]   ##**.           #
+[manque]   #*...  ##########
+[manque]   ########         
+[intention] coup 211/376 | RAPPROCHER (du but) | posees 6/11 | joueur (10,6)
+[manque] SIGNALE (10,5) | but actif (3,8) rang 7/11 | coup 247/376
+[manque]   cause : ECHEC AU PAS 0 / LE JOUEUR EST DU MAUVAIS COTE — Bas (appui (10,4)) ferait baisser la distance, mais l'appui est HORS de sa zone
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   #########@$ # ###
+[manque]   #***.  ##       #
+[manque]   ##**.           #
+[manque]   #**..  ##########
+[manque]   ########         
+[intention] coup 248/376 | RAPPROCHER (du but) | posees 7/11 | joueur (10,5)
+[manque] SIGNALE (10,3) | but actif (4,6) rang 8/11 | coup 293/376
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           #@$   #  
+[manque]           ##$   #  
+[manque]   #########   # ###
+[manque]   #***.  ##       #
+[manque]   ##**.           #
+[manque]   #***.  ##########
+[manque]   ########         
+[intention] coup 294/376 | ECARTER (du chemin d'une autre caisse) | posees 8/11 | joueur (10,3)
+
+=== niveau 3 — annotation du 2026-08-02 19:19:54 — 376 coups (302 par macro) ===
+[intention] coup 3/376 | OUVRIR (un passage pour le joueur) | posees 0/11 | joueur (13,3)
+[intention] coup 36/376 | OUVRIR (un passage pour le joueur) | posees 1/11 | joueur (13,6)
+[intention] coup 67/376 | ECARTER (du chemin d'une autre caisse) | posees 2/11 | joueur (14,6)
+[intention] coup 211/376 | RAPPROCHER (du but) | posees 6/11 | joueur (10,6)
+[manque] SIGNALE (10,6) | but actif (2,8) rang 6/11 | coup 210/376
+[manque]   cause : ECHEC AU PAS 0 / LE JOUEUR EST DU MAUVAIS COTE — Bas (appui (10,5)) ferait baisser la distance, mais l'appui est HORS de sa zone
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   ######### $ # ###
+[manque]   #***.  ##@$     #
+[manque]   ##**.           #
+[manque]   #*...  ##########
+[manque]   ########         
+[intention] coup 211/376 | RAPPROCHER (du but) | posees 6/11 | joueur (10,6)
+
+=== niveau 3 — annotation du 2026-08-02 19:28:31 — 376 coups (302 par macro) ===
+
+=== niveau 3 — annotation du 2026-08-02 19:31:45 — 376 coups (302 par macro) ===
+[intention] coup 3/376 | OUVRIR (un passage pour le joueur) | posees 0/11 | joueur (13,3)
+[intention] coup 36/376 | OUVRIR (un passage pour le joueur) | posees 1/11 | joueur (13,6)
+[intention] coup 67/376 | ECARTER (du chemin d'une autre caisse) | posees 2/11 | joueur (14,6)
+[manque] SIGNALE (10,6) | but actif (2,8) rang 6/11 | coup 210/376
+[manque]   cause : ECHEC AU PAS 0 / LE JOUEUR EST DU MAUVAIS COTE — Bas (appui (10,5)) ferait baisser la distance, mais l'appui est HORS de sa zone
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   ######### $ # ###
+[manque]   #***.  ##@$     #
+[manque]   ##**.           #
+[manque]   #*...  ##########
+[manque]   ########         
+[intention] coup 211/376 | RAPPROCHER (du but) | posees 6/11 | joueur (10,6)
+[manque] SIGNALE (10,5) | but actif (3,8) rang 7/11 | coup 247/376
+[manque]   cause : ECHEC AU PAS 0 / LE JOUEUR EST DU MAUVAIS COTE — Bas (appui (10,4)) ferait baisser la distance, mais l'appui est HORS de sa zone
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   #########@$ # ###
+[manque]   #***.  ##       #
+[manque]   ##**.           #
+[manque]   #**..  ##########
+[manque]   ########         
+[intention] coup 248/376 | RAPPROCHER (du but) | posees 7/11 | joueur (10,5)
+[manque] SIGNALE (10,3) | but actif (4,6) rang 8/11 | coup 293/376
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           #@$   #  
+[manque]           ##$   #  
+[manque]   #########   # ###
+[manque]   #***.  ##       #
+[manque]   ##**.           #
+[manque]   #***.  ##########
+[manque]   ########         
+[intention] coup 294/376 | ECARTER (du chemin d'une autre caisse) | posees 8/11 | joueur (10,3)

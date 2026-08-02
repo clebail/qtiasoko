@@ -1,0 +1,232 @@
+
+=== niveau 2 — annotation du 2026-08-01 19:53:52 — 517 coups (400 par macro) ===
+[intention] coup 4/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (10,5)
+[intention] coup 12/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (11,6)
+[intention] coup 13/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (11,5)
+[intention] coup 14/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (11,4)
+[intention] coup 19/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (10,2)
+
+=== niveau 2 — annotation du 2026-08-02 18:30:58 — 517 coups (400 par macro) ===
+[intention] coup 4/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (10,5)
+[intention] coup 12/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (11,6)
+[intention] coup 19/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (10,2)
+
+=== niveau 2 — annotation du 2026-08-02 18:53:04 — 517 coups (400 par macro) ===
+[intention] coup 4/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (10,5)
+[intention] coup 12/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (11,6)
+[intention] coup 19/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (10,2)
+[manque] SIGNALE (11,7) | but actif (1,1) rang 4/10 | coup 204/517
+[manque]   cause : DESCENTE BLOQUEE en (10,7), il restait 17 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #..  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #*.      ##  #
+[manque]   #*.  # #    ##
+[manque]   ###### ##$$  #
+[manque]     # $  $ $ $ #
+[manque]     #    #   @ #
+[manque]     ############
+[manque] SIGNALE (9,7) | but actif (2,5) rang 5/10 | coup 266/517
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #*.      ##  #
+[manque]   #*.  # #    ##
+[manque]   ###### ##$$  #
+[manque]     # $  $@$   #
+[manque]     #    #     #
+[manque]     ############
+[manque] SIGNALE (7,7) | but actif (2,4) rang 6/10 | coup 316/517
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #*.      ##  #
+[manque]   #**  # #    ##
+[manque]   ###### ##$$  #
+[manque]     # $ @$     #
+[manque]     #    #     #
+[manque]     ############
+[manque] SIGNALE (4,7) | but actif (2,3) rang 7/10 | coup 367/517
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #**      ##  #
+[manque]   #**  # #    ##
+[manque]   ###### ##$$  #
+[manque]     #@$        #
+[manque]     #    #     #
+[manque]     ############
+[manque] SIGNALE (4,7) | but actif (2,3) rang 7/10 | coup 367/517
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #**      ##  #
+[manque]   #**  # #    ##
+[manque]   ###### ##$$  #
+[manque]     #@$        #
+[manque]     #    #     #
+[manque]     ############
+[manque] SIGNALE (10,6) | but actif (2,2) rang 8/10 | coup 406/517
+[manque]   cause : DESCENTE BLOQUEE en (5,7), il restait 10 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #**  # ####  #
+[manque]   #**      ##  #
+[manque]   #**  # #  @ ##
+[manque]   ###### ##$$  #
+[manque]     #          #
+[manque]     #    #     #
+[manque]     ############
+[manque] SIGNALE (9,6) | but actif (2,1) rang 9/10 | coup 465/517
+[manque]   cause : DESCENTE BLOQUEE en (5,7), il restait 11 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #**  #       #
+[manque]   #**  # ####  #
+[manque]   #**      ##  #
+[manque]   #**  # # @  ##
+[manque]   ###### ##$   #
+[manque]     #          #
+[manque]     #    #     #
+[manque]     ############
+
+=== niveau 2 — annotation du 2026-08-02 18:58:48 — 517 coups (400 par macro) ===
+[intention] coup 4/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (10,5)
+[intention] coup 12/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (11,6)
+[intention] coup 19/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (10,2)
+[manque] SIGNALE (11,7) | but actif (1,1) rang 4/10 | coup 204/517
+[manque]   cause : DESCENTE BLOQUEE en (10,7), il restait 17 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #..  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #*.      ##  #
+[manque]   #*.  # #    ##
+[manque]   ###### ##$$  #
+[manque]     # $  $ $ $ #
+[manque]     #    #   @ #
+[manque]     ############
+[intention] coup 205/517 | RAPPROCHER (du but) | posees 4/10 | joueur (11,7)
+[manque] SIGNALE (10,6) | but actif (2,5) rang 5/10 | coup 258/517
+[manque]   cause : DESCENTE BLOQUEE en (10,7), il restait 14 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #*.      ##  #
+[manque]   #*.  # #  @ ##
+[manque]   ###### ##$$  #
+[manque]     # $  $ $   #
+[manque]     #    #     #
+[manque]     ############
+
+=== niveau 2 — annotation du 2026-08-02 19:03:47 — 517 coups (400 par macro) ===
+[intention] coup 4/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (10,5)
+[intention] coup 12/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (11,6)
+[intention] coup 13/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (11,5)
+[intention] coup 19/517 | OUVRIR (un passage pour le joueur) | posees 0/10 | joueur (10,2)
+[manque] SIGNALE (11,7) | but actif (1,1) rang 4/10 | coup 204/517
+[manque]   cause : DESCENTE BLOQUEE en (10,7), il restait 17 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #..  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #*.      ##  #
+[manque]   #*.  # #    ##
+[manque]   ###### ##$$  #
+[manque]     # $  $ $ $ #
+[manque]     #    #   @ #
+[manque]     ############
+[intention] coup 205/517 | RAPPROCHER (du but) | posees 4/10 | joueur (11,7)
+[manque] SIGNALE (9,7) | but actif (2,5) rang 5/10 | coup 266/517
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #*.      ##  #
+[manque]   #*.  # #    ##
+[manque]   ###### ##$$  #
+[manque]     # $  $@$   #
+[manque]     #    #     #
+[manque]     ############
+[intention] coup 267/517 | RAPPROCHER (du but) | posees 5/10 | joueur (9,7)
+[manque] SIGNALE (7,7) | but actif (2,4) rang 6/10 | coup 316/517
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #*.      ##  #
+[manque]   #**  # #    ##
+[manque]   ###### ##$$  #
+[manque]     # $ @$     #
+[manque]     #    #     #
+[manque]     ############
+[intention] coup 317/517 | RAPPROCHER (du but) | posees 6/10 | joueur (7,7)
+[manque] SIGNALE (4,7) | but actif (2,3) rang 7/10 | coup 367/517
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #**      ##  #
+[manque]   #**  # #    ##
+[manque]   ###### ##$$  #
+[manque]     #@$        #
+[manque]     #    #     #
+[manque]     ############
+[intention] coup 368/517 | RAPPROCHER (du but) | posees 7/10 | joueur (4,7)
+[manque] SIGNALE (10,6) | but actif (2,2) rang 8/10 | coup 406/517
+[manque]   cause : DESCENTE BLOQUEE en (5,7), il restait 10 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #**  # ####  #
+[manque]   #**      ##  #
+[manque]   #**  # #  @ ##
+[manque]   ###### ##$$  #
+[manque]     #          #
+[manque]     #    #     #
+[manque]     ############
+[intention] coup 407/517 | RAPPROCHER (du but) | posees 8/10 | joueur (10,6)
+[manque] SIGNALE (9,7) | but actif (2,1) rang 9/10 | coup 465/517
+[manque]   (pas une caisse — repere pose sur l'etat)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #**  #       #
+[manque]   #**  # ####  #
+[manque]   #**      ##  #
+[manque]   #**  # # @  ##
+[manque]   ###### ##$   #
+[manque]     #          #
+[manque]     #    #     #
+[manque]     ############
+[manque] SIGNALE (9,6) | but actif (2,1) rang 9/10 | coup 465/517
+[manque]   cause : DESCENTE BLOQUEE en (5,7), il restait 11 de distance (1 branche essayee)
+[intention] coup 466/517 | RAPPROCHER (du but) | posees 9/10 | joueur (9,6)

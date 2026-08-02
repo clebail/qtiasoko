@@ -1,0 +1,29 @@
+
+=== niveau 5 — annotation du 2026-08-02 14:28:53 — 429 coups (399 par macro) ===
+[intention] coup 3/429 | OUVRIR (un passage pour le joueur) | posees 0/12 | joueur (13,5)
+
+=== niveau 5 — annotation du 2026-08-02 14:29:09 — 429 coups (399 par macro) ===
+[intention] coup 3/429 | OUVRIR (un passage pour le joueur) | posees 0/12 | joueur (13,5)
+[intention] coup 6/429 | OUVRIR (un passage pour le joueur) | posees 0/12 | joueur (11,6)
+[intention] coup 270/429 | RETOURNER (sortir pour reprendre dans l'autre sens) | posees 8/12 | joueur (13,4)
+
+=== niveau 5 — annotation du 2026-08-02 19:41:49 — 429 coups (399 par macro) ===
+[intention] coup 3/429 | OUVRIR (un passage pour le joueur) | posees 0/12 | joueur (13,5)
+[intention] coup 6/429 | OUVRIR (un passage pour le joueur) | posees 0/12 | joueur (11,6)
+[manque] SIGNALE (13,4) | but actif (3,7) rang 8/12 | coup 269/429
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           #####    
+[manque]           #   #####
+[manque]           # #$##  #
+[manque]           #    @$ #
+[manque]   ######### ###$  #
+[manque]   #***.  ## $   ###
+[manque]   #***.         ## 
+[manque]   #**..  ##      # 
+[manque]   #########     ## 
+[manque]           #      # 
+[manque]           ### ## # 
+[manque]             #    # 
+[manque]             ###### 
+[intention] coup 270/429 | RAPPROCHER (du but) | posees 8/12 | joueur (13,4)

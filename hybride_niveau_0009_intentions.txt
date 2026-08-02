@@ -1,0 +1,45 @@
+
+=== niveau 9 — annotation du 2026-08-02 19:58:56 — 676 coups (574 par macro) ===
+
+=== niveau 9 — annotation du 2026-08-02 19:59:01 — 676 coups (574 par macro) ===
+[intention] coup 7/676 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (6,10)
+[intention] coup 20/676 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (11,10)
+[intention] coup 32/676 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (7,10)
+[intention] coup 46/676 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (6,9)
+[intention] coup 53/676 | OUVRIR (un passage pour le joueur) | posees 0/14 | joueur (8,8)
+[manque] SIGNALE (11,11) | but actif (13,4) rang 12/14 | coup 574/676
+[manque]   cause : DESCENTE BLOQUEE en (14,10), il restait 19 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]             #######
+[manque]             #  ***#
+[manque]         #####  ***#
+[manque]         #      * *#
+[manque]         #  ##  .**#
+[manque]         ## ##  .**#
+[manque]        ### ########
+[manque]        #     ##    
+[manque]    #####      #####
+[manque]   ##   #      #   #
+[manque]   #               #
+[manque]   ######$    $#####
+[manque]        #     @#    
+[manque]        ########    
+[intention] coup 575/676 | RETOURNER (sortir pour reprendre dans l'autre sens) | posees 12/14 | joueur (11,11)
+[manque] SIGNALE (6,11) | but actif (13,5) rang 13/14 | coup 635/676
+[manque]   cause : DESCENTE BLOQUEE en (3,10), il restait 19 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]             #######
+[manque]             #  ***#
+[manque]         #####  ***#
+[manque]         #      * *#
+[manque]         #  ##  ***#
+[manque]         ## ##  .**#
+[manque]        ### ########
+[manque]        #     ##    
+[manque]    #####      #####
+[manque]   ##   #      #   #
+[manque]   #               #
+[manque]   ######$     #####
+[manque]        #@     #    
+[manque]        ########    
+[intention] coup 636/676 | RETOURNER (sortir pour reprendre dans l'autre sens) | posees 13/14 | joueur (6,11)

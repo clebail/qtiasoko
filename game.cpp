@@ -4,6 +4,8 @@
 #include <QRegularExpression>
 #include <QHash>
 #include <QByteArray>
+#include <QFile>
+#include <QDir>
 #include <algorithm>
 #include <climits>
 #include <utility>
@@ -1575,6 +1577,49 @@ QVector<int> Game::distanceLivraison(const QVector<bool>& bloque) const {
 //
 // Statique (ne lit que les murs et les caisses de DÉPART), donc calculé une fois par
 // niveau, comme casesMortes. O(buts² × plateau).
+// Le fichier d'ordre injecté pour ce niveau, s'il existe — sinon une chaîne vide.
+// EXEMPLAIRE UNIQUE du nom : `calculDistancePoussee` le lit, l'UI l'interroge pour
+// dire dans le journal hybride que l'ordre affiché n'est PAS l'ordre calculé. Deux
+// endroits qui devineraient le nom chacun de leur côté finiraient par diverger.
+// ⚠️ OUTIL DE CHANTIER (campagne hybride, 2026-08-01), à retirer avec elle.
+QString Game::cheminOrdreInjecte(int numNiveau) {
+    const QString nom = QString("ordre_niveau_%1.txt").arg(numNiveau, 4, 10, QChar('0'));
+    const QString ici = QDir::current().filePath(nom);
+    return QFile::exists(ici) ? ici : QString();
+}
+
+// LES SALLES (§6.2, 2026-08-01) : composantes connexes du sous-graphe des cases-buts
+// en 4-connexité. Deux buts voisins sont dans la même salle ; une salle est donc un
+// bloc de buts d'un seul tenant. Mesuré sur les 35 niveaux : 30 n'ont qu'UNE salle
+// (donc rien ne peut y changer), et six sont multi — 0 (trois salles d'un but !),
+// 10 (28+4), 18 (7+2+2), 24 (20+2), 25 (17+2), 26 (12+1).
+// ⚠️ Ce n'est PAS « les pièces du plateau » : le plateau est connexe pour le joueur.
+// C'est l'adjacence des BUTS, et c'est elle qui décide si la macro peut enchaîner.
+QVector<int> Game::sallesDeButs() const {
+    QVector<int> salle(nbButs, -1);
+    int n = 0;
+    for (int i = 0; i < nbButs; i++) {
+        if (salle[i] >= 0) continue;
+        salle[i] = n;
+        // Propagation jusqu'à saturation. nbButs ≤ 32 : le coût quadratique est
+        // sans objet, et c'est du statique (appelé une fois, au chargement).
+        for (bool encore = true; encore; ) {
+            encore = false;
+            for (int a = 0; a < nbButs; a++) {
+                if (salle[a] != n) continue;
+                const int ax = goals[a] % largeur, ay = goals[a] / largeur;
+                for (int b = 0; b < nbButs; b++) {
+                    if (salle[b] >= 0) continue;
+                    const int bx = goals[b] % largeur, by = goals[b] / largeur;
+                    if (qAbs(ax - bx) + qAbs(ay - by) == 1) { salle[b] = n; encore = true; }
+                }
+            }
+        }
+        n++;
+    }
+    return salle;
+}
+
 QVector<QVector<int>> Game::precedenceGlobale() const {
     QVector<QVector<int>> requis(nbButs);
 
@@ -1969,24 +2014,55 @@ QVector<int> Game::ordreParPrecedence() const {
     // respecte déjà toutes ses arêtes, chaque but est prêt à son tour et la séquence
     // ressort INCHANGÉE — l'identité, et donc le canari, sont préservés par
     // construction sur les niveaux sains (28 sur 33 le 2026-07-30).
+    //
+    // ⚠️ Le tri porte AUSSI le groupement SALLE PAR SALLE (§6.2, 2026-08-01), et il
+    // le porte ici plutôt qu'en post-passe séparée pour une raison de correction :
+    // remonter en bloc les buts d'une salle APRÈS coup casserait les arêtes de
+    // précédence que ce tri vient d'établir. En préférant, parmi les buts PRÊTS,
+    // celui de la salle en cours, on obtient le groupement maximal **compatible**
+    // avec les précédences — jamais au prix d'une violation.
+    //
+    // Pourquoi grouper : mesuré sur le 10 (28 buts + une satellite de 4), l'ordre
+    // entrelace la satellite aux rangs 0/14/29/31, donc dès la première pose le but
+    // actif part dans l'autre salle et plus AUCUNE macro n'est générée — 886 états
+    // sur 1 658 sans macro dans la partie mesurée. Ce n'est pas « l'humain préfère
+    // ne pas entrelacer », c'est « entrelacer rend la macro indisponible ».
+    // L'ordre ENTRE salles n'est pas gravé (trois ordres inter-salles mesurés, tous
+    // gagnants à +3 % près) : il tombe de la stabilité, la salle rencontrée en
+    // premier passe en premier.
     {
         QVector<bool> emis(nbButs, false);
+        const QVector<int> salle = sallesDeButs();
+        int salleCourante = -1;
         QVector<int>  trie;
         trie.reserve(nbButs);
+        auto pret = [&](int b) {
+            for (int g : requis[b]) if (!emis[g]) return false;
+            return true;
+        };
         while (trie.size() < nbButs) {
             int choisi = -1;
+            // 1) rester dans la salle en cours tant qu'elle a un but prêt. Sur un
+            //    niveau à salle unique cette passe est exactement la 2), donc
+            //    l'ordre ressort INCHANGÉ — 30 niveaux sur 35, canari compris.
             for (int b : ordre) {
-                if (emis[b]) continue;
-                bool pret = true;
-                for (int g : requis[b]) if (!emis[g]) { pret = false; break; }
-                if (pret) { choisi = b; break; }
+                if (emis[b] || salle[b] != salleCourante) continue;
+                if (pret(b)) { choisi = b; break; }
             }
+            // 2) sinon le premier but prêt de l'ordre courant : on change de salle,
+            //    et c'est lui qui fixe laquelle vient ensuite (stabilité).
+            if (choisi < 0)
+                for (int b : ordre) {
+                    if (emis[b]) continue;
+                    if (pret(b)) { choisi = b; break; }
+                }
             // CYCLE (aucun but prêt) : le modèle optimiste se contredit — on émet le
             // premier restant plutôt que de boucler. Dégradation gracieuse, jamais un
             // blocage : `butActif()` exige une permutation complète.
             if (choisi < 0)
                 for (int b : ordre) if (!emis[b]) { choisi = b; break; }
             emis[choisi] = true;
+            salleCourante = salle[choisi];
             trie.append(choisi);
         }
         ordre = trie;
@@ -2199,12 +2275,31 @@ void Game::calculDistancePoussee() {
     // règle. Or l'histoire du projet dit l'inverse — sur le 11, l'ordre est venu de
     // la main d'abord, la règle six approches plus tard.
     //
-    //   ORDRE_HUMAIN="(15,9) (15,8) (15,7) …"   (coordonnées x,y, dans l'ordre)
+    // DEUX sources, même format « (x,y) (x,y) … » :
     //
-    // ⚠️ Variable d'ENVIRONNEMENT, donc invisible depuis l'app lancée par un
-    // launcher (§7) : c'est un outil de BENCH. Et elle ne fait qu'ÉCRASER un ordre,
-    // jamais en ajouter un — sans elle, rien ne change.
-    const QByteArray inj = qgetenv("ORDRE_HUMAIN");
+    //   1. ORDRE_HUMAIN="(15,9) (15,8) …"  — variable d'ENVIRONNEMENT. ⚠️ Invisible
+    //      depuis l'app lancée par un launcher (§7) : c'est l'outil du BENCH.
+    //   2. le FICHIER `ordre_niveau_XXXX.txt` du répertoire courant — c'est le seul
+    //      moyen d'injecter un ordre dans l'APP, donc de le jouer en mode hybride et
+    //      de voir OÙ il coince. Même raison d'être, autre canal.
+    //
+    // Aucune des deux n'AJOUTE quoi que ce soit : elles écrasent un ordre déjà
+    // calculé. Sans elles, rien ne change (§7 : « un défaut coupé se voit tout de
+    // suite, un défaut manquant ne se voit jamais »). Et parce qu'un fichier oublié
+    // dans un coin changerait le comportement en SILENCE, l'injection est BRUYANTE :
+    // elle s'annonce sur stderr, et l'UI la répète dans le journal hybride — sans
+    // quoi on dépouillerait un jour une partie en croyant lire l'ordre calculé.
+    //
+    // ⚠️ OUTIL DE CHANTIER, À RETIRER avec le reste de la campagne hybride.
+    QByteArray inj = qgetenv("ORDRE_HUMAIN");
+    const QString fic = cheminOrdreInjecte(numNiveau);
+    if (inj.isEmpty() && !fic.isEmpty()) {
+        QFile f(fic);
+        if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            inj = f.readAll();
+            fprintf(stderr, "[ORDRE_FICHIER] lecture de %s\n", qPrintable(fic));
+        }
+    }
     if (!inj.isEmpty()) {
         QVector<int> voulu;
         const QRegularExpression re("\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)");
@@ -2501,6 +2596,39 @@ bool Game::macroPeutDemarrer(int idxCaisse, int indexBut, const QVector<bool>& z
     for (int d = 0; d < NB_DIRECTION; d++)
         if (avanceVersBut(idxCaisse, d, dCur, dpb, zone) >= 0) return true;
     return false;
+}
+
+Game::ECausePas0 Game::diagnosticPas0(int idxCaisse, int indexBut, const QVector<bool>& zone,
+                                      QVector<QPair<int,int>>* dirsAppui) const {
+    if (dirsAppui) dirsAppui->clear();
+
+    // Le même préambule que macroPeutDemarrer, aux mêmes conditions — mais chaque
+    // sortie devient une CAUSE au lieu d'un `false` indifférencié.
+    if (idxCaisse == goals[indexBut]) return Pas0DejaSurBut;
+    const int* dpb = distanceParBut.constData() + (qsizetype)indexBut * size * maxRegions;
+    const int joueurIdx = playerPoint.x() + playerPoint.y() * largeur;
+    const int rAvant = regions[joueurIdx * size + idxCaisse];
+    if (rAvant < 0) return Pas0HorsRegion;
+    const int dCur = dpb[idxCaisse * maxRegions + rAvant];
+    if (dCur <= 0) return Pas0ButInatteignable;
+
+    // Zone TOTALE : le joueur supposé capable d'atteindre n'importe quel appui.
+    // Une direction qui passe ici mais pas avec la zone réelle isole exactement
+    // la contrainte de placement du joueur, et rien d'autre.
+    const QVector<bool> zoneTotale(size, true);
+    int bloqueesParLeJoueur = 0;   // compté à part : le verdict ne doit pas
+                                   // dépendre de la présence du pointeur de sortie
+    for (int d = 0; d < NB_DIRECTION; d++) {
+        if (avanceVersBut(idxCaisse, d, dCur, dpb, zone) >= 0) return Pas0Demarre;
+        if (avanceVersBut(idxCaisse, d, dCur, dpb, zoneTotale) < 0) continue;
+        bloqueesParLeJoueur++;
+        if (dirsAppui) {
+            const int ax = idxCaisse % largeur - directions[d].dx;
+            const int ay = idxCaisse / largeur - directions[d].dy;
+            dirsAppui->append({d, ax + ay * largeur});
+        }
+    }
+    return bloqueesParLeJoueur > 0 ? Pas0JoueurMauvaisCote : Pas0DetourRequis;
 }
 
 bool Game::macroVersBut(int idxCaisse, int indexBut, QVector<QPair<int,int>>& poussees,

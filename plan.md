@@ -63,6 +63,10 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `moureel <niv> [astar]` | **(neuf, 2026-07-28) OÙ NAÎT LE MOU DE `h`** : rejoue une solution **optimale** et décompose le mou poussée par poussée. Sur un chemin optimal `C*(état) = C* − g`, donc `mou = (C* − g) − h` **sans aucun sous-solve**. Repère les poussées de RECUL (`Δh = +1`), suit le devenir de la case libérée (la même caisse revient ? une autre passe ? le joueur ?) et compte les conflits de trajets. Auto-vérifié par `Σ(1+Δh) = mou` |
 | `bench <niv> <mode> record` | **(neuf, 2026-07-28)** écrit en `.xsb` **chaque état qui bat le record de caisses posées**, daté en dépilements (stderr, entrelacé avec la jauge). Vérifie que le chemin reconstruit mène bien à l'état exporté. C'est ce qui a chiffré le plongeon AVANT de le coder. `bench` accepte aussi un **chemin `.xsb`** au lieu d'un numéro |
 | `ordre <niv>` | **(neuf, 2026-07-29) POURQUOI LA MACRO SE MURE** : imprime `ordreButs` (carte des rangs en base 36 + déroulé), et vérifie **deux** précédences — la **locale** du §6.2 (approches du dernier pas) et une **globale** neuve (trajet de tirage complet : *G doit précéder B si, B traité comme occupé, plus aucune caisse n'atteint G*). Statique, O(buts²×plateau), aucune recherche. À sa création : **0 violation sur les 14 résolus + 190/191, 1 à 29 sur 11 non-résolus** — depuis que la précédence globale est CODÉE (2026-07-30, §6.2), **0 violation partout**, l'outil ne sert donc plus qu'à surveiller les régressions et le murage LOCAL |
+| **mode HYBRIDE** (dans l'app) | **(neuf, 2026-08-01) LE SOLVEUR ANNOTE UNE PARTIE HUMAINE.** Case à cocher : l'ordre de remplissage s'affiche en chiffres sur les buts, et à CHAQUE coup joué à la main l'UI rejoue le **régime d'engagement du solveur** (`solveurastar.cpp:331-343` — `getCaissesDeplacable` → `macroPeutDemarrer` → `macroVersButBacktrack` + `!isPerdu`) et surligne les macros jouables. Clic sur une caisse cerclée = la macro se joue ; clic sur une case libre = le perso y marche ; **clic DROIT = « il aurait dû y avoir une macro ici »**, qui consigne la CAUSE (poussable dans aucune direction / échec au pas 0 / descente bloquée en (x,y) avec N restants / aboutit mais `perdu`) + le plateau. Tout part dans `hybride_niveau_XXXX.txt` (un par niveau, en AJOUT, flush par ligne). C'est le seul outil qui répond à « l'ordre est-il BIEN JOUÉ ? », là où `ordre` ne répond qu'à « est-il FAISABLE ? »<br>**(2026-08-01, suite) LE RANG DU COUP HUMAIN** — à chaque poussée vraiment choisie (hors macro, hors rejeu), l'UI rejoue l'**enfilage** du solveur sur l'état d'avant (mêmes enfants, mêmes élagages dans le même ordre, même clé de tri que le comparateur) et journalise `[rang] (x,y) Dir \| rang R/N \| h .. f .. \| meilleur (x,y) Dir \| df ±k`. Trois variantes : `HORS REGIME MACRO` (le solveur ne générerait aucune poussée simple — c'est la mesure du désaccord), `⚠ ECARTE par le solveur` (**faux positif d'élagage PROUVÉ** si la partie est gagnée : c'est le juge `fp` étendu aux niveaux NON RÉSOLUS), `⚠ INTROUVABLE` (le miroir a divergé du solveur). ⚠️ Rang **parmi les frères**, pas dans la file globale : ce qui s'y transporte, c'est `df` |
+| `pas0 <niv>` | **(neuf, 2026-08-01) POURQUOI AUCUNE MACRO N'EST DISPONIBLE**, sur le plateau de DÉPART. Pour chaque couple (caisse, but), rejoue le contrat EXACT de l'UI — `macroPeutDemarrer`, descente `macroVersButBacktrack` menée au bout, `!isPerdu` — et classe les échecs : *amorce puis bloque en (x,y)*, *détour non-monotone requis*, *joueur du mauvais côté*. Répond en une seconde à « le premier but choisi change-t-il quelque chose au démarrage ? » (sur le 12 : non, aucun des 15 n'est atteignable). ⚠️ **Le premier jet ne testait que `macroPeutDemarrer` et annonçait l'inverse** — amorcer n'est PAS aboutir. Outil de chantier |
+| **injection d'ordre par FICHIER** | **(neuf, 2026-08-01)** `ordre_niveau_XXXX.txt` dans le répertoire courant écrase l'ordre calculé de ce niveau. Complète `ORDRE_HUMAIN`, qui est une variable d'environnement et **n'atteint donc pas l'app** lancée par un launcher (§7) : c'est le seul moyen de JOUER un ordre à la main en mode hybride et de voir où il coince. Même parseur, exemplaire unique. **Bruyant des deux côtés** (`[ORDRE_FICHIER]` sur stderr, et le journal hybride écrit `ordre de remplissage ⚠ INJECTE depuis …` au lieu de `calcule`) — un fichier oublié changerait sinon le comportement en silence, le pire cas du §7. Absent = rien ne change |
+| **rejeu de journal + INTENTIONS** (dans l'app) | **(neuf, 2026-08-01) CAPTURER LE PLAN, PAS LE COUP.** Touche `L` : relit `hybride_niveau_XXXX.txt`, en extrait la **dernière partie GAGNÉE** (les `[undo]` retirent le dernier coup) et l'installe dans le rejeu pas à pas existant — aucune mécanique de navigation en double. `N` saute à la prochaine **poussée choisie** (macros et marche franchies d'un coup). Six touches d'intention en vocabulaire **FERMÉ** : `E` écarter du chemin d'une autre caisse · `O` ouvrir un passage joueur · `G` garer pour plus tard · `A` préparer un appui · `T` **sortir pour reprendre dans l'autre sens** (= le RECUL du §3) · `R` rapprocher · `?` je ne sais pas. **Une frappe par PLAN**, valable jusqu'à la suivante — c'est l'objet même : le rang d'un coup isolé ne peut pas voir un plan sur plusieurs coups. Sortie : `hybride_niveau_XXXX_intentions.txt`, avec le **numéro de coup** (sans lui les annotations seraient orphelines). ⚠️ Flèches et Retour arrière **neutralisés** pendant une session : ils modifient le plateau sans toucher à `posPas`, et le numéro de coup écrit devient faux |
 | `diverge`, `paires`, `trace`, `passages`, `congestion` | mou de `h`, interactions de paires, solution pas à pas, cartes de trajets |
 
 **Règles de mesure, non négociables :**
@@ -1228,10 +1232,13 @@ re-couvrage tardif de la case d'entrée (2,10) est la danse de la case-porte (co
 niv 11), **pas** un entrelacement. **L'ordre entre salles est LIBRE** (dixit l'utilisateur : « on
 pourrait faire G d'un coup n'importe quand ») — ce qui compte, c'est **ne pas entrelacer**.
 
-- [ ] **Correctif minimal** dans `calculDistancePoussee()` (où `ordreButs` est construit) :
+- [x] **Correctif minimal** dans `calculDistancePoussee()` (où `ordreButs` est construit) :
   grouper les buts par **composante connexe** (= salle), rebours **dans** chaque composante,
   émettre **salle par salle** (jamais mélangé). `butActif()` finira alors une salle avant
   l'autre, automatiquement.
+  ✅ **FAIT le 2026-08-01** (session dédiée en fin de §6.2) : **×7,54 sur le 10** (2 160 492 → 286 428
+  états, 544 poussées des deux côtés), binaire contre binaire. Réalisé non pas en post-passe mais
+  **dans le tri topologique** — grouper après coup casserait les arêtes de précédence.
 - [ ] **Ne PAS inventer de règle inter-salles** à partir du seul niveau 10 (piège §11.4) : un
   ordre par défaut stable, point. La mesure sur les 33 tranche (canari intact = pas de
   régression sur les résolus, une seule composante = ordre inchangé).
@@ -1595,6 +1602,12 @@ haut ; il fallait l'inverse.
   lui** (2 175 724 états, 544 poussées), alors que tout le §6.2 le présentait comme le niveau qui
   l'exigeait. Son ordre calculé est d'ailleurs **sain** (99 arêtes, 0 violée). Le correctif reste
   ouvert pour 18/24/25/26, mais **déclassé en priorité**.
+  ➡️ ⚠️ **REQUALIFIÉ le 2026-08-01** (session « mode hybride », fin du §6.2) : « sain » et
+  « déclassé » restent vrais au sens où le 10 tombe sans le correctif — mais son ordre est bel et
+  bien **mauvais**, et on sait enfin en quoi. La satellite est éclatée aux rangs 0/14/29/31, donc
+  **dès la première pose le but actif part dans l'autre salle** et la macro devient indisponible.
+  Mesuré sur une partie humaine gagnante : **4 macros lancées sur 32**, 884 états bloqués sur le
+  même but. Le correctif est **re-priorisé**, et son argument n'est plus esthétique.
 
 #### ✅ Session du 2026-07-29 (suite) — FAMILLE A CORRIGÉE : le glouton ne force plus, il recule
 
@@ -1922,19 +1935,29 @@ répondable. Le 18 cesse d'être un problème par disparition de la question.
   `staticDeadlock` regarde `casesMortes` où (14,6) est un but. Il faudrait le test de **gel**.
 - [ ] **Faire respecter l'ordre aux poussées simples (R1)** — toujours pas fait, et c'est ce qui
   manque pour que le 12 tombe **sans** injection. Deux variantes : sèche (interdire toute pose hors
-  ordre dans le repli) ou avec exemption de transit. ⚠️ Le cas du 13 penche pour la sèche : la
-  caisse fautive de (14,7) peut encore bouger latéralement, donc une exemption la laisserait passer.
+  ordre dans le repli) ou avec exemption de transit. ~~⚠️ Le cas du 13 penche pour la sèche : la
+  caisse fautive de (14,7) peut encore bouger latéralement, donc une exemption la laisserait
+  passer.~~ ❌ **RÉFUTÉ le 2026-07-31 (nuit)** : la partie gagnante du 13 fait **84 départs de but**
+  pour 16 poses définitives — la sèche interdirait la solution. Cf. la session dédiée ci-dessous.
 - [ ] **Corriger la contiguïté de run** pour que le 12 et le 13 sortent le bon ordre tout seuls.
   Le 12 donne enfin une **cible mesurable** (son ordre humain résout), le 13 une cible localisée
   (colonne x=16). Diagnostic manquant : les candidats et leurs clés de tri au rang décisif — c'est
   la trace `ORDRE_TRACE` retirée le 2026-07-20, une dizaine de lignes à remettre.
-- [ ] **Ordre à la main du 13** — l'utilisateur le reprend à tête reposée. « Ça va pas être simple
-  d'en sortir une règle » : c'est le chemin normal ici, l'ordre du 11 est venu de la main d'abord
-  et la règle six approches plus tard.
+  ⚠️ **Le 13 n'est plus une cible valable** (session ci-dessous) : la règle qui reproduirait son
+  ordre humain reproduirait un ordre **mesuré perdant**. Reste le 12, et le murage de 18/22.
+- [x] **Ordre à la main du 13** — ✅ **RELEVÉ ET MESURÉ le 2026-07-31 (nuit)**, session dédiée
+  ci-dessous. La règle EST sortie (« remplir en peigne, du fond vers l'entrée ») ; l'ordre, lui,
+  fait **perdre** le solveur.
 - [ ] **Régime `ordre-dyn` : à garder ou à jeter ?** Il coûte plus cher que `coupl-plongeon` partout
   où il a été mesuré (6 : ×87, 7 : ×9, 5 : ×8,3 ; 17 : −11 %), résout les 8 niveaux testés, et n'a
   débloqué ni le 13 (8/16 contre 9/16 à 120 s) ni rien d'autre. Sa garde anti-échouage est
   **relâchée presque en permanence** (trace `[ordre]`), donc elle ne sert quasiment à rien.
+  ➡️ **NE PAS LE JETER TOUT DE SUITE** (2026-08-01, fin du §6.2) : on sait maintenant **ce qu'il
+  achète**, ce qui manquait pour trancher. Avec un ordre STATIQUE, la macro est indisponible pour
+  tout but qu'on n'est pas en train de faire — sur le 10 joué à la main, **886 états sur 1 658**
+  (53 %) sans aucune macro, le but actif figé sur un but d'une autre salle. Ça ne prouve pas qu'il
+  paie ; ça donne enfin l'hypothèse à tester. ⚠️ Le tester **après** le correctif salle par salle,
+  pas avant : celui-ci supprime la majeure partie du symptôme à coût nul.
 - [ ] **Le 18 restera muré quoi qu'on fasse** au modèle statique : son espace de recherche est
   réellement épuisé à budget 200 (il n'escalade pas). Aucun ordre sain complet n'y existe.
 
@@ -1944,12 +1967,1221 @@ anti-échouage + trace `[ordre]` (`game.cpp`/`game.h`) ; régime d'essai `ordre-
 affichage UI du but actif en bleu et des autres en sable sur l'état-max (`goal.cpp`, `wgame.*`,
 `mainwindow.cpp`).
 
-### 6.3 Robustesse / temps
+#### ❌ Session du 2026-07-31 (nuit) — L'ORDRE HUMAIN DU 13 : relevé sur partie gagnante, et il fait PERDRE
+
+**La partie.** L'utilisateur a joué le 13 à la main jusqu'au bout et livré la trace `[mouv]`
+complète (le `qDebug` par coup de `mainwindow.cpp`, gardé depuis le 2026-07-20 — il vient de payer
+une deuxième fois). **Rejouée avec contrôle de légalité** à chaque poussée — caisse présente à la
+source, destination libre, appui atteignable par flood-fill depuis la position réelle du joueur —
+elle rend **276 poussées, toutes légales, 16/16 : GAGNÉ**. Les quatre `[undo]` forment deux groupes
+qui annulent exactement deux poussées ; c'est pris en compte.
+
+⚠️ **Le rejeu n'est pas une précaution de confort.** C'est lui qui garantit qu'une transcription de
+276 poussées ne porte pas d'erreur silencieuse : une poussée fausse casse la légalité d'une
+suivante, et le seul rejeu qui va au bout est le bon. Même exigence que le « vérifier que le chemin
+reconstruit mène bien à l'état exporté » de `bench … record` (§6.3) — et même raison, le bug
+big-endian de `mou` (§5). **Les chiffres ci-dessous ne sont pas une lecture de la trace, ils sont un
+rejeu.** (Transcription et script : jetables, non versionnés.)
+
+**L'ORDRE DÉFINITIF DE POSE** (dernière arrivée sur chaque but, transits ignorés — la même
+extraction que sur la trace du 192 le 2026-07-20) :
+
+```
+(14,8) (14,6) (15,3) (14,4) (16,3) (16,4) (16,6) (14,3)
+(16,8) (16,5) (14,5) (16,7) (14,7) (16,9) (15,9) (14,9)
+```
+
+**Il passe les trois tests** (`ordre 13` sous `ORDRE_HUMAIN`) : 0 violation locale, 0 globale,
+0 arête-paire, aucun murage. L'ordre calculé, lui, est **MURÉ au rang 14 sur (16,3)** et viole 2
+arêtes globales. **Le 13 n'est donc PAS un second 12** : ici les outils voient bien le défaut.
+
+**❌ ET POURTANT IL FAIT PERDRE.** Même binaire (`8ae4cc9`, arbre propre), même régime
+`coupl-plongeon`, seule la variable d'environnement diffère :
+
+| | ordre **calculé** (défaut) | ordre **humain** (injecté) |
+|---|---|---|
+| meilleur remplissage | **9/16**, atteint dès **544 445** dépilés | **1/16**, encore 1/16 à **5 802 000** dépilés |
+| plongeons tentés | 8 | **0** — aucun record ne se produit |
+| `rangees` en régime courant | 1 à 6 | **0** |
+
+**Dix fois plus de travail pour neuf fois moins de caisses posées**, et la signature est celle du
+**Groupe A** (§0) : la macro ne s'engage jamais, le solveur brûle des états bon marché en poussées
+simples (5,8 M dépilés en 300 s contre ~1,8 M pour la référence, qui elle fait tourner macro et
+corrals).
+
+> ⚠️ **L'INVERSION EST COMPLÈTE : l'ordre que les trois tests VALIDENT est celui qui perd, celui
+> qu'ils déclarent MURÉ est celui qui avance.** C'est le pendant exact du 12, où l'ordre humain
+> débloquait. La réserve « humain et gagnant ne veut pas dire bon pour la macro » (§6.2, 2026-07-20)
+> était connue **dans un seul sens** — « moins bon » (l'ordre du 11 de juillet : 460 000 états contre
+> 27). Elle vaut aussi dans le sens **catastrophique**, et un ordre validé par les outils n'est pas
+> une garantie de quoi que ce soit.
+
+**LA GÉOMÉTRIE, et elle explique le prix.** La salle est un **peigne** : deux colonnes de 7 buts
+(x=14 et x=16) séparées par les dents (15,4) (15,6) (15,8), et bordées à gauche par (13,4) (13,6)
+(13,8). Conséquences, toutes statiques :
+
+- **6 buts sur 16 n'ont AUCUNE approche latérale** — (14,4) (14,6) (14,8) et (16,4) (16,6) (16,8) :
+  ils ne peuvent être servis qu'en circulant *le long* de leur colonne. Ce sont les « murs chiants »
+  de l'utilisateur, et ils occupent les rangs **0, 1, 3, 5, 6, 8** de l'ordre humain — tous dans les
+  neuf premiers.
+- **La rangée 3 n'est alimentée QUE par le haut de la colonne 16.** Une caisse ne peut entrer en
+  (15,3) que depuis (16,3) poussée à gauche (joueur en (17,3)) ou depuis (14,3) poussée à droite
+  (joueur en (13,3)) — et **(13,3) n'est atteignable que depuis (14,3) poussée à gauche**, donc
+  depuis l'intérieur. Il n'y a pas d'entrée externe en haut de la salle.
+- **D'où l'ENROULAGE, qui est littéral** : la première caisse fait rangée 9 vers la droite →
+  (16,9) → poussée jusqu'en haut de la colonne 16 → (16,3) → rangée 3 vers la gauche → (15,3) →
+  (14,3) → garage en **(13,3)**, puis relancée à droite et descendue toute la colonne 14 jusqu'en
+  **(14,8)**. Une trentaine de poussées pour une caisse. **17,2 poussées par caisse** sur l'ensemble
+  de la partie (276 pour 16) — c'est le prix du tour.
+
+**LA RÈGLE EST SORTIE, elle, et elle est formulable** (l'utilisateur annonçait l'inverse : « ça va
+pas être simple d'en sortir une règle ») :
+
+> Chaque ligne de buts est alimentée par une **extrémité**. On la remplit **du fond vers l'entrée** —
+> mais **EN PEIGNE** : on saute les buts qui gardent une alimentation latérale indépendante, parce
+> qu'ils servent de passage au joueur et d'entrée aux caisses tant qu'ils sont vides. Ils se
+> comblent en dernier.
+
+Sur le 13 elle rend exactement les rangs relevés : colonne 14 (alimentée par le haut) → **8, 6, 4**
+puis (14,3) puis 5, 7, 9 ; colonne 16 (alimentée par le bas) → **3, 4, 6, 8** puis 5, 7, 9. C'est
+précisément ce qui manque à la **contiguïté de run**, qui remplit *en continu* — et ça explique le
+défaut noté le 2026-07-31 (soir) : « la colonne x=16 est attaquée par les deux bouts, (16,5)/(16,6)
+restent en sandwich ».
+
+- ⚠️ **Mais ne pas la coder en espérant débloquer le 13** : elle reproduirait à peu près l'ordre
+  humain, donc le tableau ci-dessus. Elle ne se justifie que pour rendre l'ordre calculé **sain**
+  (il est muré) et sur les deux autres murés, **18 et 22**. Bénéfice attendu : nul sur le 13.
+
+**LE CHIFFRE EXPLOITABLE, et il tranche une question ouverte.** Les 16 buts reçoivent **100
+arrivées** pour **84 départs** — (14,9) est traversé 10 fois, (16,7) et (16,9) 8 fois chacun :
+
+> **Dans cette salle, les cases-BUTS SONT le couloir de livraison.** Il n'y a pas d'autre route.
+
+- **❌ La variante SÈCHE de R1 est morte sur le 13** (interdire toute pose hors ordre aux poussées
+  simples) : elle interdirait les 84 transits qui font la solution. Le plan penchait pour la sèche
+  la veille au soir, sur l'argument « la caisse fautive de (14,7) peut encore bouger latéralement » ;
+  la partie dit le contraire. **Sixième déguisement du piège « caisses = murs »** (gel naïf, `h` qui
+  soustrait, caisses=murs, gelées=murs, buts-remplis=murs, et maintenant buts-dans-l'ordre=murs).
+- **✅ Le MASQUAGE est le bon mécanisme, et pour une raison mesurée** : un but non révélé est du sol
+  ordinaire, donc les 84 transits passent **gratuitement**, sans aucune exemption à écrire. C'est
+  l'argument « R1 gratuitement » du 2026-07-31 (soir), enfin appuyé par un chiffre.
+
+**Reste ouvert :**
+- [ ] **Le verrou du 13 n'est pas l'ordre — c'est l'EXÉCUTION de l'enroulage.** La macro sait le
+  faire **une fois** (elle atteint 1/16), jamais deux : chaque but suivant redemande un tour complet
+  avec quinze caisses dans le passage. C'est `echecBloque` (§6.3) sur un trajet de 30 poussées.
+  Piste à discuter avant de coder : rien dans le plan n'attaque ce cas.
+  ➡️ ⚠️ **REQUALIFIÉ le 2026-08-01** (dernière session du §6.2) : ce n'est pas l'exécution, c'est la
+  **GÉNÉRATION**. Mesuré sur une partie gagnée à la main : une macro vers l'entrée (14,9) est
+  engageable dans 87 % des états, donc `solveurastar.cpp:792` supprime les poussées simples et **89 %
+  des coups de la solution ne sont l'enfant de rien**. La macro n'échoue pas — elle est offerte en
+  permanence, et elle est **perdante**.
+- [ ] **Ne pas relancer le 13 sur l'ordre.** Trois voies y ont été fermées en deux jours : l'ordre
+  calculé (muré), l'escalade de budget (chargement non borné), l'ordre humain (perdant).
+
+#### 🎯 Session du 2026-08-01 — LE MODE HYBRIDE : cinq niveaux rejoués à la main, annotés par le solveur
+
+**L'outil** (§1, idée utilisateur) : on joue à la main pendant que l'UI rejoue à chaque coup le
+**régime d'engagement du solveur** et affiche l'ordre de remplissage sur les buts. Tout est
+journalisé. Ça répond à la question que ni `ordre`, ni `fp -3`, ni la précédence par paires ne
+savaient poser — **« l'ordre est-il BIEN JOUÉ ? »**, et non « est-il faisable ? » (c'est la réserve
+du 12, §6.2 : les trois tests séparent l'infaisable du faisable, pas le mauvais du bon).
+
+**Cinq niveaux joués et GAGNÉS à la main : 1, 2, 3, 4 et 10.** Aucun n'est un score
+([scores.md](scores.md) ne bouge pas : ce sont des parties humaines, pas des solves).
+
+**FAIT 1 — LA MACRO POSE 100 % DES CAISSES. Les poussées simples font 100 % du démêlage.**
+
+| niveau | buts | **macros lancées** | coups | poussées (optimum) |
+|---|---|---|---|---|
+| 1 | 6 | **6** | 256 | 97 (= 97) |
+| 2 | 10 | **10** | 517 | 157 (131) |
+| 3 | 11 | **11** | 376 | 138 (134) |
+| 4 | 20 | **20** | 1 156 | 418 (355) |
+
+Pas une seule caisse posée à la main sur les quatre. **Ce sont deux machines disjointes**, et ça
+déplace le diagnostic : le problème du solveur n'est pas que la macro soit mauvaise — elle ne rate
+rien — c'est qu'il n'a **aucun guidage** pendant la phase où elle ne peut pas s'engager.
+
+**FAIT 2 — l'ordre calculé de 1/2/3/4 est bon ET jouable : 0 inversion sur les quatre.** C'est la
+première fois qu'on le sait. ⚠️ Réserve : l'ordre était AFFICHÉ, donc c'est de la conformité
+volontaire — ça prouve qu'il est **jouable jusqu'au bout**, pas qu'il soit optimal.
+
+**FAIT 3 — LES TRANSITS SONT MASSIFS, et cette fois sur cinq niveaux** (le plan ne les tenait que
+du 13, 100 arrivées / 84 départs) :
+
+| niveau | 2 | 3 | 4 | **10** |
+|---|---|---|---|---|
+| arrivées sur but | 15 | 26 | 59 | **209** |
+| poses définitives | 10 | 11 | 20 | 32 |
+| **transits** | 5 | **15** | **39** | **177** |
+
+> **La variante SÈCHE de R1 est re-tuée, cinq fois.** Interdire les poses hors ordre aux poussées
+> simples interdirait 177 transits sur le seul niveau 10. Le **masquage** reste le seul mécanisme
+> qui les laisse passer gratuitement (§6.2, 2026-07-31 nuit).
+
+**FAIT 4 — le démêlage d'entrée du 4, mesuré : 142 des 153 états qui précèdent la première pose
+n'offrent AUCUNE macro** (93 %), en une seule plage continue. Contre 12 sur le 1, 19 sur le 2, 3 sur
+le 3. Ce chiffre-là n'est pas contaminé par le FAIT 6 ci-dessous : rien n'était encore posé, il n'y
+avait aucun ordre dont s'écarter. **Le trou de démêlage est un trou de GUIDAGE** — `ordreButs` n'y
+est pas lu (les poussées simples ne le lisent jamais), les tie-breaks sont épuisés (§6.1), il ne
+reste rien. C'est la seule phase du jeu où le solveur n'a aucune information directionnelle.
+
+**FAIT 5 — LE 10, TROIS ORDRES INTER-SALLES, TOUS GAGNANTS.** Le 10 est le multi-salles d'école
+(satellite 4 buts en (2-3, 10-11), grosse salle 28 buts en x=15-17). L'ordre calculé **entrelace** :
+satellite aux rangs **0, 14, 29, 31**.
+
+| ordre joué | satellite aux rangs joués | coups | poussées | **macros lancées** | états sans macro |
+|---|---|---|---|---|---|
+| l'ordre calculé, suivi | 0,1,20,31 | 1 607 | 519 | **30/32** | 133 (8 %) |
+| satellite d'un bloc, en 1ᵉʳ | 0,1,2,3 | 1 610 | 521 | **29/32** | 132 (8 %) |
+| **grosse salle d'abord** | 28,29,30,31 | 1 658 | 524 | **4/32** | **886 (53 %)** |
+
+- **L'ordre ENTRE salles est libre au sens du coût** — les trois gagnent, à +3 % près. Ça confirme
+  le « on pourrait faire G d'un coup n'importe quand » de juillet. Ce qui n'est pas libre, c'est
+  **d'entrelacer**.
+- **L'EXCEPTION « PORTE » EST MORTE.** La partie « satellite d'un bloc » met (2,10) en **4ᵉ
+  position**, pas au rang 20 comme la partie de juillet. La porte n'a pas besoin d'attendre la
+  grosse salle : sa précédence est **interne à la salle**, et `ordreParPrecedence` la produit déjà.
+  Le correctif salle par salle n'a donc **aucune exception à écrire**.
+- **Mais la 3ᵉ variante n'est pas exploitable par le solveur** : 4 macros sur 32, 28 caisses posées
+  à la main. Cause lue dans le journal — `butActif()` rend le premier but non rempli de `ordreButs`,
+  donc **(3,10), rang 0, reste le but actif pendant 884 états** pendant qu'on remplit l'autre salle.
+  Aucune macro vers la grosse salle n'est jamais générée.
+
+**FAIT 6 — ⚠️ LE PIÈGE DE LA SESSION, tombé dedans en direct.**
+
+> **La métrique « états sans macro » ne mesure PAS la difficulté — elle mesure l'ÉCART À
+> `ordreButs`.** Dès qu'on joue autre chose que le but actif, elle sature.
+
+Le 113 contre 87 des deux premières variantes avait été lu comme « aller poser 4 caisses à l'autre
+bout concentre le démêlage ». **Faux** : après (3,10) rang 0, le but actif saute à (15,8) rang 1 —
+dans l'autre salle — pendant qu'on finit la satellite ; les 113 états sont bloqués sur (15,8), pas
+sur une difficulté de plateau. C'est la 3ᵉ variante (884 états sur (3,10)) qui a rendu le mécanisme
+lisible. **Un instrument d'observation peut mesurer l'observateur** — cf. §7.
+Les chiffres de 1/2/3/4 ne sont PAS touchés : 0 inversion, donc aucun écart possible.
+
+**CE QUE ÇA CHANGE POUR LE CORRECTIF MULTI-SALLES** (ouvert depuis le 2026-07-17, déclassé le
+2026-07-29 au motif que « le 10 est tombé sans lui ») : il gagne une justification qu'il n'avait
+pas. Ce n'est plus « l'humain préfère ne pas entrelacer », c'est **entrelacer rend la macro
+indisponible** — dès la première pose, le but actif part dans l'autre salle.
+
+- [x] **À CODER, décidé le 2026-08-01** — dans `calculDistancePoussee()` : composantes
+  connexes de buts (= les salles), rebours + contiguïté **inchangés à l'intérieur** de chaque
+  composante, **émission salle par salle**. Aucune exception « porte ». ~~Les niveaux à une seule
+  salle sortent **inchangés à l'octet par construction** — donc zéro risque sur les 15 résolus.~~
+  Juges dans l'ordre : `ordre` sur les 35 (0 violation partout), canari au solveur, puis `bench 10`.
+  ✅ **FAIT le 2026-08-01**, les trois juges passés, **×7,54 sur le 10**. ⚠️ Le « zéro risque sur les
+  15 résolus » était **faux** : le **0 et le 10 sont multi-salles et résolus** (mesuré avant de coder,
+  cf. la session dédiée). Le 0 ressort tout de même identique — trois salles d'un but sont déjà
+  groupées trivialement.
+- [ ] **Prédiction à vérifier après le correctif** (c'est elle qui le valide ou l'enterre) : avec la
+  satellite aux rangs 0-1-2-3 puis la grosse salle, la partie « satellite d'un bloc » doit passer de
+  **29/32 macros et un trou de 113** à **~32/32 et pas de trou**. Rejouable en dix minutes.
+- [ ] **Ordre inter-salles : ne rien graver.** Les trois variantes gagnent ; rien dans cette session
+  ne dit quelle salle doit passer en premier. Défaut stable, point (§6.2, piège du 2026-07-17 :
+  « ne PAS inventer de règle inter-salles à partir du seul niveau 10 »).
+
+**L'ARGUMENT NEUF POUR `ordre-dyn`**, que le plan s'apprêtait à jeter (« coûte plus cher partout,
+n'a rien débloqué ») : avec un ordre STATIQUE, la macro est indisponible pour **tout but qu'on n'est
+pas en train de faire**. Sur un multi-salles, c'est la moitié de la partie (886 états sur 1 658).
+Ce n'est pas une preuve qu'`ordre-dyn` paie — il reste plus cher partout où il a été mesuré — mais
+c'est la première fois qu'on sait **ce qu'il achète**.
+
+**Reste à faire :**
+- [ ] **Rejouer les autres niveaux dans ce mode** (campagne en cours). Ce qu'il faut lire dans un
+  journal : les inversions par rapport à `ordreButs`, les `-> POUSSEES SIMPLES` (et le but actif qui
+  les bloque, pour ne pas retomber dans le FAIT 6), le rapport transits/poses, et les causes
+  `[manque]`.
+- [x] **Le 13 et le 12 dans ce mode** — ce sont les deux niveaux dont le plan dit le plus de choses
+  contradictoires sur l'ordre. Le mode devrait trancher sans une ligne de solveur.
+  ✅ **13 FAIT le 2026-08-01** (dernière session du §6.2) : il a tranché, et pas sur l'ordre — le 13
+  est **gagné à la main** et 89 % de cette partie est hors de l'arbre du solveur. **Le 12 reste à
+  faire**, et c'est maintenant le plus intéressant des deux : son ordre humain, lui, RÉSOUT.
+
+**État du code** (non commité, branche `ordre-dynamique`) : `mainwindow.ui` (case `cbHybride`),
+`mainwindow.*` (surcouches, journal, exécution de macro, marche au clic, rapport `[manque]`,
+`plateauXsb` factorisé avec l'export), `wgame.*` (rangs des buts, macros jouables, cases signalées,
+clic droit). `solveur.h` : `appuis` passée de `protected` à `public` — l'UI descend les poussées en
+coups de marche par la même recette que `reconstruire()`, exemplaire unique. **Rien dans le
+solveur**, aucune variable d'environnement (§7). Canari vérifié après coup : 4/97/131/134/213
+poussées, 4/14/412/499/24 786 états.
+➡️ ⚠️ **« Rien dans le solveur » n'est plus vrai depuis la session ci-dessous** (2026-08-01,
+suite) : deux constantes (`CORRAL_BUDGET`, `corralActif`) sont passées de `solveurastar.cpp` à
+`solveurastar.h` pour que le miroir de l'UI ne puisse pas dériver. Aucun changement de
+comportement, vérifié binaire contre binaire.
 
 - [ ] **Repli anytime pour la macro** : passe 1 avec macro plafonnée en états, passe 2 sans
   macro si le budget est épuisé. Le repli doit se déclencher sur le **budget**, pas sur
   l'échec (un cas lent n'émet jamais « aucune solution »). Borne surtout le temps des cas
   lents (8, 9).
+
+#### ❌ Session du 2026-08-01 (suite) — LE RANG DU COUP HUMAIN : le démêlage n'est PAS un problème de CLASSEMENT
+
+**La question, et pourquoi elle valait d'être posée.** Le FAIT 4 ci-dessus disait « le trou de
+démêlage est un trou de GUIDAGE » — les poussées simples ne lisent jamais `ordreButs`, les
+tie-breaks sont épuisés (§6.1), il ne reste rien. Mais « le solveur n'a aucun guidage » n'était pas
+un nombre. D'où la mesure : **à quelle place le solveur classerait-il la poussée qu'on vient de
+jouer à la main ?** Rang 1-3 en permanence ⇒ le démêlage n'est pas un problème de guidage et il faut
+chercher ailleurs ; rang 80 ⇒ on connaît l'écart à combler, et le journal devient un corpus étiqueté
+(état → bon coup) pour juger une `h` candidate **hors ligne**, sans écrire une ligne de solveur.
+
+**L'outil** (`MainWindow::mesureRangCoup`, cf. §1) : à chaque poussée **vraiment choisie** (ni rejeu
+de solution, ni exécution de macro), l'UI rejoue l'enfilage de `solveurastar.cpp` sur l'état d'avant
+— mêmes enfants, mêmes élagages dans le même ordre (`isPerdu` → corral unitaire → corral-N au même
+budget), même clé de tri que le comparateur — et journalise le rang du coup joué.
+
+**RÉSULTAT — et c'est un résultat NÉGATIF, donc le plus utile de la session.** Les neuf journaux
+existants rejoués hors ligne (harnais jetable, non versionné), **204 poussées mesurées** en régime
+poussées simples :
+
+| niv | mesurées | enfants (moy.) | rang moyen | **rang 1** | **`df` = 0** | rang max |
+|---|---|---|---|---|---|---|
+| 4 | 60 | 6,8 | 3,12 | 45 | 75 % | 18 |
+| 7 | 37 | 4,1 | 2,43 | 9 | 62 % | 6 |
+| 8 | 33 | 8,0 | 2,06 | 21 | 64 % | 6 |
+| 10 | 22 | 9,6 | 2,41 | 15 | 68 % | 9 |
+| 6 | 20 | 4,8 | 3,60 | 1 | 85 % | 5 |
+| 2 | 18 | 5,3 | 3,33 | 1 | 39 % | 6 |
+| 3 / 5 / 1 | 7 / 4 / 3 | ~4,4 | 2,6 / 4,0 / 2,0 | 3 | — | 5 |
+
+- ⚠️ **LE FACTEUR DE BRANCHEMENT EST MINUSCULE : 3,3 à 9,6 enfants.** « Rang 80 » n'était pas au
+  menu — il n'y a structurellement pas la place. **Le bon coup n'est jamais enterré** : 1ᵉʳ dans
+  **47 % des cas** (95/204), jamais au-delà du 18ᵉ, et le pire maximum sur un niveau est 9.
+- **67 % des coups humains sont sur le MÊME palier `f` que le meilleur enfant** (`df = 0`, 137/204).
+  A\* les développera de toute façon (§3, régime `f < C*`), et un tie-break n'y mord pas. **Ce que
+  l'humain sait ne se lit donc pas dans le classement d'un état isolé** — il porte sur un PLAN de
+  plusieurs coups, que cette mesure ne peut pas voir par construction.
+- **`df` ne vaut jamais que 0, +2 ou +8, jamais impair.** Le +2 (47 cas) est la signature du
+  **RECUL** de `moureel` (§3) : l'humain joue délibérément une poussée de congestion là où une
+  poussée productive existait. Le +8 (5 cas, tous sur le 4) est un réarrangement du couplage
+  hongrois, cohérent avec `deltaf` (§6.3) — non creusé.
+
+**CONSÉQUENCE POUR LA FEUILLE DE ROUTE.** La piste « guidage du démêlage par un meilleur classement
+des poussées simples » est **fermée avant d'avoir coûté une ligne de solveur** — c'est exactement ce
+que le guidage par portes avait coûté en 2026-07-21, et qui avait été payé plein tarif. Ce qui
+reste : capturer l'INTENTION sur plusieurs coups (piste discutée, non codée : vocabulaire fermé de
+cinq motifs sur le coup joué), ou l'affectation caisse→but voulue, comparée au hongrois.
+
+⚠️ **DEUX RÉSERVES, et elles bornent la portée :**
+1. **Tous ces niveaux sont RÉSOLUS.** Le démêlage qui bloque 13/18/22/27 peut être d'une autre
+   nature. **La prochaine mesure utile est une partie à la main sur un NON-RÉSOLU** — c'est elle qui
+   confirme ou casse la conclusion.
+2. **Trois des neuf niveaux n'apportent que 3 à 7 points** (1, 3, 5) et ne pèsent rien (§11.4).
+   L'essentiel vient du 4 (60), du 7 (37), du 8 (33).
+
+**✅ EFFET DE BORD NON PRÉVU — le juge `fp` s'étend aux niveaux NON RÉSOLUS.** Sur une partie gagnée,
+tout état traversé est soluble par construction : un élagage qui écarte le coup joué est donc un
+faux positif **PROUVÉ**, le raisonnement exact de `mesures/fp`. Or `fp` exige une solution de
+référence, donc il ne tourne que sur les résolus. Le mode hybride en fabrique une **à la main**.
+Mesuré ici : **0 coup écarté sur 204**, sur 9 niveaux — corroboration indépendante du corral
+(unitaire, pince et N confondus). ⚠️ La preuve ne vaut que si la partie est effectivement gagnée et
+qu'aucun `[undo]` n'intervient après ; le journal porte les deux, le dépouillement tranche.
+
+**LE DÉPOUILLEMENT DE 5, 6 ET 7** (journaux fournis le même jour, parties gagnées à la main) —
+**il corrige DEUX faits de la session du matin :**
+
+| | buts | **macros** | coups | poussées | arrivées/poses → transits | états sans macro | inversions |
+|---|---|---|---|---|---|---|---|
+| 5 | 12 | **12/12** | 421 | 143 | 30 / 12 → **18** | 26 (6 %) | **0** |
+| 6 | 10 | **7/10** | 368 | 116 | 22 / 10 → **12** | 46 (12 %) | **0** |
+| 7 | 11 | **10/11** | 369 | 120 | 32 / 11 → **21** | **143 (39 %)** | **0** |
+
+- ❌ **LE FAIT 1 TOMBE : la macro ne pose PAS 100 % des caisses.** Quatre poses à la main — les rangs
+  **3, 4, 5 du niveau 6** (la colonne (1,5)(1,4)(1,3), d'un bloc) et le **rang 0 du niveau 7**
+  (10,6). Le rang 3 du 6 est précisément là où le clic droit a consigné un `[manque]` :
+  `DESCENTE BLOQUEE en (3,4), reste 3`. Sur les quatre niveaux du matin elle ne ratait rien ; sur
+  neuf, elle rate quatre fois.
+- ⚠️ **LE FAIT 4 EST À NUANCER : le démêlage n'est pas qu'un trou d'ENTRÉE.** Sur le 4, les 142 états
+  sans macro formaient **une plage continue avant la première pose**. Sur le 7, les 143 sont éclatés
+  sur **quatre buts en plein milieu** (35 + 35 + 31 + 26) : après chaque pose il faut aller rechercher
+  une caisse loin, et la macro est indisponible pendant tout le trajet. **Deux formes différentes du
+  même trou**, et la seconde n'est pas couverte par « le démêlage se joue au début ».
+- **Le compteur est propre ici** (pas le piège du FAIT 6, §7) : **0 inversion sur les trois**, les
+  macros suivent `ordreButs` rang par rang. Les 143 états du 7 sont donc une vraie indisponibilité de
+  macro, pas un écart à l'ordre.
+- ⚠️ **PIÈGE DE DÉPOUILLEMENT, tombé dedans en direct** : `grep -c POUSSE` compte AUSSI les lignes
+  `-> POUSSEES SIMPLES` du journal. Les poussées de 5/6/7 avaient été annoncées à 169/162/263 avant
+  correction (vraies valeurs 143/116/120) — l'erreur vaut jusqu'à **+119 %** sur le 7, celui qui a
+  le plus d'états sans macro. **Compter `POUSSE caisse`, jamais `POUSSE`.**
+
+**Canari, binaire contre binaire** (worktree sur `HEAD`, `bench <niv> macro`) — les deux constantes
+déplacées ne changent rien : **0/1/2/3/5/6/7/17 identiques à l'unité**, 4 / 14 / 412 / 499 / 9 123 /
+570 / 24 376 / 24 786 états, 4/97/131/134/143/110/90/213 poussées.
+
+**Reste ouvert :**
+- [x] **Rejouer un NON-RÉSOLU en mode hybride** (13, 18, 22 ou 27) : c'est le seul juge de la
+  conclusion ci-dessus. Tant qu'il n'est pas passé, « le démêlage n'est pas un problème de
+  classement » ne vaut que pour les niveaux qu'on sait déjà finir.
+  ✅ **FAIT le 2026-08-01 sur le 13** (session dédiée ci-dessous, niveau **gagné à la main**). La
+  conclusion **tient** sur les coups classables (rang moyen 3,9 sur 43) — mais elle est **dépassée** :
+  89 % des coups de cette partie gagnante ne sont **pas générés du tout** par le solveur.
+- [ ] **Le `df = +8` du niveau 4** (5 cas) : réarrangement du couplage sur une poussée simple, jamais
+  vu ailleurs. À regarder si on reprend `h`.
+- [ ] **Piste suivante, discutée non codée** : l'INTENTION du coup, en vocabulaire FERMÉ (écarter du
+  chemin de telle caisse / ouvrir un passage joueur / rapprocher du but / garer pour plus tard /
+  préparer un appui). C'est la seule des pistes envisagées qui capture un plan sur plusieurs coups —
+  précisément ce que le rang ne peut pas voir. ⚠️ Vocabulaire clos : du texte libre ne serait pas
+  dépouillable.
+
+**État du code** (non commité, branche `ordre-dynamique`) : `mainwindow.*`
+(`mesureRangCoup` + appel dans `joue()` + `nomDirection` factorisé avec le journal de macro) ;
+`solveurastar.h`/`.cpp` — `CORRAL_BUDGET` et `corralActif` **déplacés** de l'implémentation vers
+l'en-tête, sans changement de comportement, pour que l'UI passe le MÊME budget et le même régime
+d'élagage que le solveur (deux copies de `150` dériveraient sans que rien ne le signale, §7).
+Harnais de rejeu des journaux : **jetable, non versionné** (scratchpad).
+
+#### 🎯 Session du 2026-08-01 (fin) — LE 13 GAGNÉ EN HYBRIDE : 89 % de la solution N'EST PAS DANS L'ARBRE
+
+**C'est l'item que la session ci-dessus réclamait comme seul juge** (« rejouer un NON-RÉSOLU en mode
+hybride »). Fait sur le 13, et la réponse déborde la question posée.
+
+**Le journal** (`hybride_niveau_0013.txt`, deux parties) : une abandonnée à 8/16, puis **une GAGNÉE —
+914 coups, 276 poussées, 16/16**, 2 `[undo]`. Même total de poussées que la partie de juillet
+(§6.2, 2026-07-31 nuit) mais **ordre de pose différent** — j'y reviens plus bas.
+
+**LE RÉSULTAT : le coup humain n'est pas mal classé, il n'est pas GÉNÉRÉ.**
+
+| | poussées | par macro | **choisies** | **jamais générées** |
+|---|---|---|---|---|
+| **13** (gagné) | 408 | **17 (4 %)** | 391 | **348 (89 %)** |
+| 1 / 4 | 194 / 418 | 188 / 358 | 6 / 60 | **0 / 0 (0 %)** |
+| 8 / 2 / 3 / 7 | 373 / 157 / 138 / 120 | 259 / 136 / 130 / 77 | 114 / 21 / 8 / 43 | 6 % / 14 % / 12 % / 14 % |
+| 5 / 6 | 227 / 126 | 214 / 79 | 13 / 47 | 23 % / 55 % |
+| résolus cumulés | 1 846 | 1 180 | 666 | 236 (36 %) |
+
+`HORS REGIME MACRO` ne veut pas dire « mal classé » : dès qu'**une** macro s'engage,
+`solveurastar.cpp:792` (`if (macrosOk == 0)`) ne génère **aucune** poussée simple. Sur le 13 une
+macro est engageable dans 87 % des états, donc 89 % des coups de la seule solution connue **ne sont
+l'enfant de rien**. Le solveur ne peut pas trouver cette partie, quel que soit le temps qu'on lui
+donne. C'est l'incomplétude que le §6.0 énonce depuis toujours (« il ne génère que les macros vers le
+but actif et abandonne le reste ») — **jamais chiffrée sur une solution réelle jusqu'ici**.
+
+⚠️ **LE TÉMOIN QUI EMPÊCHE DE LIRE ÇA COMME UN ARTEFACT.** Le taux hors-régime mesure aussi l'écart
+volontaire à `ordreButs` (c'est le piège du FAIT 6, §7). Le comparatif juste est donc la **3ᵉ partie
+du 10**, où l'utilisateur s'écartait délibérément (grosse salle d'abord, 4 macros sur 32) :
+
+| partie du 10 | poussées | macros lancées | choisies | hors régime |
+|---|---|---|---|---|
+| ordre calculé suivi | 519 | 30 | 31 | 29 % |
+| satellite d'un bloc | 521 | 29 | 43 | 35 % |
+| **grosse salle d'abord** (écart maximal) | 524 | **4** | **495** | **30 %** |
+
+> **Même en jouant à contre-ordre de bout en bout sur un niveau RÉSOLU, on plafonne à 30 %.** Le 89 %
+> du 13 n'est donc pas un effet du désaccord, c'est une **différence de nature** : sur le 10, s'écarter
+> rend la macro indisponible (`macrosOk == 0`) et le solveur retombe sur les poussées simples — il
+> *pourrait* jouer le coup ; sur le 13 la macro reste engageable **quoi qu'on fasse**, donc le solveur
+> reste enfermé en régime macro.
+
+**POURQUOI : le but actif reste figé sur la PORTE D'ENTRÉE.**
+
+| but actif | états | % | dont macro dispo |
+|---|---|---|---|
+| **(14,9) rang 0** | **709 / 916** | **77 %** | 588 |
+| (14,7) rang 3 | 197 | 22 % | 195 |
+
+Or **(14,9) est le but le plus traversé du plateau — 10 arrivées sur 96** : c'est le couloir
+d'alimentation de la salle, et l'ordre calculé le pose **au rang 0**. La partie gagnante le pose en
+**12ᵉ**. Les 588 macros offertes bouchaient donc l'entrée — et l'utilisateur le confirme de
+l'autre bout : *« je connais le niveau et je sais que l'ordre calculé et donc les macros vont me faire
+perdre »*. **Le solveur ne génère quasiment que des coups perdants et supprime tous les autres.**
+
+**CE QUE ÇA CONFIRME** (et qui ne bouge pas) :
+- **0 coup ÉCARTÉ sur 391** → zéro faux positif d'élagage **prouvé sur un niveau NON RÉSOLU**,
+  première fois (corral unitaire + pince + N confondus). ⚠️ 2 `[undo]` dans la partie gagnée, à
+  déduire en toute rigueur ; sans effet, le total est nul.
+- **La conclusion de la session précédente TIENT** sur les 43 poussées réellement classables :
+  branchement 13,4, rang moyen 3,9, rang 1 dans 32 % des cas, `df = 0` à 64 %, max 19. Le démêlage
+  n'est pas un problème de classement, et la réserve n° 1 (« tous ces niveaux sont résolus ») est
+  levée. ⚠️ **Mais elle est dépassée** : le problème n'est ni en aval (le rang) ni en amont (l'ordre),
+  il est à la **GÉNÉRATION**.
+- **80 transits** (96 arrivées / 82 départs / 16 poses) — la variante sèche de R1 re-tuée une
+  septième fois.
+
+**UN SECOND ORDRE GAGNANT, DIFFÉRENT, ET LA MÊME RÈGLE.** L'ordre de pose relevé :
+
+```
+(14,8) (14,6) (14,4) (14,3) | (15,3) (16,3) (16,4) (16,6) (16,8) (16,9) | (15,9) (14,9) | (16,5) (14,5) (16,7) (14,7)
+└─ colonne 14, en peigne ─┘   └──── colonne 16, en peigne ────────────┘   └─ l'entrée ─┘   └─ les buts sautés ─┘
+```
+
+Rangs calculés correspondants : `1 4 5 6 10 12 13 15 8 7 2 0 14 11 9 3`. **Deux parties gagnantes,
+deux ordres distincts, une seule structure** — peigne, puis l'entrée, puis les buts à alimentation
+latérale. La règle de juillet (« remplir en peigne, du fond vers l'entrée ») en sort nettement
+renforcée : elle n'était appuyée que sur un ordre unique.
+
+**❌ LA PISTE « TRAFIC » : un DÉTECTEUR, pas un correcteur.** L'hypothèse à tester était : le but à
+fort trafic doit être posé tard, et ce trafic est prédictible **statiquement**.
+
+*Méthode* — `mesures/passages` ne convenait pas (il **résout** le niveau, ou somme des sous-niveaux à
+une caisse qu'il faudrait fabriquer). Miroir Python jetable du BFS de tirage de `precedenceGlobale`
+(`game.cpp:1585`), **validé en reproduisant à l'unité les quatre comptes d'arêtes du plan** : 13→4,
+11→28, 21→32, 10→99. ⚠️ Un miroir non validé n'aurait rien valu (§7).
+
+| corrélation de rang (Spearman) | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 10 | **13** |
+|---|---|---|---|---|---|---|---|---|---|
+| trafic RÉEL ↔ rang calculé | +0,94 | +1,00 | +0,84 | +0,78 | +0,83 | +0,65 | +0,73 | +0,74 | **+0,21** |
+| **gêne STATIQUE ↔ rang calculé** | 0,94 | 0,93 | 0,44 | 0,81 | 0,73 | 0,03 | 0,81 | 0,39 | **−0,14** |
+| gêne statique ↔ trafic réel | 1,00 | 0,93 | 0,54 | 0,72 | 0,72 | 0,10 | 0,92 | 0,52 | **0,01** |
+
+- **La version « peut passer par »** (une case-but est-elle dans le BFS de tirage d'un autre but ?)
+  **SATURE** — 15/15 sur les seize buts du 13. Relaxation trop optimiste, elle ne discrimine rien.
+  Écartée. La version retenue est la **gêne** : de combien les trajets des autres s'allongent si ce
+  but-ci est occupé (∞ = coupé). **Stable à son paramètre** (pénalité de coupure 5 → 200 : les
+  résolus ne bougent pas d'un centième, le 13 va de −0,28 à −0,14).
+- ✅ **`ordreParPrecedence` respecte DÉJÀ la règle** là où il marche (+0,73 à +0,94 sur 1/2/4/5/7) —
+  et c'est logique après coup, sa **garde anti-échouage** fait exactement ce travail. Il n'y a rien à
+  ajouter de ce côté.
+- ✅ **Le 13 est le seul du corpus à corrélation NÉGATIVE** : son ordre calculé pose les buts gênants
+  trop tôt. C'est un **discriminant statique de plus**, dans la lignée de `ordre` (§6.6, voie (a)), à
+  quelques millisecondes.
+- ❌ **Mais la gêne ne prédit ni le trafic réel du 13 (0,01) ni l'ordre joué (+0,34).** On sait
+  **détecter** que son ordre est mauvais, pas **construire** le bon. Et même si on savait : le plan a
+  déjà mesuré que l'ordre humain du 13 injecté fait **PERDRE** (1/16 contre 9/16). **L'ordre n'est pas
+  le levier du 13** — c'est la troisième voie fermée par là (§6.2, 2026-07-31 nuit : ordre calculé
+  muré, escalade de budget, ordre humain perdant ; et maintenant le trafic).
+
+⚠️ **PIÈGE DE DÉPOUILLEMENT, tombé dedans en direct** — le premier tableau annonçait **23 %** au lieu
+de 89 % : le test de régime cherchait `macro jouable` et **ratait le PLURIEL** (`2 macros jouables`),
+ne comptant que les états à exactement une macro. Détecté parce que le compte ne recoupait pas les
+348 lignes `HORS REGIME` que l'UI écrit elle-même. **Deux compteurs indépendants du même fait dans le
+même journal, c'est ce qui a sauvé la mesure** — même leçon que `POUSSE caisse` contre `POUSSE`.
+
+**Reste ouvert :**
+- [ ] **Le verrou du 13 est la GÉNÉRATION, et rien dans le plan ne l'attaque.** Ce qui l'adresserait :
+  laisser le solveur **refuser de s'engager** — générer les poussées simples *en plus* des macros sous
+  condition. C'est un élargissement combinatoire majeur (le régime d'engagement est ce qui rend la
+  macro payante, §2.2), **à cadrer avant d'écrire une ligne**.
+  ⚠️ Deux fausses pistes déjà écartées, au code : **`ordre-dyn` ne le règle pas** (il rend le premier
+  but non rempli *encore livrable*, or (14,9) reste livrable — il resterait actif ; cohérent avec le
+  8/16 mesuré) ; **le masquage non plus tel quel** ((14,9) étant rang 0, il serait révélé en premier).
+- [x] **Généraliser à un second niveau à peigne** — le **20** est le candidat désigné par
+  l'utilisateur, et il est **Groupe A** (ne démarre pas, 1/18). Prédiction à falsifier avant de jouer,
+  ci-dessous.
+  ❌ **FAIT le 2026-08-01, et la prédiction est RÉFUTÉE** (session suivante) : le 20 est **gagné deux
+  fois à la main** avec **0 à 1 % hors régime**. Le 89 % du 13 est une **singularité**, pas une
+  famille — deux niveaux à peigne, deux verrous différents.
+- [x] Le trafic statique comme **détecteur** : le passer sur les 18 non-résolus coûte quelques
+  millisecondes et dirait combien partagent le défaut du 13.
+  ✅ **FAIT le 2026-08-01.** Corrélation gêne statique ↔ rang calculé :
+
+  | | valeurs |
+  |---|---|
+  | **14 résolus (témoins)** | médiane **+0,81**, min +0,03 (le 6) — **aucun négatif** |
+  | **non-résolus NÉGATIFS** | **29 (−0,21)**, **13 (−0,14)** — les deux seuls sur 18 |
+  | non-résolus faibles | 14 (+0,06), 20 (+0,18), 19 (+0,27) |
+
+  **Le défaut du 13 est partagé par exactement un autre niveau, le 29** — désigné par une mesure
+  statique et non à l'intuition, c'est le prochain candidat hybride. ⚠️ Deux réserves : le **6 est à
+  +0,03 et il est résolu**, donc « faible » ne discrimine rien (seul « négatif » le fait) ; et ça ne
+  repose que sur **2 cas**. ⚠️ Le **12 est à +0,61** : le trafic ne voit pas son défaut, ce qui est
+  cohérent — le sien est un sens de parcours, pas une porte posée trop tôt (session ci-dessous).
+
+#### 🎉 Session du 2026-08-01 (suite) — LE 20 GAGNÉ À LA MAIN : le 13 est une SINGULARITÉ, et le détour non-monotone est CONFIRMÉ
+
+**Le 20 est un second niveau à peigne** (constat utilisateur) : colonne x=17 pleine (y=4→13), colonne
+x=16 en alternance buts/murs (les dents), et la rangée du bas (14,13)…(17,13) pour entrée. 18 buts.
+Quatre parties jouées, **deux GAGNÉES** (17/18 à l'affichage, victoire au dernier coup). Ce n'est pas
+un score ([scores.md](scores.md) ne bouge pas — parties humaines).
+
+**❌ PRÉDICTION FAITE PUIS RÉFUTÉE, des deux côtés.** Avant la partie, j'avais prédit : *si (14,13)
+ou (15,13) sortent dans les premiers rangs, le 20 aura la signature du 13*. **Les deux conditions
+tombent :**
+
+| | 13 | **20** |
+|---|---|---|
+| entrée de salle dans l'ordre calculé | rang **0** | rangs **10, 11, 12** (« entrée tard » respecté) |
+| **hors régime** (coups choisis que le solveur ne génère pas) | **89 %** | **0 à 1 %** sur les 4 parties |
+| macros lancées / buts | 1 / 16 | **18 à 21** / 18 |
+| verdict de l'utilisateur sur l'ordre calculé | perdant | *« finalement l'ordre est bon »* |
+
+> **LE 89 % DU 13 EST UNE SINGULARITÉ, pas une famille.** Sur le 20 — même géométrie de peigne, même
+> classe de difficulté, non résolu lui aussi — le solveur et le joueur sont d'accord à 99 % : les
+> poussées jouées à la main sont bien celles qu'il générerait. **Deux niveaux à peigne, deux verrous
+> différents.** Et c'est la prédiction ratée qui l'établit : sans elle on aurait généralisé.
+
+**✅ LA QUESTION DE L'UTILISATEUR, TRANCHÉE — et c'est sa seconde hypothèse qui est la bonne.**
+Constat posé après la campagne : *« le perso gêne systématiquement l'enclenchement des macros, ou
+alors — et à mon sens c'est tout à fait plausible — une macro ne peut pas pousser une caisse 2 fois
+sur la même case »*.
+
+1. **La seconde est vraie, et STRUCTURELLEMENT.** `avanceVersBut` (game.cpp) n'accepte un pas que si
+   `dpb[devant] == dCur - 1` : la descente est **strictement décroissante**, donc sans détour ni
+   retour. (Rigoureusement, la distance est indexée par *(case, région joueur)* — une même case
+   pourrait rouvrir avec une région différente et une distance plus basse ; très contraint en
+   pratique.) Le §6.3 l'écrivait comme une limite du backtracking sur forks : « ne couvre pas un vrai
+   détour non-monotone — **aucun cas confirmé de ce genre n'a encore été trouvé** ». **Il l'est.**
+
+   ➡️ ⚠️ **CORRIGÉ LE SOIR MÊME — j'avais fusionné DEUX énoncés distincts**, et la parenthèse
+   « très contraint en pratique » servait à couvrir l'écart. Constat utilisateur : *« les macros
+   permettent de passer une caisse 2× par le même chemin »*. Vérifié sur les **566 macros détaillées**
+   des journaux : **5 repassent par la même case dans une seule invocation.** Exemple, niv 26, macro
+   `(5,6) → but (10,4)` :
+
+   ```
+   (5,6)→bas→(5,7) →gauche→ (4,7) → (3,7) → (2,7)     la caisse part à GAUCHE
+   (2,7) →haut→ (2,6) →droite→ (3,6) →bas→ (3,7)      elle contourne par le haut
+   (3,7) →droite→ (4,7) → (5,7) → (6,7) → …           et REVIENT vers la droite
+   ```
+
+   | énoncé | verdict |
+   |---|---|
+   | la macro ne fait pas de détour **NON-MONOTONE** | **VRAI** — la distance décroît toujours |
+   | la macro ne repasse pas 2× par la même **CASE** | **FAUX** — 5 cas sur 566 |
+
+   Le mécanisme est le **joueur-aware** : après le contournement, le joueur a changé de région, donc
+   la même case a une distance PLUS BASSE. L'invariant tient, il n'interdit simplement pas de
+   repasser. **La macro sait donc faire des manœuvres de retournement** — elle est plus puissante
+   qu'écrit ici, et « elle ne sait faire que des trajets monotones » est à bannir du vocabulaire.
+2. **La première est FAUSSE**, et c'est la mesure qui le dit.
+
+**L'INSTRUMENT QUI A TRANCHÉ** (`Game::diagnosticPas0`, game.h/game.cpp + rapport du clic droit).
+Le journal confondait sous un seul libellé « ECHEC AU PAS 0 » les deux causes — 29 des 55 clics de la
+campagne étaient donc **illisibles**. La distinction s'obtient en **relâchant la seule contrainte de
+zone** : on rappelle `avanceVersBut` avec une zone totale, et une direction qui passe alors mais pas
+avec la zone réelle isole exactement le placement du joueur. **Aucune logique dupliquée** — c'est le
+même exemplaire unique de la condition de descente, celui que `game.cpp` interdit explicitement de
+réécrire. Canari revérifié après coup : 4/14/412/499/9 123/570/24 376/24 786 états,
+4/97/131/134/143/110/90/213 poussées.
+
+| cause, après désambiguïsation | occurrences |
+|---|---|
+| **DÉTOUR NON-MONOTONE REQUIS** (aucune direction ne baisse la distance, joueur placé où l'on veut) | **14** |
+| **LE JOUEUR EST DU MAUVAIS CÔTÉ** (l'appui est hors de sa zone) | **0** |
+| DESCENTE BLOQUÉE en cours de route | 6 |
+
+- ⚠️ **NE PAS LIRE « 14 CAS » : c'est UN cas, observé 14 fois.** Les quatorze portent sur **la même
+  caisse, en (5,5)**, testée contre **treize buts actifs différents** — l'utilisateur a cliqué à
+  chaque changement de but pour voir si la macro finirait par la vouloir. Jamais. C'est un cas
+  d'école propre (*une caisse que la macro ne peut bouger vers AUCUN but*), pas un échantillon.
+- ⚠️ **Et il ne bloque pas le 20.** Cette caisse est dans le labyrinthe d'acheminement de gauche, loin
+  de la salle ; la manœuvrer aux poussées simples est le régime normal, et le solveur les génère bien
+  ici (0-1 % hors régime). Le détour non-monotone est une **limite confirmée**, pas le verrou du 20.
+
+**CE QUE ÇA LAISSE POUR LE 20, et c'est inconfortable.** Ordre bon (dixit l'utilisateur, et il gagne
+avec), macro qui s'engage 18 à 21 fois sur 18 buts, aucun coup humain hors de l'arbre, aucun coup
+écarté par un élagage — **tout ce qu'on sait mesurer dit « le solveur peut jouer cette partie »**, et
+il reste à 1/18 en 120 s (Groupe A, §6.6). Le verrou du 20 n'est ni l'ordre, ni la génération, ni
+l'élagage : c'est le **démêlage** au sens du §4, c'est-à-dire trouver la séquence. Rien dans le plan
+ne l'attaque, et le §6.1 a fermé les tie-breaks.
+
+**Reste ouvert :**
+- [ ] **Le secours de recherche borné pour les détours non-monotones** (§6.0, item 6 — laissé ouvert
+  depuis le 2026-07-23 faute de cas confirmé) : **le cas existe maintenant**, mais **un seul**, et
+  non bloquant. Ne pas ouvrir le chantier sur cette base — la barre du projet est un cas qui COÛTE
+  quelque chose de mesurable. À rouvrir si la campagne en produit d'autres.
+- [ ] **Relever d'autres `[manque]` avec le libellé désambiguïsé** : 14 occurrences d'un seul motif ne
+  disent rien de la fréquence relative des deux causes. C'est bon marché — un clic droit.
+- [ ] **Pourquoi le 20 reste à 1/18** alors que rien ne s'y oppose dans ce qu'on mesure. C'est la
+  question ouverte la plus nette de la campagne hybride, et elle est **négative** : elle dit ce que
+  le verrou n'est pas.
+
+#### 🎉 Session du 2026-08-01 (soir) — SEPT NON-RÉSOLUS GAGNÉS À LA MAIN, et trois généralisations mortes
+
+**La campagne hybride a produit, en une journée, sept parties gagnantes sur des niveaux que le
+solveur ne finit pas** : 12, 13, 18, 19, 20, 22, 23. ⚠️ **Aucun n'est un score** —
+[scores.md](scores.md) ne bouge pas, ce sont des parties humaines, pas des solves. Ce qu'elles
+valent, c'est ce qu'elles apprennent sur le solveur.
+
+| niv | buts | poussées | **macros** | **hors régime** | inversions | transits | états sans macro |
+|---|---|---|---|---|---|---|---|
+| 20 | 18 | 603 | 21/18\* | **0 %** | 0 | — | — |
+| 12 | 15 | 234 | 10/15 | **1 %** | 16 | 37 | 21 % |
+| 23 | 18 | 549 | **18/18** | **1 %** | **0** | 51 | **45 %** |
+| **26** | 13 | 232 | **13/13** | **2 %** | 1 | 41 | **67 %** |
+| 19 | 15 | 321 | **15/15** | **3 %** | **0** | 31 | 15 % |
+| **25** | 19 | 436 | 20/19\* | **6 %** | **0** | 106 | **66 %** |
+| **24** | 22 | 587 | **22/22** | **10 %** | **0** | 92 | 17 % |
+| **22** | 27 | 502 | 19/27 | **67 %** | 148 | **119** | 32 % |
+| **13** | 16 | 276 | **1/16** | **89 %** | 52 | 80 | — |
+| **18** | 11 | 247 | 4/11 | **90 %** | 26 | 34 | 6 % |
+
+\* le 20 et le 25 relancent des macros après des transits, d'où un total supérieur au nombre de buts.
+
+**DIX non-résolus gagnés à la main dans la journée** (12, 13, 18, 19, 20, 22, 23, 24, 25, 26). La
+série hors régime devient **0, 1, 1, 2, 3, 6, 10, 67, 89, 90** — le continuum se confirme, avec un
+trou entre 10 % et 67 % qui ne repose que sur l'absence de mesure intermédiaire, pas sur une
+structure. **Ne pas y voir deux groupes.**
+
+**LE CORRECTIF MULTI-SALLES VALIDÉ CÔTÉ HUMAIN.** Le **24** (salles 20+2) et le **25** (17+2) sont
+joués **sans une inversion**, l'ordre groupé suivi tel quel, avec la macro qui pose toutes les
+caisses (22/22, 20/19). Le **18** (7+2+2), lui, est joué dans l'ordre inter-salles **INVERSE** du
+correctif (petite salle en premier) — et il gagne aussi. **Ça conforte le « ne rien graver » du
+§6.2** : ce qui compte est de ne pas entrelacer, pas l'ordre entre salles. Deux points de plus
+qu'hier, où l'affirmation ne reposait que sur le 10.
+
+⚠️ **Le 25 et le 26 plafonnent à 66-67 % d'états sans macro** — le double du 22 (32 %) et le
+quadruple du 24 (17 %). Sur le 25, **243 poussées choisies contre 193 par macro** : plus de la moitié
+du travail est du démêlage pur, et le solveur générerait 94 % de ces coups. Ce sont les meilleurs
+candidats pour le corpus d'intentions.
+
+**⏸️ LE 18 AU SOLVEUR — AUCUN VERDICT, et le MUR MÉMOIRE est de retour.** L'ordre humain du 18
+(petite salle en premier) injecté, `coupl-plongeon`, laissé sans budget :
+
+| | |
+|---|---|
+| dépilements | **104 768 000** |
+| **états vus** | **217 013 303** |
+| file à l'arrêt | 139 912 264 (+1021, en hausse) |
+| max | 10/11 |
+| fin | **tué par la pression mémoire** à 11 Go de footprint, swap saturé (2 Go / 3) |
+
+- ⚠️ **Aucun verdict, dans aucun sens** — quatrième application de la règle (31, 13/r07, 11 de
+  juillet, et maintenant le 18). Ce qu'on peut écrire : *le 18 ne se résout ni avec l'ordre calculé
+  en 40,6 M dépilements, ni avec l'ordre humain en 104,8 M*. Rien de plus.
+- **217 M états vus est le RECORD du projet**, devant les 188 M du 31 et loin devant les 87 M qui ont
+  suffi au 11. Le 18 n'a pas été « essayé sérieusement », il a été entamé.
+- 🔴 **Le §6.5 se re-confirme, plus fort** : il rouvrait le mur mémoire sur les 5 Go du 11 ; ici on
+  atteint **11 Go** et c'est le système qui tranche, pas le temps. Les chantiers classés « sans
+  objet » (arène — poste dominant —, hachage 128 bits, blocs pour `noeuds`/file) redeviennent
+  d'actualité dès qu'un run va au bout de ses forces.
+- ⚠️ **`ps rss` a menti dans le mauvais sens, en direct** : la RSS s'est **effondrée de 8,7 à 2,6 Go**
+  au moment précis où `phys_footprint` atteignait 11 Go — le compresseur macOS sortait les pages de
+  la RSS. S'y fier aurait fait conclure que tout allait mieux. Le §1 l'avertissait ; c'est la
+  première fois qu'on le voit se produire pendant un run.
+
+**⚠️ TROIS GÉNÉRALISATIONS PROPOSÉES ET TOMBÉES, LE MÊME JOUR, SUR LE MÊME SUJET.** Elles sont
+consignées parce que la mécanique de l'erreur est plus instructive que le résultat :
+
+| affirmation | tombée sur | après combien de points |
+|---|---|---|
+| « le 89 % du 13 est une **famille** » | le 20 (1 %) | 1 |
+| « le 89 % du 13 est une **singularité** » | le 18 (90 %) | 3 |
+| « c'est une **partition** sans valeur intermédiaire » | le 22 (**67 %**) | 5 |
+
+La série complète est **0, 1, 1, 3, 29, 30, 35, 67, 89, 90** (les trois valeurs médianes viennent des
+variantes du 10) : **c'est un CONTINUUM, pas une structure.** C'est le §11.4 exécuté trois fois en une
+journée, à chaque fois avec deux à cinq points. **Ne plus annoncer de structure sur ce compteur.**
+
+**Ce qui est mesuré, et rien de plus :**
+- La part des coups humains que le solveur **ne génère pas** varie continûment de 0 à 90 %.
+- Elle dépend d'**au moins deux facteurs qui se cumulent** : l'écart à `ordreButs`, et le fait qu'une
+  macro **reste engageable malgré cet écart**. On ne sait pas les séparer.
+- ⚠️ **Le nombre d'inversions ne la prédit pas**, et c'est ce qui empêche de la réduire à un artefact
+  d'observation (le FAIT 6) : le 18 a **26 inversions et 90 %**, le 10 en a **191 et 30 %**, le 12 en
+  a 16 et 1 %. Le témoin décisif est la 3ᵉ partie du 10 — l'écart maximal du corpus, et le compteur
+  reste bas parce que s'écarter y **coupe** la macro (`macrosOk == 0`), ce qui rend la main au régime
+  des poussées simples.
+
+**LE GROUPE QUI INTERROGE LE PLUS : 19, 20, 23.** Ordre calculé suivi **sans une inversion**, macro
+qui pose **toutes** les caisses (15/15, 18/18), 0-3 % hors régime — **tout ce qu'on sait mesurer dit
+que le solveur peut jouer ces parties**, et il ne les trouve pas (10/15 et 0/18 au profilage à 120 s).
+Le 23 est le cas extrême : **45 % de ses états n'offrent aucune macro**, le record du corpus, et ses
+162 poussées choisies sont générables à 99 %. **Leur verrou n'est ni l'ordre, ni la génération, ni
+l'élagage : c'est le démêlage du §4.** Rien dans le plan ne l'attaque, et le §6.1 a fermé les
+tie-breaks.
+
+**Deux acquis ponctuels :**
+- **La cause « LE JOUEUR EST DU MAUVAIS CÔTÉ » existe** — 0 occurrence sur les 14 du niveau 20, mais
+  une sur le 12 (au départ, caisse (6,4)) et une sur le 22 (appui (16,11) hors zone). L'hypothèse
+  utilisateur du 2026-08-01 est donc **vraie mais rare**, là où le détour non-monotone domine.
+- **Les transits explosent avec la taille** : 119 sur le 22 (27 buts) pour 146 arrivées et 27 poses.
+  La variante sèche de R1 est re-tuée une huitième fois.
+
+#### ✅ Session du 2026-08-01 (suite 3) — LE CORRECTIF MULTI-SALLES CODÉ ET PROMU : ×7,5 sur le 10
+
+**Ouvert depuis le 2026-07-17, déclassé le 2026-07-29, re-priorisé le 2026-08-01, fait.**
+
+**Le code, deux pièces, aucune variable d'environnement (§7) :**
+1. **`Game::sallesDeButs()`** (game.cpp) — composantes connexes des cases-buts en **4-connexité**.
+   ⚠️ Ce n'est pas « les pièces du plateau » (le plateau est connexe pour le joueur), c'est
+   l'adjacence des BUTS. Statique, O(nbButs²) avec nbButs ≤ 32, calculé au chargement.
+2. **Une préférence de salle DANS le tri topologique stable**, pas en post-passe. ⚠️ Ce choix est une
+   question de correction, pas de style : remonter les buts d'une salle en bloc **après** le tri
+   casserait les arêtes de précédence que ce tri vient d'établir. En préférant, parmi les buts
+   **PRÊTS**, celui de la salle en cours, on obtient le groupement maximal **compatible** avec les
+   précédences — jamais au prix d'une violation. Sur un niveau à salle unique la préférence ne
+   discrimine rien : l'ordre ressort **inchangé, par construction**.
+
+**⚠️ UNE AFFIRMATION DU PLAN CORRIGÉE AVANT DE CODER.** Le §6.2 promettait « les niveaux à une seule
+salle sortent inchangés à l'octet — donc **zéro risque sur les 15 résolus** ». C'est faux, et la
+vérification préalable l'a montré :
+
+| | niveaux |
+|---|---|
+| **une seule salle** | **30 sur 35** |
+| **multi-salles** | **0** (trois salles d'UN but !), **10** (28+4), 18 (7+2+2), 24 (20+2), 25 (17+2), 26 (12+1) |
+
+**Le 0 et le 10 sont multi-salles ET résolus** — et le 0 est le canari le plus simple du projet. Le
+risque n'était pas nul, il était circonscrit à deux niveaux. (Le 0 ressort finalement identique :
+trois salles d'un but sont déjà « groupées » trivialement.)
+
+**LES TROIS JUGES, dans l'ordre annoncé :**
+
+| juge | résultat |
+|---|---|
+| `ordre` sur les 35 | **0 arête violée**, et exactement les 3 murages locaux préexistants (13, 18, 22) |
+| cartes de rangs, avant/après | **identiques partout sauf 10 et 18** — vérifié contre les ordres enregistrés dans les journaux hybrides, qui sont des **traces du binaire d'avant** |
+| canari solveur (12 niveaux) | **poussées identiques** : 4/97/131/134/355/143/110/90/237/213/220/250 |
+
+**LE GAIN, binaire contre binaire — même binaire, seul l'ordre change** (l'ancien réinjecté par
+`ORDRE_HUMAIN`, `coupl-plongeon`) :
+
+| ordre du 10 | états | poussées |
+|---|---|---|
+| ancien (satellite éclatée aux rangs 0/14/29/31) | **2 160 492** | 544 |
+| **nouveau (satellite groupée 0-1-2-3)** | **286 428** | 544 |
+| | **×7,54** | **identiques** |
+
+- **L'ancien ordre réinjecté reproduit exactement le 2 160 492 macOS** du 2026-07-31 : l'injection
+  rejoue fidèlement le comportement d'avant, le ×7,54 n'est donc imputable qu'au groupement.
+- **544 poussées des deux côtés**, alors qu'on est en régime plongeon où les poussées ne sont pas un
+  canari (§6.3) — la solution est la même, elle est juste trouvée sept fois plus vite.
+- **Vérifié aussi à la main** : en mode hybride, le 10 rejoué avec le nouvel ordre passe à **32 macros
+  lancées sur 32 buts** (contre 30 et 29) et **0 coup hors régime** (contre 9 et 15). La macro pose
+  désormais toutes les caisses, et le but actif reste dans la salle qu'on est en train de faire.
+
+⚠️ **LA PRÉDICTION DU PLAN N'EST TENUE QU'À MOITIÉ, et l'autre moitié est réfutée.** Elle annonçait
+« ~32/32 macros **et pas de trou** » (le trou de 113 états sans macro). Les macros y sont ; le trou
+**GRANDIT** — 132 → **187**. Et le compteur n'est pas contaminé cette fois (0 inversion, 0 hors
+régime), donc c'est une vraie indisponibilité : faire la satellite d'un bloc oblige à y amener quatre
+caisses de loin, sans macro pendant tout le trajet. C'est cohérent avec le **FAIT 4** (« le trou de
+démêlage est un trou de GUIDAGE ») : un correctif d'ordre ne pouvait structurellement pas le combler.
+**Deux choses distinctes avaient été mises dans la même prédiction.**
+
+- [ ] **18, 24, 25, 26 non mesurés** — les quatre autres multi-salles. Le 18 voit son ordre changer
+  (regroupé en 7+2+2) ; les trois autres restent à vérifier. C'est là que le correctif peut encore
+  rapporter, ou ne rien donner.
+
+#### ❌ Session du 2026-08-01 (suite 2) — LE 12 : c'est le SENS de parcours qui décide, pas le groupement
+
+**Le 12 gagné à la main en hybride** — 234 poussées, 15/15, **10 macros** lancées, **1 % hors
+régime**, 37 transits. Troisième non-résolu joué, troisième fois que le solveur générerait les coups
+joués : avec le 20 (0-1 %) et le 12 (1 %), ~~**le 89 % du 13 est définitivement une singularité**~~.
+➡️ ❌ **RÉFUTÉ LE JOUR MÊME par le 18** (gagné à la main quelques heures plus tard, **90 % hors
+régime**). Ce n'est pas une singularité, c'est une **PARTITION** — et sur quatre non-résolus joués
+elle est nette, sans valeur intermédiaire :
+
+| niveau | hors régime | macros lancées |
+|---|---|---|
+| **13** | **89 %** | 1 / 16 |
+| **18** | **90 %** | 4 / 11 |
+| 12 | 1 % | 10 / 15 |
+| 20 | 0-1 % | 12 à 21 / 18 |
+
+⚠️ **Deux fois de suite j'ai généralisé sur trop peu de points** — d'abord « le 13 est une famille »
+(réfuté par le 20), puis « le 13 est une singularité » (réfuté par le 18). Le §11.4 en une journée,
+dans les deux sens. **Le bon énoncé est descriptif** : deux niveaux sur quatre ont l'essentiel de
+leur solution hors de l'arbre du solveur, deux ne l'ont pas ; on ne sait pas encore ce qui les sépare.
+
+**L'ordre de pose relevé, comparé à celui de juillet :**
+
+```
+aujourd'hui : (15,5)(15,6)(15,7)(15,8)(15,9) | (13,5)…(13,9) | (14,9)(14,8)(14,7)(14,6)(14,5)
+juillet     : (15,9)(15,8)(15,7)(15,6)(15,5) | (13,5)…(13,9) | (14,9)(14,8)(14,7)(14,6)(14,5)
+```
+
+**Une seule variable diffère : le SENS de la colonne 15.** Même joueur, même niveau, deux parties
+gagnées, colonnes 13 et 14 identiques, aucun entrelacement des deux côtés. C'est l'expérience la plus
+propre du projet sur l'ordre de remplissage — et elle a été obtenue sans rien coder, en relevant deux
+parties.
+
+**Mesuré (même binaire, `coupl-plongeon`, `ORDRE_HUMAIN`, budget 900 s) :**
+
+| ordre | groupé ? | dépilés | résultat |
+|---|---|---|---|
+| **juillet — colonne 15 BAS→HAUT** | oui | **2 097 527** | ✅ **RÉSOLU, 212 poussées** |
+| calculé (témoin) | **non**, entrelacé | 10 183 000 | tué au budget, `max 10/15` |
+| **aujourd'hui — colonne 15 HAUT→BAS** | oui | 10 587 000 | tué au budget, `max 9/15` |
+
+> **CE QUI EST ÉTABLI, ET RIEN DE PLUS** : l'ordre de juillet résout en 2,1 M états ; celui
+> d'aujourd'hui **n'a pas résolu en 10,6 M**, soit au moins **×5 plus cher — si tant est qu'il
+> résolve**. Le groupement ne suffit donc pas à lui seul : deux ordres également groupés, ne différant
+> que par le sens d'une colonne, se comportent très différemment face à la macro.
+
+⚠️ **CE QUI N'EST PAS ÉTABLI, et que ce paragraphe affirmait à tort dans sa première rédaction :**
+1. **Que l'ordre d'aujourd'hui ne résout PAS.** Il a été **tué à 900 s**, et le §6.3 le répète —
+   « ne termine pas dans le budget » veut dire **lent**, pas mort (le 4, le 9 et le 8 sont tous
+   tombés laissés sans budget). Seul un run mené au bout trancherait.
+2. **Qu'il est « pire que l'ordre entrelacé »**, sur la foi de `max 9/15` contre `max 10/15`. Le §6.6
+   a **réfuté la progression à budget borné comme prédicteur** — le 10 y affiche 12 % et il tombe.
+   Comparer deux runs tués par leur remplissage est exactement l'erreur que ce document interdit.
+
+**Corrigé après remarque de l'utilisateur** (« je ne serais pas aussi catégorique, mon run manuel
+passe sans souci ») : sa partie GAGNE, et rien ici ne dit le contraire. La phrase du §6.2
+(2026-07-31) sur les colonnes en sens opposés reste **plausible et non contredite**, pas « confirmée
+et chiffrée ».
+
+- ⚠️ **« Humain et gagnant » ≠ « bon pour la macro », TROISIÈME fois** — et pour la première fois sans
+  échappatoire : ni joueur différent, ni niveau différent, ni ordre approximatif. **Deux parties
+  gagnantes du même joueur sur le même niveau, dont une seule est jouable par le solveur** *dans le
+  budget mesuré*. Le §6.2 énonçait la règle depuis le 2026-07-20 ; ici elle est isolée à une variable.
+  ⚠️ Ce que ça ne dit PAS : que l'ordre d'aujourd'hui soit mauvais. Une partie humaine gagnante reste
+  une partie gagnante — l'écart mesuré porte sur le **coût pour la macro**, pas sur la validité de
+  l'ordre.
+- **B reproduit 2 097 527 / 212 à l'unité** (chiffre du 2026-07-31, autre binaire) : canari gratuit
+  qui confirme au SOLVEUR que le correctif multi-salles du jour est bien inerte sur le 12 (mono-salle),
+  et pas seulement d'après la carte des rangs.
+- ⚠️ **PIÈGE DE LECTURE, tombé dedans en direct** : j'ai d'abord écrit « A n'est pas nul pour autant,
+  `max 9/15` contre `max 6/15` pour le témoin » — en comparant un run **fini** à un run **encore en
+  cours**. Le témoin a continué jusqu'à `max 10/15`, et l'ordre A est en réalité le pire. **Un run
+  borné ne se lit qu'à budget égal**, y compris quand les deux tournent sous ses yeux.
+
+**➡️ SUITE DU MÊME JOUR — L'ORDRE INJECTÉ DANS L'APP, ET L'ÉCART LOCALISÉ.**
+
+L'utilisateur a rejoué le 12 en hybride **avec son ordre injecté** (mécanisme neuf, ci-dessous) et l'a
+**gagné**. Ce que ça apprend, et qui n'était pas prévisible :
+
+| partie du 12 | macros lancées | avant la 1ʳᵉ pose | après |
+|---|---|---|---|
+| ordre calculé | 10/15 | 34 états, **100 % sans macro** | 27 % sans macro |
+| **son ordre (injecté)** | **15/15** | 33 états, **100 % sans macro** | 21 % sans macro |
+
+- **Son ordre fait poser les 15 caisses par la macro** (contre 10/15). Une fois le démarrage passé, il
+  est **meilleur** que l'ordre calculé — alors que c'est lui qui coûte ≥×5 au solveur. Les deux faits
+  cohabitent, et c'est ce qui rendait le diagnostic difficile.
+- **Constat utilisateur : « le seul problème vient du fait que la macro ne se déclenche pas pour la
+  première caisse ».** Vérifié, et il est **plus large que ça** — outil `pas0` (§1) sur le plateau de
+  départ : **AUCUN des 15 buts n'est atteignable par macro**, pas seulement le premier. Cause
+  identique partout : la caisse (8,4) s'amorce puis **bloque en (9,4)** (reste 11), et la caisse (6,4)
+  est bloquée **au pas 0 par la position du joueur** (`Haut baisserait la distance, appui (6,5) hors
+  zone`) — **première occurrence de cette cause dans tout le corpus**, 0 sur les 14 du niveau 20.
+- **Conséquence : le choix du premier but ne change RIEN au démarrage**, il est identique pour les
+  trois ordres. Le trou de 33 états est le **FAIT 4** (trou de GUIDAGE : les poussées simples ne lisent
+  jamais `ordreButs`), le même que les 142/153 du niveau 4. **Il n'explique donc pas l'écart A/B.**
+
+**OÙ NAÎT L'ÉCART, alors — lu dans les jauges des deux runs, sans rien relancer :**
+
+| record | **B — juillet (résout)** | **A — aujourd'hui** |
+|---|---|---|
+| 1/15 | 6 208 dépilés | 6 109 dépilés |
+| **2/15** | **7 888** | **2 345 974** — **×297** |
+| 3, 4, 5 | 8 046 → 8 238 | ~2 350 000 |
+| 6/15 | 2 097 527 → **plongeon RÉUSSI en 15 états** | 5 150 555 → échec au budget plein (100 991) |
+
+> **Ce n'est pas la première caisse, c'est la DEUXIÈME.** Les deux ordres posent la première au même
+> prix (~6 100 états, à 1,6 % près). Ensuite B enchaîne les quatre suivantes en 2 000 états ; A met
+> **2,34 millions** pour la seule seconde. Tout l'écart est là, et le reste en découle.
+
+**Hypothèse, NON vérifiée** : c'est la contiguïté de run du §6.2 (2026-07-20) — « une caisse poussée
+d'un trait s'arrête au mur ou à la caisse déjà posée », la colonne se remplit fond→entrée **par la
+physique du jeu**. Remplir depuis l'entrée obligerait à approcher chaque but par le côté déjà occupé.
+⚠️ **Pas confirmé sur la géométrie du 12** : l'accès à la salle se fait par le bas en (13,10) et les
+murs en x=12 interdisent les appuis à gauche — la vérifier demanderait `pas0` sur l'état d'APRÈS la
+première pose, qu'on n'a pas exporté. À faire avant d'en tirer quoi que ce soit.
+
+**Conséquence pour la cible « corriger la contiguïté de run ».** Elle se complique : il ne suffit pas
+de ne pas entrelacer, il faut le **bon sens de parcours**, et **aucune règle du projet ne le donne**.
+C'est exactement là que le §6.2 a échoué en juillet — le wall-ext (« partir d'un cul-de-sac ») est
+indispensable sur 2/3 et toxique sur les blocs pleins, tension jugée alors « irréductible en un seul
+scalaire local ». Le 12 fournit désormais une **cible mesurable** pour la trancher (son ordre juillet
+résout, son ordre d'aujourd'hui non), ce qui manquait.
+
+**🎯 LE CORPUS D'INTENTIONS — amorcé le soir même, et il tient.** La piste « capturer l'INTENTION en
+vocabulaire fermé » était *discutée, non codée* depuis le matin (fin de la session « rang du coup
+humain »). Elle est codée, et les quatre premiers niveaux annotés donnent :
+
+| niv | étiquettes | répartition |
+|---|---|---|
+| 1 | 3 | OUVRIR 3 |
+| 2 | 5 | OUVRIR 5 |
+| 3 | 3 | OUVRIR 1, GARER 2 |
+| **4** | **11** | **OUVRIR 29 · ECARTER 19 · GARER 12** (poussées couvertes) |
+
+**Le 4 est le premier corpus exploitable, et il recoupe DEUX résultats du plan par une voie neuve :**
+- **60 poussées choisies, toutes couvertes**, 0 avant la première étiquette. Le format tient.
+  ➡️ ⚠️ **57, pas 60** (recompté le 2026-08-02, session ci-dessous) : le journal du 4 porte 418
+  lignes `POUSSE caisse` mais **5 `[undo]`**, et le compte annoncé ici était le compte BRUT. Le
+  chiffre undo-aware est **415 poussées / 57 choisies**. Sans effet sur les conclusions.
+- **`OUVRIR` et `ECARTER` sont EXCLUSIVEMENT dans la phase d'entrée** (coups 9 à 131, tous à
+  `posees 0/20`), `GARER` exclusivement après (coups 488, 1040, 1103, à 10/18/19 caisses posées).
+  Deux vocabulaires pour deux phases, sans que ce soit décidé d'avance.
+  ➡️ ❌ **« `GARER` exclusivement après » est RÉFUTÉ au-delà du 4** (2026-08-02, session ci-dessous) :
+  sur les huit niveaux annotés, **5 des 16 `GARER` sont à `posees 0`** (6, 7 et 8). `GARER` est la
+  seule catégorie SANS phase — et celle qui couvre le plus de poussées. Le reste du découpage tient
+  et se renforce.
+- **47 des 60 poussées choisies sont dans le trou de démêlage d'entrée** — le **FAIT 4** mesurait
+  « 142 des 153 états sans macro » sur ce même niveau et le qualifiait de *trou de guidage* ; on sait
+  maintenant **ce qu'il y a dedans**.
+- ⚠️ **Et ce sont les DEUX CAUSES DU MOU du §3** — « écarter une caisse assise sur le trajet d'une
+  autre **ou** qui bloque le joueur » — que `moureel` avait séparées par niveau (1 et 2 : joueur ;
+  3 et 17 : laisser passer). Retrouvées à la main, sur un cinquième niveau, par une voie
+  indépendante. C'est la première corroboration croisée de ce découpage.
+- **La correction fonctionne** : le coup 33 porte `OUVRIR` puis `ECARTER` ; le dépouillement garde la
+  seconde. Deux annotations au même numéro = une correction.
+  ➡️ ❌ **SÉMANTIQUE CHANGÉE le 2026-08-02** (session ci-dessous) : la même gestuelle sert aussi à
+  énoncer **deux** intentions, et « la dernière gagne » perdait la première en silence. Le coup 33 se
+  lit désormais `OUVRIR` **ET** `ECARTER`. Règle complète et les 4 cas du corpus : session du
+  2026-08-02.
+
+⚠️ **`T` (RETOURNER) ajouté après coup**, sur constat utilisateur : ses trois `GARER` du 4 n'en sont
+pas, ce sont des *« je sors la caisse de la zone pour la reprendre dans le bon sens »*. C'est le
+**RECUL du §3**, la seule catégorie du vocabulaire qui corresponde à une grandeur déjà chiffrée
+ailleurs (`mou = 2 × reculs`, la caisse revenant sur la case libérée 9 fois sur 10). **Un vocabulaire
+fermé doit être ajusté par celui qui joue, pas deviné** — les trois `GARER` du 4 sont à relire comme
+des `T`.
+
+**État du code de la journée du 2026-08-01** (non commité, branche `ordre-dynamique`) :
+- `game.cpp`/`game.h` — **`sallesDeButs()`** + préférence de salle dans le tri topologique (le
+  correctif multi-salles, **PROMU**, aucun interrupteur) ; **`diagnosticPas0()`** (outil de
+  diagnostic UI) ; **`cheminOrdreInjecte()`** + lecture du fichier d'ordre (chantier).
+- `mainwindow.cpp`/`.h` — rapport du clic droit éclaté en causes distinctes ; le journal hybride
+  annonce la SOURCE de l'ordre (`calcule` / `⚠ INJECTE depuis …`) ; **`rejoueJournal()`,
+  `prochainCoupChoisi()`, `noteIntention()`** + les touches `L`/`N`/`E`/`O`/`G`/`A`/`T`/`R`/`?` ;
+  **légende des touches** dans la barre d'état ; flèches et Retour arrière neutralisés en annotation.
+- `mesures/pas0.cpp` + `pas0.pro` — **neuf**, chantier.
+- ⚠️ **À RETIRER avec la campagne** : l'injection par fichier, `pas0`, le rejeu de journal + les
+  intentions + la légende, et `diagnosticPas0` si le clic droit ne sert plus. **À GARDER** :
+  `sallesDeButs()` et le groupement, qui sont de la production.
+- **Validation du parseur de journal, à refaire si on y touche** : les chemins extraits des 14
+  journaux ont été **rejoués sur un plateau** — tous légaux, tous gagnants, 0 coup illégal, malgré
+  2 602 `[undo]` dans le corpus (dont 608 sur le seul 18). C'est le seul test qui prouve que la
+  gestion des undo est correcte ; un parseur faux dérape dès le premier et n'arrive jamais au bout.
+- ⚠️ **`mesures/bench` (binaire versionné) a été écrasé** par un rebuild — comportement identique
+  (canari vérifié), mais c'est un fichier suivi par git qui n'avait pas à changer.
+
+#### ✅ Session du 2026-08-02 — LE CORPUS D'INTENTIONS SUR 8 NIVEAUX : le vocabulaire fermé TIENT
+
+**Ce qui a été fait** : l'utilisateur a rejoué et annoté les **huit premiers niveaux** (1 à 8), là où
+le corpus de la veille n'en portait que quatre. Le 8 est en plus une **partie NEUVE** (2026-08-02) —
+**244 poussées** contre les 373 consignées au tableau du §6.2, pour 24 poussées choisies contre 114 ;
+elle passe tout près des 238 du solveur. Les sept autres annotent les parties de la veille.
+⚠️ **Ces 244 ne sont PAS un score** : c'est une partie humaine, [scores.md](scores.md) ne bouge pas —
+la ligne du 8 y reste celle du solve (238 poussées).
+
+⚠️ **Dépouillement fait par un miroir Python jetable du parseur `rejoueJournal()`** (dernière partie
+gagnée, `[undo]` qui dépile, `[macro] LANCEE`/`TERMINEE` qui marque l'appartenance). **Validé avant
+toute lecture** : il reproduit **à l'unité** les `N coups (M par macro)` que l'app écrit elle-même en
+tête de chaque session d'annotation, sur les huit. Un miroir non validé n'aurait rien valu (§7,
+même exigence que le miroir du BFS de tirage).
+
+**LE RÉSULTAT — le vocabulaire fermé à 7 entrées n'a jamais manqué :**
+
+| | étiquettes | poussées couvertes |
+|---|---|---|
+| OUVRIR | 19 | 64 |
+| GARER | 18 | 117 |
+| ECARTER | 5 | 21 |
+| RETOURNER | 4 | 17 |
+| **`?` (INCONNU)** | **0** | — |
+| **total** | **46** *(sur 43 coups annotés)* | 206 poussées choisies |
+
+⚠️ **Les « poussées couvertes » se CHEVAUCHENT** depuis la règle de conjonction ci-dessous : un coup
+à deux étiquettes compte ses poussées dans les deux lignes, la colonne ne se somme donc pas. Le
+corpus fait **206 poussées choisies**, pas 219.
+
+- **Un seul `?` dans tout le corpus** (niveau 7, coup 148, sur 50 frappes en comptant les sessions
+  écrasées) — et il est **corrigé deux fois derrière** (`GARER` puis `RETOURNER`). Il n'en survit
+  **aucun** au dépouillement.
+- **Couverture totale : 0 poussée choisie avant la première étiquette, sur les huit niveaux.**
+- ⚠️ **Ce qui compte n'est pas le score, c'est que l'échappatoire ait été MISE À L'ÉPREUVE et
+  abandonnée.** Un vocabulaire fermé dont la sortie de secours n'est jamais prise ne prouve rien (on
+  ne saurait pas si elle est inutile ou si l'annotateur s'en interdit l'usage) ; ici elle est prise
+  une fois, puis remplacée par une catégorie existante. **Aucune catégorie ne manque.**
+- ⚠️ **LA MAILLE, et elle borne tout ce qui précède** : 43 étiquettes pour 206 poussées choisies.
+  Une seule frappe `GARER` du niveau 6 en couvre **44** à elle seule. « Tous les coups sont utiles »
+  est établi à la maille du **PLAN**, jamais du coup — c'est précisément l'objet de l'outil (le rang
+  d'un coup isolé ne peut pas voir un plan sur plusieurs coups), mais ça ne se lit pas comme une
+  couverture coup par coup.
+
+**LES CATÉGORIES SE RÉPARTISSENT PAR PHASE, et c'est net sur huit niveaux là où le 4 seul le
+suggérait :**
+
+| catégorie | à `posees 0` | remplissage aux autres étiquettes |
+|---|---|---|
+| **ECARTER** | **5/5** | — |
+| **OUVRIR** | **15/18** | 33 %, 36 %, 83 % |
+| **GARER** | 5/16 | 11 à 95 %, sans regroupement |
+| **RETOURNER** | **0/4** | **36 %, 45 %, 54 %, 66 %** |
+
+- **`ECARTER` et `OUVRIR` sont le vocabulaire de l'ENTRÉE** (20 étiquettes sur 23 à `posees 0`) —
+  c'est le **FAIT 4** vu de l'intérieur : le trou de démêlage d'entrée est fait de ces deux gestes.
+- **`RETOURNER` est le vocabulaire du MILIEU** : jamais à l'entrée, toujours entre 36 % et 66 %.
+- **`GARER` n'a pas de phase** — et c'est ce qui réfute la lecture du 4 (corrigée ci-dessus). C'est
+  la fourre-tout du vocabulaire : plus d'étiquettes qu'`ECARTER` et `RETOURNER` réunis, et **plus de
+  la moitié des poussées couvertes du corpus**. Si une catégorie doit être scindée un jour, c'est
+  celle-là.
+
+⚠️ **UNE TENSION AVEC LE §3, à ne PAS trancher sur quatre points.** `RETOURNER` est le **RECUL** de
+`moureel` (`mou = 2 × reculs`). Or `moureel` mesure les reculs comme **concentrés au tout début** —
+5 des 6 du niveau 17 dans les **neuf premières poussées**. Ici aucun `RETOURNER` n'est à `posees 0`.
+Les deux mesures ne portent ni sur les mêmes niveaux (1/2/3/17 contre 5/7) ni sur la même abscisse
+(`posees` n'est pas le numéro de poussée : les neuf premières poussées du 17 sont toutes à
+`posees 0`). **C'est une question ouverte, pas un résultat** — 4 étiquettes sur 2 niveaux, soit
+exactement le format d'erreur du §11.4 commis trois fois le 2026-08-01.
+
+**⚠️ RÈGLE DE CONJONCTION — adoptée en cours de campagne, sur constat utilisateur** (*« il y a des
+fois où je voudrais répondre O et G »*). Le plan posait « deux annotations au même numéro = une
+correction, la dernière gagne » ; **cette sémantique perd de l'information en silence**, puisque la
+même gestuelle sert à se raturer et à énoncer deux intentions.
+
+- **L'UI n'est PAS en cause et ne bouge pas** : `noteIntention()` écrit une ligne par frappe, le
+  journal est fidèle. Tout se joue au **dépouillement**.
+- **L'asymétrie décide** : lire une conjonction comme une correction **perd** une étiquette sans
+  signal ; lire une correction comme une conjonction en **ajoute** une, et une étiquette de trop se
+  repère. Donc **on ACCUMULE**, avec deux exceptions mécaniques : **`?` suivi de quoi que ce soit est
+  superseded** (c'est la définition de la touche — « je ne sais pas *encore* »), et **la même
+  étiquette deux fois n'en fait qu'une**.
+- **Quatre coups concernés sur 43** : 4/33 `OUVRIR+ECARTER`, 8/220 `GARER+OUVRIR`, 1/8
+  `OUVRIR+OUVRIR` (une seule), 7/148 `? → GARER+RETOURNER`. ⚠️ **Le 7/148 est le seul où la règle
+  peut se tromper** — `GARER` puis `RETOURNER` peut être une rature. Non tranché, à confirmer par
+  celui qui a tapé.
+- **Aucune touche d'effacement ajoutée**, délibérément : changer la sémantique de l'outil au milieu
+  d'un corpus rendrait le 25 incomparable aux huit premiers. À faire seulement si le besoin de
+  rature explicite se manifeste vraiment (~5 lignes, plus une ligne `EFFACE` au journal).
+
+**Reste ouvert :**
+- [ ] **Le corpus ne porte que des niveaux RÉSOLUS** — c'est la réserve n° 1 posée le 2026-08-01 et
+  elle n'est pas levée : 206 poussées choisies sur 8 niveaux qu'on sait finir. Les candidats sont
+  déjà désignés par la campagne : le **25** a à lui seul **243 poussées choisies** (66 % d'états sans
+  macro) et le **26** 67 %. **Un seul des deux doublerait le corpus, sur du non-résolu.**
+- [ ] **Ce que le corpus ne dit toujours pas** : à quoi il sert. Il décrit des plans ; rien n'indique
+  encore comment un plan se transforme en signal exploitable par le solveur — et le §6.1 rappelle
+  que le guidage par classement est fermé. **Ne pas coder sur cette base sans avoir d'abord énoncé
+  ce qu'on en ferait.**
+- [ ] `GARER` à scinder ? À décider **par celui qui joue**, pas déduit (c'est la leçon du `T`).
+
+#### 🎯 Session du 2026-08-02 (suite) — ONZE NIVEAUX RÉ-ANNOTÉS : l'instrument décidait du vocabulaire
+
+**Le corpus du matin (8 niveaux, 46 étiquettes) a été intégralement REFAIT**, plus les niveaux 9, 10
+et 11 joués et gagnés à la main dans la foulée. État final : **11 niveaux, 96 coups annotés.**
+
+| | matin (8 niv) | **soir (11 niv)** |
+|---|---|---|
+| OUVRIR | 22 | **46** |
+| RAPPROCHER | 14 | 21 |
+| ECARTER | 6 | 19 |
+| RETOURNER | 1 | 5 |
+| **GARER** | **10** | **1** |
+| `?` INCONNU | 0 | **4** (tous sur le 10) |
+
+> 🎯 **LE RÉSULTAT DE LA SESSION : `GARER` s'est effondré de 10 à 1**, et pas parce qu'on a changé sa
+> définition — parce qu'on a donné à l'annotateur **la vue des coups suivants**. `GARER` était la
+> fourre-tout (le §6.2 du matin la décrivait comme « la seule catégorie SANS phase, celle qui couvre
+> le plus de poussées »). Dès qu'on voit où la caisse VA, on sait si elle finit sur un but (`R`), si
+> elle laisse passer (`E`), si elle ouvre (`O`), si elle ressort (`T`).
+>
+> **Une catégorie vague n'était pas un défaut du vocabulaire, c'était un défaut de l'INSTRUMENT.**
+
+**L'OUTILLAGE, et chaque pièce vient d'un constat utilisateur en cours d'annotation :**
+
+| ajout / retrait | ce qui l'a déclenché |
+|---|---|
+| **`N` RETIRÉE** (saut à la poussée choisie suivante) | *« un raccourci trop facile, qui fait rater des étapes »* — elle imposait la maille de la POUSSÉE |
+| **`A` retirée** | 0 usage sur 46 étiquettes |
+| **`?` reformulé** (« je ne sais pas ENCORE le dire ») | « réflexe » était faux : personne ne joue au hasard |
+| **APERÇU des 12 prochaines arrivées** (chiffres sur le plateau, orange = choisie, gris = macro) | *« je ne vois qu'un coup à la fois, alors que pour choisir entre E et R j'ai besoin de voir plusieurs coups »* |
+| **Cadre orange/gris sur la caisse du coup** + `Coup : A TOI` au panneau | *« si une poussée n'est pas la mienne, il faut que je le voie en interface »* |
+| **ANNULATION (Retour arrière)** | *« un retour en arrière devrait annuler la dernière touche, sinon je vais y passer ma vie »* |
+| **Zone du joueur en violet + compte `Zj`**, armée par `L`, sans bascule | *« O permet au perso de couvrir plus de cases ou d'autres cases »* |
+| **compteur « reste N à toi »** | *« est-ce que tu sais quand plus aucun coup n'est à moi ? »* |
+| `[manque]` **ancré au numéro de coup**, écrit dans le journal d'INTENTIONS | il partait orphelin dans le journal de jeu, qui est une donnée brute qu'on relit |
+
+⚠️ **Un bug corrigé au passage, de la famille habituelle** : `journalIntentions` n'était fermé que
+dans `rejoueJournal()`, donc il **survivait à un changement de niveau**. Une frappe avant d'avoir
+pressé `L` écrivait dans le fichier du niveau précédent, avec les numéros de coup du niveau courant.
+Silencieux. Corpus vérifié indemne (aucune ligne `coup 0/0`, et le miroir recoupe les en-têtes).
+C'est le troisième état de la journée qui survit à ce qui le justifiait — avec la zone armée hors
+rejeu et la marque de poussée affichée hors annotation. **Même forme à chaque fois, et c'est celle
+qui ne se voit jamais à l'écran.**
+
+**LE TEST-RETEST, et il bascule dans la journée :**
+
+| niveau | deux annotations de la MÊME partie | accord |
+|---|---|---|
+| **7** (matin, avant outillage) | 14:32 contre 17:19 | **0 / 7** |
+| **7** (soir, après) | 17:19 contre 20:0x | **7 / 8** |
+| 3 | deux passes à 20 min | 5 / 5 |
+| 4 | veille contre soir | 2 / 8 — dont **3 désaccords qui sont la correction `GARER`→`T` que le plan avait écrite** |
+
+Le 0/7 du matin s'expliquait par la **maille** : la passe au `N` annotait à la poussée
+(`RAPPROCHER` 12 fois), l'autre au plan. Retirer `N` et montrer la suite a suffi.
+
+**LES OBSERVABLES A POSTERIORI — six essayés, UN survit.** Objectif : juger `E` sans jugement humain
+(*« hyper difficile à juger sur le coup, il faut qu'on trouve un moyen de juger a posteriori »*).
+
+| observable | verdict |
+|---|---|
+| devenir de la case libérée | bruit — sur 300 coups, toute case finit traversée |
+| idem, borné à W poussées | tout bascule en « RIEN », aucune séparation |
+| distance à la case finale | `GARER` 9/9, pile ou face |
+| écart avant que la caisse rebouge | contaminé par la rafale |
+| mobilité des caisses (poussées légales) | ne sépare pas les `O` inertes des `E` |
+| **zone du joueur gagnée ≥ 2 ⇒ `O`, jamais `E`** | ✅ **SURVIT — 0 contre-exemple** sur tous les `E` du corpus |
+
+⚠️ **Et un septième, annoncé comme fonctionnel puis RÉFUTÉ dans la même heure** : « la manœuvre
+place-t-elle la caisse » donnait `T` 4/4 — artefact d'une **rafale non bornée**, qui suivait la caisse
+à travers la macro et mesurait la livraison du solveur, pas la manœuvre humaine. Bornée aux poussées
+CHOISIES, `T` tombe à 0/3. La « signature du `T` » (0 poussée neuve, mobilité −2) tombe avec.
+
+> **LA LEÇON, payée quatre fois dans la journée : c'est toujours l'UNITÉ DE MESURE.** Poussée au lieu
+> de manœuvre, manœuvre au lieu de manœuvre-choisie. Un observable juste sur la mauvaise unité rend
+> un résultat propre et faux — et il se présente comme un résultat.
+
+⚠️ **LA LIMITE DU SEUL OBSERVABLE QUI RESTE** : il est **sûr mais silencieux**. Sur les niveaux à
+démêlage dense, **12 des 19 `OUVRIR` laissent la zone du joueur RIGOUREUSEMENT inchangée** (4 : 3/5
+inertes ; 9 : 2/5 ; 11 : **7/9**). Là où le démêlage est dur, « ouvrir » ne veut donc pas dire « le
+perso atteint plus de cases » — et l'hypothèse de rechange (ouvrir une route de CAISSE) est réfutée
+par la mobilité. **On n'a aucun observable pour ce que l'utilisateur voit là.**
+
+**LES `[manque]` — 25 signalements avec cause, et la distribution existe enfin :**
+
+| cause | occurrences |
+|---|---|
+| **DESCENTE BLOQUÉE** en cours de route | **18** |
+| détour non-monotone requis | 4 |
+| joueur du mauvais côté | 3 |
+
+- **`echecBloque` écrase tout (72 %)** — le §6.3 l'écrivait déjà (« c'est LE mode d'échec, sur les 17
+  niveaux mesurés sans exception »), mais par échantillonnage. **C'est maintenant mesuré sur des
+  chemins de solution réels.** Deux régimes distincts : la macro meurt **à 1-3 poussées du but**
+  (6, 7) ou **avec 10 à 26 de distance restante** (2, 9).
+- ⚠️ **Une case tue la macro trois fois** : `(3,7)` sur le niveau 7, malgré jusqu'à 3 branches de
+  backtracking. Premier goulot identifié comme tel.
+- 🎯 **L'ITEM 6 A SON CAS.** Le secours borné pour les détours non-monotones est fermé depuis le
+  2026-07-23 faute d'un cas qui coûte ; le 2026-08-01 en avait trouvé **un** (niveau 20), non
+  bloquant. La campagne en produit **quatre de plus** (2 ×2, 3, 5), tous sur des chemins gagnants.
+  ⚠️ **Ce qui n'est toujours PAS établi : leur coût pour la RECHERCHE.** Sur le niveau 2 ces macros
+  absentes coûtent 16 poussées de convoyage **à l'humain** ; le solveur, lui, résout le 2 à
+  l'optimum en poussées simples. La barre de l'item 6 est à moitié franchie.
+
+**TROIS FAITS PONCTUELS, tous neufs :**
+- **Le 11 : après le coup 393 (4/14 posées), les 177 poussées restantes sont TOUTES de macro**, et ses
+  9 `OUVRIR` sont tous à `posees 0/14`. Le §6.2 déduisait que *« le blocage du 11 n'est pas dans la
+  salle mais dans l'acheminement »* ; on le lit ici en deux nombres, sur une partie gagnante.
+- **Le 9 joué à la main en 237 poussées — le compte exact du solveur.** Partie humaine, pas un score.
+- **Le niveau 2 a une RAMPE DE LANCEMENT** : 5 de ses 10 macros partent de la même case (11,6), et
+  **16 poussées choisies sur 16 après le coup 19 ne font qu'y convoyer des caisses**. Au coup 205 la
+  macro est **à une poussée près** : 0 macro jouable en (11,7), 19 poussées offertes depuis (11,6).
+
+**LE PREMIER `?` DU CORPUS — quatre, tous sur le niveau 10** (coups 141-158, `posees 3/32`). Le matin,
+le plan notait que tant qu'aucun `?` ne survivrait, le corpus n'aurait jamais produit **la donnée qui
+montre qu'une catégorie manque**. Elle est là, et le geste est identifiable : la caisse A **quitte**
+(10,3) pendant que la caisse B **vient l'y remplacer**. Une substitution sur la même case — ni
+« écarter », ni « ouvrir », mais **un échange de destinations**. ⚠️ Rapprochement à ne pas graver mais
+à retenir : `deltaf` (§6.3) mesure exactement cet objet dans le solveur — *« la caisse que la macro
+pose n'est pas celle que le couplage y destinait : elle lui VOLE son but »* — et les cinq `df = +8`
+du niveau 4 sont un réarrangement du couplage, jamais creusé. **Non tranché : l'utilisateur n'a pas
+encore dit ce qu'il faisait.**
+
+**Reste ouvert :**
+- [ ] 🎯 **RÈGLES PLUS FIABLES — constat utilisateur en fin de session** : *« vraiment pas facile de
+  choisir entre tous ces trucs »*. Ses données lui donnent raison : `R` est stable, `G` s'est
+  effondré, **`O` contre `E` est instable** (toute la phase d'entrée du 4 a changé de camp entre deux
+  passes) — et aucun observable ne les sépare. **Le vocabulaire demande de CLASSER là où les classes
+  se recouvrent.** Piste proposée, non codée, à discuter : **DÉSIGNER au lieu de classer** — cliquer
+  le *bénéficiaire* (l'autre caisse, ou le perso) plutôt que choisir une étiquette ; `E` et `O` s'en
+  déduisent, et on gagne **laquelle**, que le plan tient pour la seule information non déductible.
+  Second volet : **ne plus annoter `R` du tout** (la partie étant finie, l'avenir de chaque caisse est
+  connu) et ne garder que les poussées qui n'avancent pas la caisse — c'est-à-dire le mou du §3.
+  ⚠️ Ce second volet suppose un observable qui a déjà échoué deux fois : **à vérifier avant de coder**.
+  ⚠️ **RÉSERVE DE L'UTILISATEUR, posée avant tout codage** : *« même le bénéficiaire, ce n'est pas
+  évident »*. À prendre au sérieux — c'est lui qui annote, et c'est exactement le genre d'avertissement
+  que la journée a validé deux fois (le `T` ajouté sur son constat, le `N` retiré sur le sien). Si
+  désigner s'avère aussi flou que classer, la conclusion ne sera pas « il faut une troisième forme
+  d'étiquette » mais **que l'intention n'est pas décidable coup par coup dans cette phase**, ce qui
+  est un résultat en soi et rejoint le §3 (le mou est un résidu d'ORDONNANCEMENT, pas une propriété
+  locale). **Ne pas coder la désignation avant un essai à la main sur un ou deux plans.**
+- [ ] **Les 4 `?` du niveau 10** : demander à l'utilisateur ce qu'ils faisaient. Une entrée manque
+  peut-être au vocabulaire, et elle aurait un correspondant déjà mesuré dans le solveur.
+- [ ] **Douze journaux restent annotables** : 12, 13, 18, 19, 20, 22, 23, 24, 25, 26, 27.
+
+**État du code** (non commité, branche `ordre-dynamique`) : `mainwindow.cpp`/`.h` — retrait de `N` et
+de `prochainCoupChoisi()`, retrait de `A`, reformulation de `?`, `journalSignalement()`,
+`pousseAnnulation()` + les deux piles, aperçu des poussées à venir, fermeture du journal au
+changement de niveau, `lbPas` descendu dans la barre d'état (il élargissait la fenêtre) ;
+`wgame.cpp`/`.h` — `showZoneJoueur()`, `setPousseeCourante()`, `setApercuSuite()`. **Rien dans le
+solveur, aucune variable d'environnement** (§7). Tout ceci part avec la campagne.
 
 #### 🎯 Session du 2026-07-28 — MESURE PRÉALABLE du PLONGEON (avant toute ligne de solveur)
 
@@ -2404,8 +3636,13 @@ avec la direction suivante.
   au but — potentiellement après PLUSIEURS forks en cascade, ce qu'un simple retry-une-fois ne
   capture pas (c'est exactement l'erreur faite dans le cas d'école ci-dessus).
 - **Ne couvre toujours pas** un vrai détour non-monotone (aucune direction ne baisse jamais la
-  distance nulle part sur le chemin) — mais aucun cas confirmé de ce genre n'a encore été trouvé ;
-  celui qu'on croyait tel s'est révélé être un second fork non exploré.
+  distance nulle part sur le chemin) — ~~mais aucun cas confirmé de ce genre n'a encore été trouvé ;
+  celui qu'on croyait tel s'est révélé être un second fork non exploré.~~
+  ⚠️ **CONFIRMÉ le 2026-08-01** (fin du §6.2) : la caisse **(5,5) du niveau 20**, testée au clic droit
+  contre **13 buts actifs différents**, ne peut avancer vers aucun — « aucune direction ne baisse la
+  distance, même joueur placé où l'on veut ». C'est le premier cas prouvé, par un instrument qui
+  relâche la contrainte de zone sur `avanceVersBut` lui-même. ⚠️ **UN seul cas, et il ne bloque
+  rien** (cette caisse se manœuvre aux poussées simples, que le solveur génère bien là).
 
 **✅ IMPLÉMENTÉ, MESURÉ, PROMU EN DÉFAUT le 2026-07-23 —
 `Game::macroVersButBacktrack`** : isolée (ne touche pas `macroVersBut`, toujours utilisée telle
@@ -2943,6 +4180,37 @@ plateau × leviers disponibles.**
   servi de « signal » pour ouvrir un chantier. **Vérifier la cohérence interne d'un relevé avant de
   raisonner dessus** : ici, 22 M de durs pour 2,17 M d'états faisait 10 durs par état contre 1,6
   mesurés, sur un plateau dont la géométrie est fixe — l'incohérence était lisible sans rien relancer.
+- ⚠️ **Un instrument d'observation peut mesurer l'OBSERVATEUR** (2026-08-01). Le mode hybride compte
+  les états où aucune goal macro n'est jouable. Lu comme une mesure de difficulté du plateau, il a
+  produit une conclusion fausse en une minute (« remplir la salle éloignée d'abord concentre le
+  démêlage »). Il mesure en réalité l'**écart à `ordreButs`** : `butActif()` rend le premier but non
+  rempli de l'ordre statique, donc dès qu'on joue autre chose, plus aucune macro n'est générée et le
+  compteur sature — 884 états sur un seul but. **Avant de lire un compteur d'absence, vérifier ce
+  qui le remet à zéro.** Ici le journal donnait la réponse gratuitement : il imprime le but actif à
+  côté du compte, et c'est sa constance qui a démasqué l'artefact.
+- ⚠️ **UNE NEUTRALISATION AU CLAVIER NE COUVRE PAS LA SOURIS** (2026-08-02). Pendant une session
+  d'annotation, `eventFilter` neutralise `Backspace` et les flèches parce qu'ils modifient le plateau
+  **sans toucher à `posPas`**, ce qui rend faux le numéro de coup écrit dans les intentions. Mais le
+  **clic** du mode hybride fait marcher le perso par le même chemin, et il n'est pas neutralisé — le
+  trou est dans le `KeyPress` du filtre, qui ne voit pas les événements souris. **La trace est déjà
+  dans le corpus** : niveau 1, coup 8, deux frappes au **même numéro de coup** avec le joueur en
+  (7,4) puis (7,3) — deux cases adjacentes, soit un pas de marche entre les deux. Contournement
+  pendant la campagne : naviguer avec ◀ ▶, `N` ou le slider, **ne pas cliquer sur le plateau**.
+  Règle générale : **quand on neutralise une entrée parce qu'elle contourne un compteur, énumérer
+  TOUTES les entrées qui l'atteignent** — le commentaire du code liste consciencieusement les
+  touches, et c'est cette liste qui a fait croire le problème réglé.
+- ⚠️ **UN WIDGET QUI NE S'AFFICHE PAS SE DIAGNOSTIQUE EN IMPRIMANT SON ÉTAT, PAS EN CHANGEANT SON
+  PLACEMENT** (2026-08-01). Une simple légende de touches a coûté **six corrections successives** :
+  layout horizontal qui écrase un texte de trois lignes → `centralWidget` qui **EST** le plateau
+  (WGame peint par-dessus) → fond forcé sans couleur de texte forcée (« tout gris » en thème sombre)
+  → texte RichText avec entités et Unicode (un texte enrichi mal formé se rend **vide sans lever
+  d'erreur**) → hauteur en constante alors que le texte était passé de 3 à 6 lignes (la barre
+  d'état tronquait) → et enfin la vraie cause : **une condition de visibilité que j'avais moi-même
+  écrite** (`setVisible(cbHybride->isChecked())`). À chaque tour, une hypothèse plausible remplaçait
+  la précédente. **Ce qui a tranché en une seconde, c'est une capture d'écran** : barre d'état haute
+  (donc le code s'exécute) + zone du widget vide (donc il est caché) ⇒ un seul suspect possible.
+  Deux règles à en tirer : **une légende ne se conditionne pas**, et devant un symptôme visuel,
+  imprimer `isVisible()`/`sizeHint()` coûte une minute là où six déductions coûtent une heure.
 - ⚠️ **Un interrupteur d'ENVIRONNEMENT dans le solveur fait diverger l'APP du bench, en silence**
   (2026-07-28). L'app lancée depuis un launcher (Finder, .desktop, Qt Creator) n'hérite pas de
   l'environnement du shell où l'on tape les `bench` : toute feature gardée par un `qgetenv` tourne

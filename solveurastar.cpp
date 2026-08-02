@@ -90,19 +90,11 @@ StatsDeltaF& statsDeltaF() {
 // Interrupteur de mesure, à retirer avec le verdict.
 static const bool livraisonSurEnfants = (qgetenv("LIVRAISON").toInt() == 5);
 
-// Corral : ACTIF par défaut (promu, cf. §6.1) — les DEUX étages, le corral
-// unitaire (motifs 1 et 2) et le corral-N (strip + A* borné). Trappe `CORRAL=0`
-// pour tout couper — réservée aux OUTILS DE MESURE (`fp`, `mort`) qui doivent
-// collecter/rejouer des états SANS que le corral les élague d'abord, sinon le
-// juge est aveugle aux faux positifs qu'il est censé chercher. La prod ne touche
-// jamais cette variable (défaut = actif).
-static const bool corralActif = (qgetenv("CORRAL") != "0");
+// corralActif() : déclaré dans solveurastar.h, même raison que CORRAL_BUDGET.
 
-// Budget du sous-solve d'enclos (corral-N). Balayage mesuré le 2026-07-27 : le
-// gain d'états SATURE dès ~150, tandis que le coût des sous-solves explose (×6)
-// au-delà — en « inconnus » qui ne prouvent rien et qu'on paie plein tarif.
-// Figé après verdict, comme les autres réglages promus.
-static const int CORRAL_BUDGET = 150;
+// CORRAL_BUDGET : déclaré dans solveurastar.h depuis le 2026-08-01 — le mode
+// hybride rejoue l'enfilage dans l'UI et doit passer le MÊME budget, sinon les
+// deux régimes divergeraient en silence (§7).
 
 // Stats du corral-N, agrégées sur tout le solve puis imprimées sur stderr en fin
 // de run(). Runtime, pas de #ifdef : la fraction de durs prouvés morts est ce qui
@@ -286,7 +278,7 @@ int SolveurAStar::plonge(const Game& etatDepart, int gDepart, int idxNoeudDepart
     auto ajoute = [&](Game& c, int gC, const QVector<QPair<int,int>>& chaine, int parent) {
         const int arrivee = chaine.isEmpty() ? -1
             : c.caseApres(chaine.last().first, (Game::EDirection)chaine.last().second);
-        if (corralActif && arrivee >= 0) {
+        if (corralActif() && arrivee >= 0) {
             if (c.corralUnitaireMort(arrivee)) return;
             c.getZoneJoueur(zoneEnfant);
             const Game::EnclosInfo inf = c.detecteEnclosArrivee(arrivee, zoneEnfant, visiteCorral,
@@ -614,7 +606,7 @@ void SolveurAStar::run() {
             // c'est son RÉSULTAT qu'on juge. Forme incrémentale (équivalence prouvée
             // au balayage complet, cf. game.h) : seule la case de repos de la caisse
             // déplacée peut avoir nouvellement scellé une voisine.
-            if (corralActif && arrivee >= 0) {
+            if (corralActif() && arrivee >= 0) {
                 if (e.corralUnitaireMort(arrivee)) return;
             }
             // getEtat(cle) referait le flood-fill en interne, dans un QVector
@@ -636,7 +628,7 @@ void SolveurAStar::run() {
             // ×9,9 sur le 4, ×7,7 sur le 17, ×3,4 sur le 9. Sound par construction
             // (on ne prune que sur une mort PROUVÉE), canari intact sur les 11
             // résolus. La zone du joueur vient d'être calculée : réutilisée gratis.
-            if (corralActif && arrivee >= 0) {
+            if (corralActif() && arrivee >= 0) {
                 const Game::EnclosInfo inf = e.detecteEnclosArrivee(arrivee, zoneEnfant,
                                                                     visiteCorral, &cacheEnclos,
                                                                     CORRAL_BUDGET);

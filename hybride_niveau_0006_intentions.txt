@@ -1,0 +1,72 @@
+
+=== niveau 6 — annotation du 2026-08-02 14:30:09 — 368 coups (225 par macro) ===
+[intention] coup 5/368 | ECARTER (du chemin d'une autre caisse) | posees 0/10 | joueur (9,4)
+[intention] coup 10/368 | ECARTER (du chemin d'une autre caisse) | posees 0/10 | joueur (9,7)
+[intention] coup 16/368 | GARER (pour plus tard, je reviendrai) | posees 0/10 | joueur (9,5)
+[intention] coup 22/368 | GARER (pour plus tard, je reviendrai) | posees 0/10 | joueur (9,3)
+
+=== niveau 6 — annotation du 2026-08-02 19:44:54 — 368 coups (225 par macro) ===
+[intention] coup 5/368 | ECARTER (du chemin d'une autre caisse) | posees 0/10 | joueur (9,4)
+[intention] coup 10/368 | ECARTER (du chemin d'une autre caisse) | posees 0/10 | joueur (9,7)
+[intention] coup 16/368 | ECARTER (du chemin d'une autre caisse) | posees 0/10 | joueur (9,5)
+[intention] coup 22/368 | ECARTER (du chemin d'une autre caisse) | posees 0/10 | joueur (9,3)
+[manque] SIGNALE (8,4) | but actif (2,4) rang 1/10 | coup 49/368
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ######  ####
+[manque]   #..  # ## ##
+[manque]   #..  ###   #
+[manque]   #..        #
+[manque]   #..  # #$$ #
+[manque]   #.*### #@  #
+[manque]   #### $ #$$ #
+[manque]      #  $#   #
+[manque]      # $  $$ #
+[manque]      #  ##   #
+[manque]      #########
+[intention] coup 50/368 | RAPPROCHER (du but) | posees 1/10 | joueur (8,4)
+[manque] SIGNALE (8,6) | but actif (1,5) rang 3/10 | coup 99/368
+[manque]   cause : DESCENTE BLOQUEE en (3,4), il restait 3 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ######  ####
+[manque]   #..  # ## ##
+[manque]   #..  ###   #
+[manque]   #.*        #
+[manque]   #.*  # #   #
+[manque]   #.*### #   #
+[manque]   #### $ #$$ #
+[manque]      #  $#@  #
+[manque]      # $  $$ #
+[manque]      #  ##   #
+[manque]      #########
+[intention] coup 100/368 | RAPPROCHER (du but) | posees 3/10 | joueur (8,6)
+[manque] SIGNALE (9,6) | but actif (1,4) rang 4/10 | coup 142/368
+[manque]   cause : DESCENTE BLOQUEE en (3,4), il restait 2 de distance (4 branches essayees)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ######  ####
+[manque]   #..  # ## ##
+[manque]   #..  ###   #
+[manque]   #.*        #
+[manque]   #.*  # #   #
+[manque]   #**### #   #
+[manque]   #### $ # $ #
+[manque]      #  $# @ #
+[manque]      # $  $$ #
+[manque]      #  ##   #
+[manque]      #########
+[intention] coup 143/368 | RAPPROCHER (du but) | posees 4/10 | joueur (9,6)
+[manque] SIGNALE (8,8) | but actif (1,3) rang 5/10 | coup 185/368
+[manque]   cause : DESCENTE BLOQUEE en (3,3), il restait 2 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ######  ####
+[manque]   #..  # ## ##
+[manque]   #..  ###   #
+[manque]   #.*        #
+[manque]   #**  # #   #
+[manque]   #**### #   #
+[manque]   #### $ #   #
+[manque]      #  $#   #
+[manque]      # $  $$ #
+[manque]      #  ##@  #
+[manque]      #########
+[intention] coup 186/368 | RAPPROCHER (du but) | posees 5/10 | joueur (8,8)

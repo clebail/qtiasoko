@@ -53,6 +53,54 @@ public:
     // aussi ». Vide efface l'overlay.
     void setArbreMacro(const QVector<bool>& visite);
 
+    // ZONE DU JOUEUR (2026-08-02, idée utilisateur) : aplat sur les cases qu'il
+    // peut atteindre à cet instant, plus leur nombre dans le panneau (« Zj »).
+    // Sert à trancher `O` contre `E` pendant l'annotation — `O` est défini par
+    // l'utilisateur comme « le perso couvre plus de cases OU d'autres cases »,
+    // ce qui ne se lit ni sur le seul cardinal ni sur le seul dessin.
+    // Aucune donnée à tenir à jour : WGame recalcule au tracé (cf. wgame.cpp).
+    void showZoneJoueur(bool on) { showZone = on; update(); }
+    bool zoneJoueurVisible() const { return showZone; }
+
+    // LA POUSSÉE COURANTE EST-ELLE ANNOTABLE ? (2026-08-02, constat utilisateur :
+    // « si une poussée n'est pas la mienne, il faut que je le voie en interface, je
+    // ne peux pas le deviner »). idxCase = la caisse qui vient d'être poussée, -1
+    // si le coup courant n'est pas une poussée (ou hors annotation) ; 'choisie'
+    // distingue un CHOIX du joueur d'une poussée de goal macro. Une intention sur
+    // un coup de macro ne veut rien dire — la macro n'a rien décidé — et c'était
+    // jusqu'ici lisible seulement dans le texte de la barre d'état.
+    void setPousseeCourante(int idxCase, bool choisie);
+
+    // APERÇU DES POUSSÉES QUI VIENNENT (2026-08-02, constat utilisateur : « je ne
+    // vois qu'un coup à la fois, alors que pour choisir entre E et R j'ai besoin de
+    // voir plusieurs coups »). ordre[case] = rang de la poussée à venir qui amènera
+    // une caisse sur cette case (1 = la prochaine), -1 ailleurs ; choisi[case] dit
+    // si c'est un CHOIX ou une macro. Peint en chiffres sur le plateau : on lit d'un
+    // coup d'œil où vont les caisses, donc quelle intention on est en train de
+    // regarder, et à quel moment cliquer pour signaler une macro manquante.
+    void setApercuSuite(const QVector<int>& ordre, const QVector<bool>& choisi);
+
+    // MODE HYBRIDE (2026-08-01) : on joue à la main pendant que l'UI montre ce
+    // que le solveur ferait. Deux surcouches, armées ensemble par cette bascule.
+    void setModeHybride(bool on);
+    // rangs[case] = rang de remplissage du but qui occupe cette case (0 = posé en
+    // premier), -1 partout ailleurs. C'est `ordreButs` rendu lisible sur le
+    // plateau. STATIQUE : calculé au chargement du niveau, il ne bouge pas d'un
+    // coup à l'autre — d'où un setter séparé de celui des macros.
+    void setRangsButs(const QVector<int>& rangs);
+    // Les goal macros jouables DANS L'ÉTAT COURANT, vers le but actif — le
+    // régime d'engagement du solveur, rejoué à la main (cf. MainWindow).
+    // 'trajets' = union des cases traversées (aplat bleu, même code que
+    // l'arbre de macro) ; 'caisses' = les caisses qui les amorcent, cerclées
+    // parce que ce sont elles qu'il faut cliquer pour lancer la macro. Vides
+    // = aucune macro jouable, l'overlay disparaît (l'information la plus utile
+    // du mode : le solveur retomberait ici sur des poussées simples).
+    void setMacrosJouables(const QVector<bool>& trajets, const QVector<bool>& caisses);
+    // Les cases SIGNALÉES à la main (clic droit) : « ici, il aurait dû se passer
+    // quelque chose ». Cerclées de rouge, effacées au coup suivant — un repère ne
+    // vaut que pour l'état où il a été posé.
+    void setSignales(const QVector<bool>& cases);
+
     // Fait glisser le perso — et la caisse qu'il pousse — de 'depart' vers la
     // case où 'game' le montre DÉJÀ : à appeler après le coup, seul l'affichage
     // retarde. Un coup joué pendant un glissement le remplace, sans rattrapage :
@@ -100,6 +148,12 @@ signals:
     // si c'est une caisse jouable.
     void caseCliquee(int idx);
 
+    // Case SIGNALÉE (clic droit) : « il manque quelque chose ici ». Sert à
+    // consigner dans le journal un désaccord entre le joueur et le solveur —
+    // typiquement une caisse dont on attendait une goal macro. WGame ne juge
+    // rien, il ne fait que rapporter la case.
+    void caseSignalee(int idx);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     // Arme l'infobulle qui déplie les abréviations, mais seulement au-dessus du
@@ -119,6 +173,17 @@ private:
     bool showChamp = false;
     bool montreOrdreButs = false;
     QVector<bool> arbreMacro;
+    bool showZone = false;
+    int  caissePoussee = -1;
+    bool pousseeChoisie = false;
+    QVector<int>  apercuOrdre;
+    QVector<bool> apercuChoisi;
+
+    bool modeHybride = false;
+    QVector<int>  rangsButs;
+    QVector<bool> macroTrajets;
+    QVector<bool> macroCaisses;
+    QVector<bool> signales;
 
     // Cases atteignables par le joueur en ignorant les caisses : l'intérieur du
     // plateau. Un .xsb écrit un espace aussi bien pour un sol praticable que pour

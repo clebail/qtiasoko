@@ -226,6 +226,25 @@ public:
     // exploration bornée (budget de nœuds) sur des copies jetables ; à
     // n'appeler que pour l'affichage humain, jamais dans le solveur.
     QVector<bool> arbreMacro(int idxCaisse, qint64 budgetNoeuds = 5000) const;
+    // POURQUOI LA MACRO NE DÉMARRE PAS (§6.2, 2026-08-01). macroPeutDemarrer rend
+    // un booléen ; le journal du mode hybride confondait donc sous « ECHEC AU
+    // PAS 0 » deux causes que rien ne permettait de départager (29 des 55 clics
+    // droits de la campagne) :
+    //   - le JOUEUR est du mauvais côté : une direction ferait bien baisser la
+    //     distance, mais l'appui n'est pas dans sa zone ;
+    //   - il faudrait un DÉTOUR non-monotone : aucune direction ne baisse la
+    //     distance, où que le joueur se place. La descente est strictement
+    //     décroissante (avanceVersBut), donc elle ne sait pas le faire.
+    // La distinction est obtenue en RELÂCHANT la seule condition de zone — on
+    // rappelle avanceVersBut avec une zone totale. Aucune logique dupliquée :
+    // c'est le même exemplaire unique de la condition de descente.
+    // 'dirsAppui' reçoit, pour Pas0JoueurMauvaisCote, les couples (direction,
+    // case d'appui) en cause — l'appelant les nomme, Game ne le fait pas.
+    // Affichage humain uniquement, jamais dans le solveur.
+    enum ECausePas0 { Pas0Demarre, Pas0DejaSurBut, Pas0HorsRegion,
+                      Pas0ButInatteignable, Pas0JoueurMauvaisCote, Pas0DetourRequis };
+    ECausePas0 diagnosticPas0(int idxCaisse, int indexBut, const QVector<bool>& zone,
+                              QVector<QPair<int,int>>* dirsAppui = nullptr) const;
     // GOAL MACRO (§10.5) : pousse la caisse en 'idxCaisse' jusqu'au but d'index
     // 'indexBut', le long de son trajet solo, en vérifiant à CHAQUE pas que la
     // poussée est réellement jouable dans l'état courant (case d'arrivée libre,
@@ -559,6 +578,19 @@ QVector<int> distanceLivraison(const QVector<bool>& bloque) const;
 // PRÉCÉDENCE GLOBALE (§6.2 famille B) : requis[B] = les buts qui doivent être
 // remplis AVANT B, parce que sans eux plus aucune caisse n'atteint B. Statique.
 QVector<QVector<int>> precedenceGlobale() const;
+
+public:
+// Le fichier `ordre_niveau_XXXX.txt` du répertoire courant s'il existe, sinon "".
+// Injecte un ordre de remplissage à la main DANS L'APP (une variable d'environnement
+// n'y arrive pas, §7), pour le jouer en mode hybride et voir où il coince.
+// ⚠️ OUTIL DE CHANTIER, à retirer avec la campagne hybride.
+static QString cheminOrdreInjecte(int numNiveau);
+private:
+
+// LES SALLES : composantes connexes des cases-buts en 4-connexité (cf. game.cpp).
+// salle[b] = index de la salle du but b. Sert au groupement salle par salle du tri
+// topologique — la macro ne peut pas enchaîner si l'ordre saute d'une salle à l'autre.
+QVector<int> sallesDeButs() const;
 
 // Ordre de remplissage déduit de la PRÉCÉDENCE DE LIVRAISON (§6.2, 2026-07-20) :
 // glouton avant + garde anti-échouage. Rend une permutation des indices de buts.

@@ -93,6 +93,17 @@ signals:
     // AStar de marche de reconstruire() est négligeable.
     void nouveauMaxCaisses(Game etatMax, int nbRangees, QList<Game::EDirection> chemin);
 
+public:
+    // Offset de la case d'APPUI relative à la caisse — l'opposé du vecteur de
+    // déplacement, pas le vecteur lui-même : pour pousser vers 'd', le joueur se
+    // tient derrière la caisse.
+    //
+    // PUBLIC depuis le mode hybride (2026-08-01) : l'UI descend elle aussi des
+    // poussées en coups de marche (MainWindow::joueMacro, même recette que
+    // reconstruire()). Exemplaire unique — recopier cette table ailleurs, c'est
+    // se garantir qu'un jour les deux ne diront plus la même chose.
+    static const Game::SDirection appuis[NB_DIRECTION];
+
 protected:
     void run() override = 0;
 
@@ -125,11 +136,6 @@ protected:
         quint16 idxCaisse;
         quint8 dir;
     };
-
-    // Offset de la case d'APPUI relative à la caisse — l'opposé du vecteur de
-    // déplacement, pas le vecteur lui-même : pour pousser vers 'd', le joueur se
-    // tient derrière la caisse.
-    static const Game::SDirection appuis[NB_DIRECTION];
 
     Game depart;
     QVector<Noeud> noeuds;

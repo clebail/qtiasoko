@@ -127,6 +127,40 @@ void WGame::setArbreMacro(const QVector<bool>& visite) {
     update();
 }
 
+void WGame::setApercuSuite(const QVector<int>& ordre, const QVector<bool>& choisi) {
+    apercuOrdre = ordre;
+    apercuChoisi = choisi;
+    update();
+}
+
+void WGame::setPousseeCourante(int idxCase, bool choisie) {
+    if (caissePoussee == idxCase && pousseeChoisie == choisie) return;   // pas de repaint inutile
+    caissePoussee = idxCase;
+    pousseeChoisie = choisie;
+    update();
+}
+
+void WGame::setModeHybride(bool on) {
+    modeHybride = on;
+    update();
+}
+
+void WGame::setRangsButs(const QVector<int>& rangs) {
+    rangsButs = rangs;
+    update();
+}
+
+void WGame::setMacrosJouables(const QVector<bool>& trajets, const QVector<bool>& caisses) {
+    macroTrajets = trajets;
+    macroCaisses = caisses;
+    update();
+}
+
+void WGame::setSignales(const QVector<bool>& cases) {
+    signales = cases;
+    update();
+}
+
 QString WGame::formaterMillier(qint64 n) {
     QString s = QString::number(n);
     for (int i = s.length() - 3; i > 0; i -= 3) {
@@ -223,6 +257,15 @@ void WGame::paintEvent(QPaintEvent *event) {
     const int largeur = game->getLargeur();
     const int hauteur = game->getHauteur();
 
+    // ZONE DU JOUEUR (2026-08-02) — les cases qu'il peut atteindre MAINTENANT, les
+    // caisses faisant obstacle. ⚠️ Calculée ICI, à chaque tracé, à partir du Game
+    // qu'on affiche : une zone stockée par MainWindow serait périmée dès qu'une
+    // caisse bouge, et une surcouche fausse ne se voit pas — c'est exactement le
+    // piège documenté pour la zone du 1ᵉʳ pas de la macro (§6.3). Un flood-fill
+    // par repaint ne coûte rien à l'échelle d'une UI.
+    QVector<bool> zoneJoueur;
+    if (showZone) game->getZoneJoueur(zoneJoueur);
+
     for (int y = 0; y < hauteur; y++) {
         for (int x = 0; x < largeur; x++) {
             const int idx = x + y * largeur;
@@ -259,6 +302,18 @@ void WGame::paintEvent(QPaintEvent *event) {
                             (montreOrdreButs && idx != caseButActif) ? 1 : 0);
             }
 
+            // Zone du joueur : aplat VIOLET. ⚠️ Deux réglages payés d'un
+            // aller-retour : l'alpha était à 55 (invisible à l'écran, alors qu'il
+            // semblait suffisant en lisant le code) et la teinte était verte, donc
+            // à un cheveu du vert des macros jouables. Le violet n'est utilisé
+            // nulle part ailleurs, et 100 d'alpha se voit sans masquer le sprite.
+            // Ce qu'on vient y lire, c'est la DIFFÉRENCE entre deux instants :
+            // quelles cases s'ouvrent quand une caisse bouge (compte « Zj »).
+            if (idx < zoneJoueur.size() && zoneJoueur[idx]) {
+                painter.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
+                                  QColor(0x9c, 0x27, 0xb0, 100));
+            }
+
             // Arbre de macro (Game::arbreMacro) : toutes les cases visitées
             // par AU MOINS UNE branche, en aplat translucide — pas de
             // nombres, juste « ce chemin marche aussi », par-dessus le sol
@@ -266,6 +321,105 @@ void WGame::paintEvent(QPaintEvent *event) {
             if (idx < arbreMacro.size() && arbreMacro[idx]) {
                 painter.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
                                   QColor(0x21, 0x96, 0xf3, 110));
+            }
+
+            // MODE HYBRIDE — les macros que le solveur pourrait engager ICI.
+            // Même aplat bleu que l'arbre de macro ci-dessus : c'est le même
+            // objet (un trajet de goal macro), il n'y a aucune raison de le
+            // peindre autrement selon qui l'a demandé.
+            if (modeHybride && idx < macroTrajets.size() && macroTrajets[idx]) {
+                painter.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
+                                  QColor(0x21, 0x96, 0xf3, 110));
+            }
+
+            // La caisse qui AMORCE une macro : c'est elle qu'il faut cliquer
+            // pour la jouer, donc elle est cerclée et pas seulement teintée —
+            // sinon rien ne la distingue des cases de son propre trajet.
+            if (modeHybride && idx < macroCaisses.size() && macroCaisses[idx]) {
+                const QRectF r(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT));
+                QPen pen(QColor(0x76, 0xff, 0x03));
+                pen.setWidth(3);
+                painter.setPen(pen);
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRect(r.adjusted(1.5, 1.5, -1.5, -1.5));
+            }
+
+            // LA CAISSE DU COUP COURANT, pendant une annotation. Orange ÉPAIS =
+            // c'est TON choix, tu peux étiqueter ; gris fin et pointillé = c'est la
+            // goal macro, il n'y a rien à annoter. Dessiné avant le rouge des cases
+            // signalées, qui reste prioritaire (plus rare, plus précieux).
+            // ⚠️ Ni vert ni bleu : les deux sont déjà pris par les macros jouables
+            // du mode hybride, et c'est justement de macro qu'il s'agit de NE PAS
+            // se tromper ici.
+            if (idx >= 0 && idx == caissePoussee) {
+                const QRectF r(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT));
+                QPen pen(pousseeChoisie ? QColor(0xff, 0x91, 0x00) : QColor(0x61, 0x61, 0x61));
+                pen.setWidth(pousseeChoisie ? 5 : 2);
+                if (!pousseeChoisie) pen.setStyle(Qt::DashLine);
+                painter.setPen(pen);
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRect(r.adjusted(2.5, 2.5, -2.5, -2.5));
+            }
+
+            // APERÇU : où les caisses vont arriver dans les poussées qui viennent.
+            // Le chiffre est le rang (1 = la prochaine). ORANGE = poussée CHOISIE,
+            // gris = macro : on voit donc du même coup d'œil où va la caisse ET
+            // quand arrive le prochain coup annotable — c'est-à-dire quand cliquer
+            // pour signaler une macro manquante. Au CENTRE de la case, avec halo
+            // noir comme les autres nombres, pour rester lisible sur un sprite.
+            if (idx < apercuOrdre.size() && apercuOrdre[idx] > 0) {
+                const QRectF r(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT));
+                const bool ch = idx < apercuChoisi.size() && apercuChoisi[idx];
+                QFont f = painter.font();
+                f.setPointSize(13 * SPRITE_WIDTH / 32);
+                f.setBold(true);
+                painter.setFont(f);
+                const QString t = QString::number(apercuOrdre[idx]);
+                painter.setPen(QColor(0, 0, 0, 220));
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                        if (dx || dy) painter.drawText(r.translated(dx, dy), Qt::AlignCenter, t);
+                painter.setPen(ch ? QColor(0xff, 0x91, 0x00) : QColor(0xbd, 0xbd, 0xbd));
+                painter.drawText(r, Qt::AlignCenter, t);
+            }
+
+            // Case signalée à la main : rouge, et par-dessus le cercle vert des
+            // macros jouables — si les deux tombent au même endroit, c'est le
+            // signalement qui doit se voir, il est plus rare et plus précieux.
+            if (idx < signales.size() && signales[idx]) {
+                const QRectF r(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT));
+                QPen pen(QColor(0xff, 0x17, 0x44));
+                pen.setWidth(3);
+                painter.setPen(pen);
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRect(r.adjusted(1.5, 1.5, -1.5, -1.5));
+                painter.drawLine(r.topLeft() + QPointF(4, 4), r.bottomRight() - QPointF(4, 4));
+                painter.drawLine(r.topRight() + QPointF(-4, 4), r.bottomLeft() + QPointF(4, -4));
+            }
+
+            // Rang de remplissage du but (ordreButs). En HAUT de case : les
+            // passages occupent le centre et le champ de distances le bas, les
+            // trois surcouches doivent pouvoir être lues ensemble. Dessiné
+            // aussi sous une caisse déjà posée — savoir qu'elle occupe le rang
+            // 12 alors que le 5 est encore vide est justement l'information
+            // qu'on vient chercher.
+            if (modeHybride && idx < rangsButs.size() && rangsButs[idx] >= 0) {
+                const QRectF r(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT));
+
+                QFont f = painter.font();
+                f.setPointSize(11 * SPRITE_WIDTH / 32);
+                f.setBold(true);
+                painter.setFont(f);
+
+                const QString t = QString::number(rangsButs[idx]);
+                painter.setPen(QColor(0, 0, 0, 200));
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                        if (dx || dy)
+                            painter.drawText(r.translated(dx, dy), Qt::AlignTop | Qt::AlignHCenter, t);
+
+                painter.setPen(QColor(0xff, 0xd5, 0x4f));   // ambre, distinct du blanc et du bleu clair
+                painter.drawText(r, Qt::AlignTop | Qt::AlignHCenter, t);
             }
 
             // Compteur de passages, par-dessus la case. Les murs n'en ont
@@ -387,13 +541,27 @@ void WGame::paintEvent(QPaintEvent *event) {
     // caractère de trop est une case masquée.
     //   Nv niveau, Dj déplacements du joueur, Pc poussées de caisses, Ex états
     //   explorés, Tr temps de résolution.
-    const QStringList stats = {
+    QStringList stats = {
         QString("Nv : %1").arg(game->getNumNiveau()),
         QString("Dj : %1").arg(game->getNbDep()),
         QString("Pc : %1").arg(game->getNbDepCaisse()),
         QString("Ex : %1").arg(formaterMillier(etatsExplores)),
         QString("Tr : %1s").arg(duree),
     };
+    // Zj : le CARDINAL de la zone du joueur. C'est lui qu'on lit en naviguant ◀ ▶ —
+    // l'aplat dit QUELLES cases, ce nombre dit COMBIEN, et une manœuvre qui déplace
+    // la zone à cardinal constant se voit alors sur l'aplat et pas sur le nombre.
+    // Les deux sont nécessaires, c'est le sens de « plus de cases OU d'autres ».
+    if (showZone) {
+        QVector<bool> z; game->getZoneJoueur(z);
+        stats << QString("Zj : %1").arg(z.count(true));
+    }
+    // Écrit EN TOUTES LETTRES, en plus du cadre sur la caisse : le cadre dit
+    // LAQUELLE, ce mot dit si on a le droit d'étiqueter. Deux témoins du même fait,
+    // c'est ce qui a sauvé deux mesures aujourd'hui (POUSSE caisse contre POUSSE,
+    // et le pluriel de « macros jouables »).
+    if (caissePoussee >= 0)
+        stats << (pousseeChoisie ? QString("Coup : A TOI") : QString("Coup : macro"));
 
     // Fond opaque sous le texte : il croise sinon les chiffres de la règle des
     // colonnes, et se perd dans les tuiles dès qu'il passe sur le plateau.
@@ -475,7 +643,8 @@ void WGame::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void WGame::mousePressEvent(QMouseEvent *event) {
-    if (game && game->isLoaded() && event->button() == Qt::LeftButton) {
+    if (game && game->isLoaded()
+        && (event->button() == Qt::LeftButton || event->button() == Qt::RightButton)) {
         // Inverse de coinCase() : mêmes marges, la case est le quotient entier
         // (pas le point) — un clic n'importe où sur une tuile doit désigner
         // cette case entière.
@@ -484,8 +653,11 @@ void WGame::mousePressEvent(QMouseEvent *event) {
         const int cx = static_cast<int>(std::floor((event->pos().x() - margX) / SPRITE_WIDTH));
         const int cy = static_cast<int>(std::floor((event->pos().y() - margY) / SPRITE_HEIGHT));
 
-        if (cx >= 0 && cx < game->getLargeur() && cy >= 0 && cy < game->getHauteur())
-            emit caseCliquee(cx + cy * game->getLargeur());
+        if (cx >= 0 && cx < game->getLargeur() && cy >= 0 && cy < game->getHauteur()) {
+            const int idx = cx + cy * game->getLargeur();
+            if (event->button() == Qt::LeftButton) emit caseCliquee(idx);
+            else                                   emit caseSignalee(idx);
+        }
     }
 
     QWidget::mousePressEvent(event);

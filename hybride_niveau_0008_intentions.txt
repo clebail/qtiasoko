@@ -1,0 +1,57 @@
+
+=== niveau 8 — annotation du 2026-08-02 14:44:59 — 701 coups (568 par macro) ===
+[intention] coup 6/701 | GARER (pour plus tard, je reviendrai) | posees 0/18 | joueur (5,6)
+[intention] coup 46/701 | GARER (pour plus tard, je reviendrai) | posees 2/18 | joueur (8,7)
+[intention] coup 220/701 | GARER (pour plus tard, je reviendrai) | posees 6/18 | joueur (7,2)
+[intention] coup 220/701 | OUVRIR (un passage pour le joueur) | posees 6/18 | joueur (7,2)
+[intention] coup 350/701 | GARER (pour plus tard, je reviendrai) | posees 10/18 | joueur (5,4)
+[intention] coup 430/701 | GARER (pour plus tard, je reviendrai) | posees 12/18 | joueur (5,2)
+[intention] coup 528/701 | OUVRIR (un passage pour le joueur) | posees 15/18 | joueur (12,3)
+
+=== niveau 8 — annotation du 2026-08-02 19:50:23 — 701 coups (568 par macro) ===
+[intention] coup 6/701 | OUVRIR (un passage pour le joueur) | posees 0/18 | joueur (5,6)
+[intention] coup 46/701 | OUVRIR (un passage pour le joueur) | posees 2/18 | joueur (8,7)
+[manque] SIGNALE (11,8) | but actif (6,14) rang 4/18 | coup 143/701
+[manque]   cause : DESCENTE BLOQUEE en (6,8), il restait 6 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]     ####          
+[manque]     #  ###########
+[manque]     #    $   $ $ #
+[manque]     # $# $ #  $  #
+[manque]     #  $ $  #    #
+[manque]   ### $# #  #### #
+[manque]   # #$  $$  ##   #
+[manque]   #      # #   # #
+[manque]   #          $@$ #
+[manque]   #####  #########
+[manque]      #      #     
+[manque]      #      #     
+[manque]      #......#     
+[manque]      #**....#     
+[manque]      #**....#     
+[manque]      ########     
+[intention] coup 144/701 | RAPPROCHER (du but) | posees 4/18 | joueur (11,8)
+[manque] SIGNALE (13,8) | but actif (6,13) rang 5/18 | coup 183/701
+[manque]   cause : DESCENTE BLOQUEE en (6,8), il restait 5 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]     ####          
+[manque]     #  ###########
+[manque]     #    $   $ $ #
+[manque]     # $# $ #  $  #
+[manque]     #  $ $  #    #
+[manque]   ### $# #  #### #
+[manque]   # #$  $$  ##   #
+[manque]   #      # #   # #
+[manque]   #            $@#
+[manque]   #####  #########
+[manque]      #      #     
+[manque]      #      #     
+[manque]      #......#     
+[manque]      #**....#     
+[manque]      #***...#     
+[manque]      ########     
+[intention] coup 184/701 | RAPPROCHER (du but) | posees 5/18 | joueur (13,8)
+[intention] coup 220/701 | OUVRIR (un passage pour le joueur) | posees 6/18 | joueur (7,2)
+[intention] coup 350/701 | ECARTER (du chemin d'une autre caisse) | posees 10/18 | joueur (5,4)
+[intention] coup 430/701 | OUVRIR (un passage pour le joueur) | posees 12/18 | joueur (5,2)
+[intention] coup 528/701 | OUVRIR (un passage pour le joueur) | posees 15/18 | joueur (12,3)

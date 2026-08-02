@@ -1,0 +1,117 @@
+
+=== niveau 7 — annotation du 2026-08-02 14:32:05 — 369 coups (205 par macro) ===
+[intention] coup 4/369 | GARER (pour plus tard, je reviendrai) | posees 0/11 | joueur (3,4)
+[intention] coup 7/369 | GARER (pour plus tard, je reviendrai) | posees 0/11 | joueur (5,3)
+[intention] coup 94/369 | OUVRIR (un passage pour le joueur) | posees 4/11 | joueur (3,4)
+[intention] coup 103/369 | GARER (pour plus tard, je reviendrai) | posees 4/11 | joueur (2,6)
+[intention] coup 148/369 | INCONNU (reflexe / je ne sais pas) | posees 5/11 | joueur (2,7)
+[intention] coup 148/369 | GARER (pour plus tard, je reviendrai) | posees 5/11 | joueur (2,7)
+[intention] coup 110/369 | RETOURNER (sortir pour reprendre dans l'autre sens) | posees 4/11 | joueur (3,6)
+[intention] coup 148/369 | RETOURNER (sortir pour reprendre dans l'autre sens) | posees 5/11 | joueur (2,7)
+[intention] coup 190/369 | RETOURNER (sortir pour reprendre dans l'autre sens) | posees 6/11 | joueur (2,9)
+[intention] coup 231/369 | GARER (pour plus tard, je reviendrai) | posees 7/11 | joueur (3,9)
+[intention] coup 236/369 | GARER (pour plus tard, je reviendrai) | posees 7/11 | joueur (4,7)
+
+=== niveau 7 — annotation du 2026-08-02 17:19:25 — 369 coups (205 par macro) ===
+[intention] coup 4/369 | OUVRIR (un passage pour le joueur) | posees 0/11 | joueur (3,4)
+[intention] coup 7/369 | OUVRIR (un passage pour le joueur) | posees 0/11 | joueur (5,3)
+[intention] coup 13/369 | RAPPROCHER (du but) | posees 1/11 | joueur (9,5)
+[intention] coup 30/369 | RAPPROCHER (du but) | posees 1/11 | joueur (9,2)
+[intention] coup 45/369 | RAPPROCHER (du but) | posees 2/11 | joueur (10,2)
+[intention] coup 64/369 | RAPPROCHER (du but) | posees 3/11 | joueur (10,3)
+[intention] coup 93/369 | OUVRIR (un passage pour le joueur) | posees 4/11 | joueur (2,4)
+[intention] coup 103/369 | RAPPROCHER (du but) | posees 4/11 | joueur (2,6)
+[intention] coup 148/369 | RAPPROCHER (du but) | posees 5/11 | joueur (2,7)
+[intention] coup 190/369 | RAPPROCHER (du but) | posees 6/11 | joueur (2,9)
+[intention] coup 231/369 | RAPPROCHER (du but) | posees 7/11 | joueur (3,9)
+[intention] coup 236/369 | INCONNU (reflexe / je ne sais pas) | posees 7/11 | joueur (4,7)
+[intention] coup 274/369 | RAPPROCHER (du but) | posees 7/11 | joueur (6,7)
+[intention] coup 309/369 | RAPPROCHER (du but) | posees 8/11 | joueur (4,8)
+[intention] coup 347/369 | RAPPROCHER (du but) | posees 9/11 | joueur (9,3)
+[intention] coup 357/369 | RAPPROCHER (du but) | posees 10/11 | joueur (4,4)
+
+=== niveau 7 — annotation du 2026-08-02 19:47:17 — 369 coups (205 par macro) ===
+[intention] coup 4/369 | OUVRIR (un passage pour le joueur) | posees 0/11 | joueur (3,4)
+[intention] coup 7/369 | OUVRIR (un passage pour le joueur) | posees 0/11 | joueur (5,3)
+[manque] SIGNALE (9,5) | but actif (10,6) rang 0/11 | coup 12/369
+[manque]   cause : DESCENTE BLOQUEE en (9,6), il restait 1 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]          ##### 
+[manque]    #######   ##
+[manque]   ## #  ## $$ #
+[manque]   #         $ #
+[manque]   # $   ###@  #
+[manque]   ### #####$###
+[manque]   # $  ### ..# 
+[manque]   # $ $ $ ...# 
+[manque]   #    ###...# 
+[manque]   # $$ ###...# 
+[manque]   #  ######### 
+[manque]   ####         
+[intention] coup 13/369 | RAPPROCHER (du but) | posees 1/11 | joueur (9,5)
+[intention] coup 94/369 | ECARTER (du chemin d'une autre caisse) | posees 4/11 | joueur (3,4)
+[manque] SIGNALE (2,6) | but actif (9,9) rang 4/11 | coup 102/369
+[manque]   cause : DESCENTE BLOQUEE en (3,6), il restait 9 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]          ##### 
+[manque]    #######   ##
+[manque]   ## #  ##    #
+[manque]   #           #
+[manque]   #   $ ###   #
+[manque]   ### ##### ###
+[manque]   #@$  ### .*# 
+[manque]   # $ $ $ ..*# 
+[manque]   #    ###..*# 
+[manque]   # $$ ###..*# 
+[manque]   #  ######### 
+[manque]   ####         
+[intention] coup 103/369 | RAPPROCHER (du but) | posees 4/11 | joueur (2,6)
+[manque] SIGNALE (2,7) | but actif (9,8) rang 5/11 | coup 147/369
+[manque]   cause : DESCENTE BLOQUEE en (3,7), il restait 7 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]          ##### 
+[manque]    #######   ##
+[manque]   ## #  ##    #
+[manque]   #           #
+[manque]   #   $ ###   #
+[manque]   ### ##### ###
+[manque]   #    ### .*# 
+[manque]   #@$ $ $ ..*# 
+[manque]   #    ###..*# 
+[manque]   # $$ ###.**# 
+[manque]   #  ######### 
+[manque]   ####         
+[intention] coup 148/369 | RAPPROCHER (du but) | posees 5/11 | joueur (2,7)
+[manque] SIGNALE (2,9) | but actif (9,7) rang 6/11 | coup 189/369
+[manque]   cause : DESCENTE BLOQUEE en (3,7), il restait 6 de distance (2 branches essayees)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]          ##### 
+[manque]    #######   ##
+[manque]   ## #  ##    #
+[manque]   #           #
+[manque]   #   $ ###   #
+[manque]   ### ##### ###
+[manque]   #    ### .*# 
+[manque]   #   $ $ ..*# 
+[manque]   #    ###.**# 
+[manque]   # $$ ###.**# 
+[manque]   # @######### 
+[manque]   ####         
+[intention] coup 190/369 | RAPPROCHER (du but) | posees 6/11 | joueur (2,9)
+[manque] SIGNALE (3,9) | but actif (8,9) rang 7/11 | coup 230/369
+[manque]   cause : DESCENTE BLOQUEE en (3,7), il restait 7 de distance (3 branches essayees)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]          ##### 
+[manque]    #######   ##
+[manque]   ## #  ##    #
+[manque]   #           #
+[manque]   #   $ ###   #
+[manque]   ### ##### ###
+[manque]   #    ### .*# 
+[manque]   #   $ $ .**# 
+[manque]   #    ###.**# 
+[manque]   #  $@###.**# 
+[manque]   #  ######### 
+[manque]   ####         
+[intention] coup 231/369 | RAPPROCHER (du but) | posees 7/11 | joueur (3,9)
+[intention] coup 236/369 | ECARTER (du chemin d'une autre caisse) | posees 7/11 | joueur (4,7)
