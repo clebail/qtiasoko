@@ -1,4 +1,3 @@
-
 === niveau 3 — partie du 2026-08-01 05:14:50 ===
 [hybride] ordre de remplissage calcule : 0:(1,6) 1:(2,6) 2:(3,6) 3:(2,7) 4:(3,7) 5:(1,8) 6:(2,8) 7:(3,8) 8:(4,6) 9:(4,7) 10:(4,8)
 [hybride] posees 0/11 | but actif (1,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
@@ -496,19 +495,6 @@
 [mouv] joueur (3,8)->(2,8) POUSSE caisse ->(1,8) [POSE]
 [hybride] posees 6/11 | but actif (2,8) rang 6/11 | 0 macro jouable -> POUSSEES SIMPLES
 [macro] TERMINEE
-[manque] SIGNALE (10,6) | but actif (2,8) rang 6/11
-[manque]   cause : DESCENTE BLOQUEE en (9,6), il restait 9 de distance (1 branche essayee)
-[manque]   plateau (lecture — pas une fixture d'ordre) :
-[manque]           ######## 
-[manque]           #      # 
-[manque]           # $#  ## 
-[manque]           # $   #  
-[manque]           ##$   #  
-[manque]   ######### $ # ###
-[manque]   #***.  ## $     #
-[manque]   ##**.           #
-[manque]   #*+..  ##########
-[manque]   ########         
 [mouv] joueur (2,8)->(3,8)
 [hybride] posees 6/11 | but actif (2,8) rang 6/11 | 0 macro jouable -> POUSSEES SIMPLES
 [mouv] joueur (3,8)->(4,8)
@@ -597,19 +583,6 @@
 [mouv] joueur (4,8)->(3,8) POUSSE caisse ->(2,8) [POSE]
 [hybride] posees 7/11 | but actif (3,8) rang 7/11 | 0 macro jouable -> POUSSEES SIMPLES
 [macro] TERMINEE
-[manque] SIGNALE (10,5) | but actif (3,8) rang 7/11
-[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
-[manque]   plateau (lecture — pas une fixture d'ordre) :
-[manque]           ######## 
-[manque]           #      # 
-[manque]           # $#  ## 
-[manque]           # $   #  
-[manque]           ##$   #  
-[manque]   ######### $ # ###
-[manque]   #***.  ##       #
-[manque]   ##**.           #
-[manque]   #**+.  ##########
-[manque]   ########         
 [mouv] joueur (3,8)->(4,8)
 [hybride] posees 7/11 | but actif (3,8) rang 7/11 | 0 macro jouable -> POUSSEES SIMPLES
 [mouv] joueur (4,8)->(5,8)
@@ -694,19 +667,6 @@
 [mouv] joueur (5,8)->(4,8) POUSSE caisse ->(3,8) [POSE]
 [hybride] posees 8/11 | but actif (4,6) rang 8/11 | 0 macro jouable -> POUSSEES SIMPLES
 [macro] TERMINEE
-[manque] SIGNALE (10,3) | but actif (4,6) rang 8/11
-[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
-[manque]   plateau (lecture — pas une fixture d'ordre) :
-[manque]           ######## 
-[manque]           #      # 
-[manque]           # $#  ## 
-[manque]           # $   #  
-[manque]           ##$   #  
-[manque]   #########   # ###
-[manque]   #***.  ##       #
-[manque]   ##**.           #
-[manque]   #***+  ##########
-[manque]   ########         
 [mouv] joueur (4,8)->(4,7)
 [hybride] posees 8/11 | but actif (4,6) rang 8/11 | 0 macro jouable -> POUSSEES SIMPLES
 [mouv] joueur (4,7)->(5,7)
@@ -956,11 +916,3 @@
 [mouv] joueur (6,8)->(5,8) POUSSE caisse ->(4,8) [POSE]
 [hybride] aucun but actif (etat gagne)
 [macro] TERMINEE
-
-=== niveau 3 — partie du 2026-08-01 11:09:13 ===
-[hybride] ordre de remplissage calcule : 0:(1,6) 1:(2,6) 2:(3,6) 3:(2,7) 4:(3,7) 5:(1,8) 6:(2,8) 7:(3,8) 8:(4,6) 9:(4,7) 10:(4,8)
-[hybride] posees 0/11 | but actif (1,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
-
-=== niveau 3 — partie du 2026-08-01 17:28:25 ===
-[hybride] ordre de remplissage calcule : 0:(1,6) 1:(2,6) 2:(3,6) 3:(2,7) 4:(3,7) 5:(1,8) 6:(2,8) 7:(3,8) 8:(4,6) 9:(4,7) 10:(4,8)
-[hybride] posees 0/11 | but actif (1,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES

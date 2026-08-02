@@ -1,0 +1,41 @@
+
+=== niveau 3 — partie du 2026-08-01 05:14:50 ===
+[manque] SIGNALE (10,6) | but actif (2,8) rang 6/11
+[manque]   cause : DESCENTE BLOQUEE en (9,6), il restait 9 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   ######### $ # ###
+[manque]   #***.  ## $     #
+[manque]   ##**.           #
+[manque]   #*+..  ##########
+[manque]   ########         
+[manque] SIGNALE (10,5) | but actif (3,8) rang 7/11
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   ######### $ # ###
+[manque]   #***.  ##       #
+[manque]   ##**.           #
+[manque]   #**+.  ##########
+[manque]   ########         
+[manque] SIGNALE (10,3) | but actif (4,6) rang 8/11
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]           ######## 
+[manque]           #      # 
+[manque]           # $#  ## 
+[manque]           # $   #  
+[manque]           ##$   #  
+[manque]   #########   # ###
+[manque]   #***.  ##       #
+[manque]   ##**.           #
+[manque]   #***+  ##########
+[manque]   ########         

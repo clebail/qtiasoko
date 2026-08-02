@@ -1,4 +1,3 @@
-
 === niveau 7 — partie du 2026-08-01 11:14:12 ===
 [hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
 [hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
@@ -452,21 +451,6 @@
 [hybride] posees 6/11 | but actif (9,7) rang 6/11 | 0 macro jouable -> POUSSEES SIMPLES
 [mouv] joueur (2,7)->(1,7)
 [hybride] posees 6/11 | but actif (9,7) rang 6/11 | 0 macro jouable -> POUSSEES SIMPLES
-[manque] SIGNALE (2,6) | but actif (9,7) rang 6/11
-[manque]   cause : DESCENTE BLOQUEE en (3,6), il restait 7 de distance (1 branche essayee)
-[manque]   plateau (lecture — pas une fixture d'ordre) :
-[manque]          ##### 
-[manque]    #######   ##
-[manque]   ## #  ##    #
-[manque]   #           #
-[manque]   #   $ ###   #
-[manque]   ### ##### ###
-[manque]   # $  ### .*# 
-[manque]   #@  $ $ ..*# 
-[manque]   #    ###.**# 
-[manque]   #  $ ###.**# 
-[manque]   #  ######### 
-[manque]   ####         
 [mouv] joueur (1,7)->(1,6)
 [hybride] posees 6/11 | but actif (9,7) rang 6/11 | 0 macro jouable -> POUSSEES SIMPLES
 [mouv] joueur (1,6)->(2,6) POUSSE caisse ->(3,6)
@@ -580,21 +564,6 @@
 [hybride] posees 7/11 | but actif (8,9) rang 7/11 | 1 macro jouable : caisse (6,7) en 4 poussees (1 branche)
 [mouv] joueur (1,9)->(1,10)
 [hybride] posees 7/11 | but actif (8,9) rang 7/11 | 1 macro jouable : caisse (6,7) en 4 poussees (1 branche)
-[manque] SIGNALE (2,9) | but actif (8,9) rang 7/11
-[manque]   cause : DESCENTE BLOQUEE en (5,7), il restait 5 de distance (2 branches essayees)
-[manque]   plateau (lecture — pas une fixture d'ordre) :
-[manque]          ##### 
-[manque]    #######   ##
-[manque]   ## #  ##    #
-[manque]   #           #
-[manque]   #   $ ###   #
-[manque]   ### ##### ###
-[manque]   #    ### .*# 
-[manque]   #     $ .**# 
-[manque]   #   $###.**# 
-[manque]   # $  ###.**# 
-[manque]   #@ ######### 
-[manque]   ####         
 [mouv] joueur (1,10)->(2,10)
 [hybride] posees 7/11 | but actif (8,9) rang 7/11 | 1 macro jouable : caisse (6,7) en 4 poussees (1 branche)
 [mouv] joueur (2,10)->(2,9) POUSSE caisse ->(2,8)
@@ -883,47 +852,3 @@
 [mouv] joueur (6,7)->(7,7) POUSSE caisse ->(8,7) [POSE]
 [hybride] aucun but actif (etat gagne)
 [macro] TERMINEE
-
-=== niveau 7 — partie du 2026-08-01 11:19:09 ===
-[hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
-[hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
-
-=== niveau 7 — partie du 2026-08-01 11:20:51 ===
-[hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
-[hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
-
-=== niveau 7 — partie du 2026-08-01 11:23:27 ===
-[hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
-[hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
-
-=== niveau 7 — partie du 2026-08-01 11:24:14 ===
-[hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
-[hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
-
-=== niveau 7 — partie du 2026-08-01 11:28:36 ===
-[hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
-[hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
-
-=== niveau 7 — partie du 2026-08-01 11:29:20 ===
-[hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
-[hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
-
-=== niveau 7 — partie du 2026-08-01 11:34:46 ===
-[hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
-[hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
-
-=== niveau 7 — partie du 2026-08-01 11:36:11 ===
-[hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
-[hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
-
-=== niveau 7 — partie du 2026-08-02 14:38:35 ===
-[hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
-[hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
-
-=== niveau 7 — partie du 2026-08-02 14:40:42 ===
-[hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
-[hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES
-
-=== niveau 7 — partie du 2026-08-02 14:41:23 ===
-[hybride] ordre de remplissage calcule : 0:(10,6) 1:(10,7) 2:(10,8) 3:(10,9) 4:(9,9) 5:(9,8) 6:(9,7) 7:(8,9) 8:(8,8) 9:(9,6) 10:(8,7)
-[hybride] posees 0/11 | but actif (10,6) rang 0/11 | 0 macro jouable -> POUSSEES SIMPLES

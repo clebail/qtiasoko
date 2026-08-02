@@ -1,0 +1,67 @@
+
+=== niveau 2 — partie du 2026-08-01 05:12:34 ===
+[manque] SIGNALE (11,7) | but actif (1,1) rang 4/10
+[manque]   cause : DESCENTE BLOQUEE en (10,7), il restait 17 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #..  #     ###
+[manque]   #*+  #       #
+[manque]   #*.  # ####  #
+[manque]   #*.      ##  #
+[manque]   #*.  # #    ##
+[manque]   ###### ##$$  #
+[manque]     # $  $ $ $ #
+[manque]     #    #     #
+[manque]     ############
+[manque] SIGNALE (9,7) | but actif (2,5) rang 5/10
+[manque]   cause : DESCENTE BLOQUEE en (8,7), il restait 12 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*+  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #*.      ##  #
+[manque]   #*.  # #    ##
+[manque]   ###### ##$$  #
+[manque]     # $  $ $   #
+[manque]     #    #     #
+[manque]     ############
+[manque] SIGNALE (7,7) | but actif (2,4) rang 6/10
+[manque]   cause : DESCENTE BLOQUEE en (5,7), il restait 8 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #*.  # ####  #
+[manque]   #*.      ##  #
+[manque]   #**@ # #    ##
+[manque]   ###### ##$$  #
+[manque]     # $  $     #
+[manque]     #    #     #
+[manque]     ############
+[manque] SIGNALE (10,6) | but actif (2,2) rang 8/10
+[manque]   cause : DESCENTE BLOQUEE en (5,7), il restait 10 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #*.  #       #
+[manque]   #**@ # ####  #
+[manque]   #**      ##  #
+[manque]   #**  # #    ##
+[manque]   ###### ##$$  #
+[manque]     #          #
+[manque]     #    #     #
+[manque]     ############
+[manque] SIGNALE (9,6) | but actif (2,1) rang 9/10
+[manque]   cause : DESCENTE BLOQUEE en (5,7), il restait 11 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ############  
+[manque]   #*.  #     ###
+[manque]   #**@ #       #
+[manque]   #**  # ####  #
+[manque]   #**      ##  #
+[manque]   #**  # #    ##
+[manque]   ###### ##$   #
+[manque]     #          #
+[manque]     #    #     #
+[manque]     ############

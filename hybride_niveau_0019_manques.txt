@@ -1,0 +1,21 @@
+
+=== niveau 19 — partie du 2026-08-01 17:50:19 ===
+[manque] SIGNALE (5,12) | but actif (17,13) rang 5/15
+[manque]   cause : DESCENTE BLOQUEE en (14,12), il restait 4 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]     ######           
+[manque]     #    ####        
+[manque]   #####     #        
+[manque]   #   ##$   ####     
+[manque]   #  $#  ##    #     
+[manque]   #   # $##### #     
+[manque]   ##  $      # #     
+[manque]    # $ $ ### # #     
+[manque]    # # $   # # #     
+[manque]    # # #$#   # #     
+[manque]   ## ###   # # ######
+[manque]   #  $  #### # #.***#
+[manque]   #   @$        .*#*#
+[manque]   ####    #     ....#
+[manque]   #       #  ## ....#
+[manque]   ###################

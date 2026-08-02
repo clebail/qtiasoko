@@ -1,3 +1,6 @@
+### ⚠️ ANCRES PERIMEES (2026-08-02) — les journaux ont ete nettoyes (undo appliques,
+### boucles de marche du perso retirees), donc les numeros « coup N/M » ci-dessous ne
+### designent plus les memes coups. A REFAIRE, ne pas depouiller en l'etat.
 
 === niveau 5 — annotation du 2026-08-02 14:28:53 — 429 coups (399 par macro) ===
 [intention] coup 3/429 | OUVRIR (un passage pour le joueur) | posees 0/12 | joueur (13,5)

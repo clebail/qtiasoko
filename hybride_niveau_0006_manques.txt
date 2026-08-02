@@ -1,0 +1,16 @@
+
+=== niveau 6 — partie du 2026-08-01 11:12:11 ===
+[manque] SIGNALE (8,6) | but actif (1,5) rang 3/10
+[manque]   cause : DESCENTE BLOQUEE en (3,4), il restait 3 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]   ######  ####
+[manque]   #..  # ## ##
+[manque]   #..  ###   #
+[manque]   #.*        #
+[manque]   #.*  # #   #
+[manque]   #.*### #   #
+[manque]   #### $ #$$ #
+[manque]      #  $#@  #
+[manque]      # $  $$ #
+[manque]      #  ##   #
+[manque]      #########

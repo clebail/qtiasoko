@@ -1,0 +1,86 @@
+
+=== niveau 10 — partie du 2026-08-01 05:21:20 ===
+[manque] SIGNALE (8,2) | but actif (16,4) rang 12/32
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    ###  #############
+[manque]   ## #### @     #   #
+[manque]   #   $  $$      ...#
+[manque]   # $ $$#       #*..#
+[manque]   # $   #       #*..#
+[manque]   ###   #  $    #**.#
+[manque]   #     # $ $ $ #**.#
+[manque]   #    ###### ###**.#
+[manque]   ## #  # $ $   #**.#
+[manque]   #  ## # $$   $##*.#
+[manque]   # .*# #      $  #.#
+[manque]   # ..# #     $$$ #.#
+[manque]   ##### #       # #.#
+[manque]       # ######### #.#
+[manque]       #           #.#
+[manque]       ###############
+[manque] SIGNALE (10,11) | but actif (3,11) rang 14/32
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    ###  #############
+[manque]   ## ####       #   #
+[manque]   #   $  $$      .+.#
+[manque]   # $ $$#       #**.#
+[manque]   # $   #       #**.#
+[manque]   ###   #  $    #**.#
+[manque]   #     # $ $ $ #**.#
+[manque]   #    ###### ###**.#
+[manque]   ## #  #       #**.#
+[manque]   #  ## #       ##*.#
+[manque]   # .*# # $    $  #.#
+[manque]   # ..# # $$$  $$ #.#
+[manque]   ##### #       # #.#
+[manque]       # ######### #.#
+[manque]       #           #.#
+[manque]       ###############
+[manque] SIGNALE (9,11) | but actif (3,11) rang 14/32
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque] SIGNALE (8,10) | but actif (3,11) rang 14/32
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+
+=== niveau 10 — partie du 2026-08-01 05:31:44 ===
+[manque] SIGNALE (8,2) | but actif (17,10) rang 19/32
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    ###  #############
+[manque]   ## ####       #   #
+[manque]   #   $  $$      ...#
+[manque]   #   $$#       #**.#
+[manque]   # $   #       #**.#
+[manque]   ###   #  $    #**.#
+[manque]   #     # $ $ $ #**.#
+[manque]   #    ###### ###**.#
+[manque]   ## #  #       #**.#
+[manque]   #  ## #       ##*.#
+[manque]   # .*# #      $  #+#
+[manque]   # .*# #      $$ #*#
+[manque]   ##### #       # #*#
+[manque]       # ######### #*#
+[manque]       #           #*#
+[manque]       ###############
+
+=== niveau 10 — partie du 2026-08-01 05:43:46 ===
+[manque] SIGNALE (11,3) | but actif (16,8) rang 8/32
+[manque]   cause : DESCENTE BLOQUEE en (13,3), il restait 10 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]    ###  #############
+[manque]   ## ####       #   #
+[manque]   #              ...#
+[manque]   #     #$   $  #*..#
+[manque]   #     #    $$ #*..#
+[manque]   ###   #     $ #*..#
+[manque]   #     # $ $ $ #*..#
+[manque]   #    ###### ###*..#
+[manque]   ## #  # $   $ #*+.#
+[manque]   #  ## # $$ $  ##*.#
+[manque]   # **# # $    $  #.#
+[manque]   # **# # $$$ $$$ #.#
+[manque]   ##### #       # #.#
+[manque]       # ######### #.#
+[manque]       #           #.#
+[manque]       ###############

@@ -2598,6 +2598,50 @@ valent, c'est ce qu'elles apprennent sur le solveur.
 
 \* le 20 et le 25 relancent des macros après des transits, d'où un total supérieur au nombre de buts.
 
+➡️ ⚠️ **LA COLONNE « ÉTATS SANS MACRO » EST SURESTIMÉE — corrigée le 2026-08-02.** Elle comptait les
+lignes `[hybride]` du journal, **y compris celles des branches ABANDONNÉES** : un coup annulé par
+`[undo]` laissait sa ligne d'état derrière lui. Le corpus portait **2 877 `[undo]`**, et le journal du
+18 était **à 48 % fait de branches mortes**. Les journaux ont été récrits (undo appliqués, séquences
+de coups vérifiées identiques à l'octet contre le commit d'origine) ; valeurs recalculées :
+
+➡️ 🔴 **ET CETTE CORRECTION EST ELLE-MÊME SUPERSÉDÉE, dans l'heure — les deux versions mesuraient
+dans le MAUVAIS ESPACE.** Le compteur prend une ligne `[hybride]` par **COUP**, marche comprise. Or
+le solveur ne voit jamais un état de marche : `pousse()` **téléporte** le joueur (§2.1), son espace
+d'états est en **POUSSÉES**. On comptait donc des états qui n'existent pas pour lui — et le résultat
+dépendait de combien le joueur avait tourné en rond, ce qu'un constat utilisateur sur le 18 a fait
+voir (« beaucoup de trajets du perso pour revenir au départ »).
+
+| niv | 23 | 25 | 26 | 20 | 22 | 12 | 24 | 19 | 18 |
+|---|---|---|---|---|---|---|---|---|---|
+| publié (par coup) | 45 % | 66 % | 67 % | — | 32 % | 21 % | 17 % | 15 % | 6 % |
+| undo appliqués | 39,5 % | 64,1 % | 56,3 % | 50,4 % | 28,6 % | 18,4 % | 17 % | 13,8 % | 1,6 % |
+| **PAR POUSSÉE — la bonne** | **25,1 %** | **52,2 %** | **50,7 %** | **46,0 %** | **19,5 %** | **7,8 %** | **9,7 %** | **11,0 %** | **6,8 %** |
+
+Hors tableau : **11** 12,4 %, **13** 10,2 %, **4** 13,7 %, **7** 30,8 %, **10** 2,5 %, **2** 11,5 %,
+**3** 5,1 %.
+
+- ⚠️ **Sur le 18, les deux biais se compensaient presque** : 6 % publié, 6,8 % juste. Un chiffre exact
+  par accident, obtenu en cumulant deux erreurs de sens opposé. **C'est le pire cas de tous** — rien
+  ne l'aurait signalé.
+- ⚠️ **Deux niveaux MONTENT** en passant par poussée (6 : 12,5 → 17,2 % ; 18 : 1,6 → 6,8 %) : leur
+  joueur marche beaucoup dans des états qui, eux, OFFRENT une macro. Le biais n'a donc pas de signe
+  fixe, on ne pouvait pas le corriger « à la louche ».
+- **Ce qui ne bouge toujours pas** : le classement (25 et 26 en tête, puis 20), et la colonne
+  « hors régime », qui compte des poussées jouées.
+
+- ⚠️ **Le 12 ne se recoupe pas** : 21 % publié, 24,3 % mesuré avant correction, **18,4 %** après. La
+  valeur d'origine ne vient donc pas de la même partie ni du même dénominateur — non élucidé, à ne
+  pas réconcilier de force.
+- ⚠️ **La phrase « le 23 est le cas extrême, 45 %, le record du corpus » était fausse AVANT cette
+  correction** : le tableau ci-dessus donne déjà 66-67 % au 25 et au 26. Erreur de lecture
+  préexistante, indépendante du biais des undo.
+- **Ce que ça ne change pas** : la colonne « hors régime », qui compte des poussées effectivement
+  jouées, pas des états traversés. Le 89 % du 13 et le 90 % du 18 tiennent.
+- 🔴 **La leçon, et elle vaut au-delà de ce tableau** : **un journal en AJOUT n'est pas une trace, c'est
+  un brouillon.** Tout compteur qui balaie ses lignes compte aussi ce que le joueur a défait. Le
+  parseur de rejeu, lui, appliquait les `[undo]` depuis toujours — donc les poussées étaient justes et
+  les états faux, dans le même fichier, sans que rien ne le signale.
+
 **DIX non-résolus gagnés à la main dans la journée** (12, 13, 18, 19, 20, 22, 23, 24, 25, 26). La
 série hors régime devient **0, 1, 1, 2, 3, 6, 10, 67, 89, 90** — le continuum se confirme, avec un
 trou entre 10 % et 67 % qui ne repose que sur l'absence de mesure intermédiaire, pas sur une
@@ -2614,6 +2658,9 @@ qu'hier, où l'affirmation ne reposait que sur le 10.
 quadruple du 24 (17 %). Sur le 25, **243 poussées choisies contre 193 par macro** : plus de la moitié
 du travail est du démêlage pur, et le solveur générerait 94 % de ces coups. Ce sont les meilleurs
 candidats pour le corpus d'intentions.
+➡️ Chiffres corrigés le 2026-08-02 (biais des `[undo]`, cf. sous le tableau ci-dessus) : **25 à
+64,1 %, 26 à 56,3 %, 22 à 28,6 %**, le 24 inchangé à 17 %. L'écart 25/26 contre 22 se réduit de
+« le double » à ×2,2 et ×2,0 — **le classement ne bouge pas, les rapports si.**
 
 **⏸️ LE 18 AU SOLVEUR — AUCUN VERDICT, et le MUR MÉMOIRE est de retour.** L'ordre humain du 18
 (petite salle en premier) injecté, `coupl-plongeon`, laissé sans budget :
@@ -2666,7 +2713,9 @@ journée, à chaque fois avec deux à cinq points. **Ne plus annoncer de structu
 **LE GROUPE QUI INTERROGE LE PLUS : 19, 20, 23.** Ordre calculé suivi **sans une inversion**, macro
 qui pose **toutes** les caisses (15/15, 18/18), 0-3 % hors régime — **tout ce qu'on sait mesurer dit
 que le solveur peut jouer ces parties**, et il ne les trouve pas (10/15 et 0/18 au profilage à 120 s).
-Le 23 est le cas extrême : **45 % de ses états n'offrent aucune macro**, le record du corpus, et ses
+Le 23 est le cas extrême : ~~**45 % de ses états n'offrent aucune macro**, le record du corpus~~
+(⚠️ **39,5 % après correction du biais des `[undo]`, et ce n'est PAS le record** — le 25 et le 26
+sont au-dessus, dans le tableau de cette même session ; double erreur relevée le 2026-08-02), et ses
 162 poussées choisies sont générables à 99 %. **Leur verrou n'est ni l'ordre, ni la génération, ni
 l'élagage : c'est le démêlage du §4.** Rien dans le plan ne l'attaque, et le §6.1 a fermé les
 tie-breaks.
@@ -4244,3 +4293,19 @@ plateau × leviers disponibles.**
   dans le chemin chaud (§7) ; **`precedencepaires.h`** (neuf, 2026-07-30) — BFS de tirage à rebours à
   deux bloqueurs, en **exemplaire unique** partagé par `ordre` et `fp -3`. ⚠️ **Objet RÉFUTÉ comme
   élagage** (§6.2) : conservé pour la LECTURE d'un état précis, jamais comme test.
+- **`mesures/compresse_journaux.py`** (neuf, 2026-08-02) — **le seul outil du projet qui RÉÉCRIT des
+  données**, d'où trois précautions à ne pas retirer : rapport seul par défaut (`--ecrire` pour
+  appliquer), **validation par REJEU sur le vrai plateau** (chaque coup légal, partie gagnée à
+  l'arrivée — une partie qui ne valide pas est laissée intacte), et **idempotence vérifiée** (relancé
+  sur un corpus déjà compressé, il ne retire plus rien). Trois passes, chacune un no-op sur la partie
+  jouée : `[undo]` appliqués **avec le coup qu'ils annulent** (retirer le seul marqueur ferait
+  rejouer les coups annulés — le parseur de l'app les applique), boucles de marche du perso retirées,
+  **une seule partie gagnée conservée** par niveau. Les `[manque]` sortent dans
+  `hybride_niveau_XXXX_manques.txt` au lieu d'être perdus. ⚠️ **Il décale les numéros de coup**, donc
+  il marque les `_intentions.txt` « ANCRES PERIMEES » — sans quoi un fichier resterait faux en
+  silence. Effet mesuré sur le corpus du 2026-08-02 : **119 711 → 47 080 lignes, 9,24 → 3,8 Mo**,
+  21 parties gagnantes conservées.
+  ⚠️ **Le piège qui a fait échouer 14 fichiers sur 21 au premier jet** : un journal contient
+  PLUSIEURS parties, et traiter le fichier d'un bloc fait enjamber une frontière à un segment de
+  marche — le rejeu de validation continue alors sur le plateau de la partie précédente. **Tout se
+  fait partie par partie.** C'est la validation qui l'a vu, pas la relecture.

@@ -1,0 +1,694 @@
+
+=== niveau 20 — partie du 2026-08-01 12:36:28 ===
+[manque] SIGNALE (9,5) | but actif (17,9) rang 5/18
+[manque]   cause : DESCENTE BLOQUEE en (16,8), il restait 2 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #     @$#  #$ #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #.#
+[manque]   # #$ $    $  #  ..#
+[manque]   #    $ # $ $ #  #.#
+[manque]   #### $###    #$ ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,11) rang 7/18
+[manque]   cause : DESCENTE BLOQUEE en (16,8), il restait 4 de distance (2 branches essayees)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # # @$    #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $    $  #  .*#
+[manque]   #    $ # $ $ #  #.#
+[manque]   #### $###    #  ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (10,11) | but actif (16,13) rang 10/18
+[manque]   cause : DESCENTE BLOQUEE en (5,5), il restait 19 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #       #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #  $$ #  #*#
+[manque]   #### $### @  #  .*#
+[manque]      #    $$ ###...*#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (11,11) | but actif (15,13) rang 11/18
+[manque]   cause : DESCENTE BLOQUEE en (5,5), il restait 18 de distance (3 branches essayees)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #       #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #   $@#  #*#
+[manque]   #### $###    #  .*#
+[manque]      #    $$ ###..**#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (9,13) | but actif (14,13) rang 12/18
+[manque]   cause : DESCENTE BLOQUEE en (5,5), il restait 19 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #       #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #    $$ ###.***#
+[manque]      #     @## ######
+[manque]      ########        
+
+=== niveau 20 — partie du 2026-08-01 12:47:13 ===
+[manque] SIGNALE (5,5) | but actif (17,9) rang 5/18
+[manque]   cause : DESCENTE BLOQUEE en (16,8), il restait 2 de distance (1 branche essayee)
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #   @## #  #  .*#
+[manque]   # #  $    #  #$ #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #.#
+[manque]   # #$ $    $  #  ..#
+[manque]   #    $ # $ $ #  #.#
+[manque]   #### $###    #$ ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,10) rang 6/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #$ #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $    $  #  ..#
+[manque]   #    $ # $ $ #  #.#
+[manque]   #### $###    #  ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,11) rang 7/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $    $  #  .*#
+[manque]   #    $ # $ $ #  #.#
+[manque]   #### $###    #  ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,12) rang 8/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $    $  #  .*#
+[manque]   #    $ # $ $ #  #*#
+[manque]   #### $###    #  ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,13) rang 9/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #  $$ #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,13) rang 10/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #   $ #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #    $$ ###...*#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,12) rang 8/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #  $$ #  #*#
+[manque]   #### $###    #  ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,13) rang 9/18
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # # @  ## #  #  .*#
+[manque]   # #  $    #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #   $ #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,13) rang 9/18
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque] SIGNALE (5,5) | but actif (16,13) rang 10/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #    $$ ###...*#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,13) rang 10/18
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # # @$    #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #    $$ ###...*#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,13) rang 10/18
+[manque]   ⚠ la macro est en fait JOUABLE — overlay perime ?
+[manque] SIGNALE (5,5) | but actif (15,13) rang 11/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #    $  ###..**#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,6) rang 13/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #       ###****#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,8) rang 14/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  **#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$$        #  .*#
+[manque]   #   $  #     #  #*#
+[manque]   ####  ###    #  .*#
+[manque]      #       ###****#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,8) rang 14/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  **#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$         #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #       ###****#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,4) rang 15/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  **#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  **#
+[manque]   # #    #  ####  #*#
+[manque]   # #          #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #       ###****#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,10) rang 16/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  **#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  **#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  **#
+[manque]   # #    #  ####  #*#
+[manque]   # #          #  .*#
+[manque]   #      #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #       ###****#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,12) rang 17/18
+[manque]   cause : ECHEC AU PAS 0 — aucune poussee legale ne fait baisser la distance au but actif
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  **#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  **#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  **#
+[manque]   # #    #  ####  #*#
+[manque]   # #          #  **#
+[manque]   #      #     #  #*#
+[manque]   ####  ###    #  .*#
+[manque]      #       ###****#
+[manque]      #      ## ######
+[manque]      ########        
+
+=== niveau 20 — partie du 2026-08-01 13:11:34 ===
+[manque] SIGNALE (5,5) | but actif (17,8) rang 4/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #$ #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  ..#
+[manque]   # #    #  ####  #.#
+[manque]   # #$ $    $  #$ ..#
+[manque]   #    $ # $ $ #  #.#
+[manque]   #### $###    #$ ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,9) rang 5/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #.#
+[manque]   # #$ $    $  #$ ..#
+[manque]   #    $ # $ $ #  #.#
+[manque]   #### $###    #$ ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,9) rang 5/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #$ #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #.#
+[manque]   # #$ $    $  #  ..#
+[manque]   #    $ # $ $ #  #.#
+[manque]   #### $###    #$ ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,10) rang 6/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #$ #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $    $  #  ..#
+[manque]   #    $ # $ $ #  #.#
+[manque]   #### $###    #  ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,11) rang 7/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $    $  #  .*#
+[manque]   #    $ # $ $ #  #.#
+[manque]   #### $###    #  ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,12) rang 8/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #  $$ #  #*#
+[manque]   #### $###    #  ..#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (17,13) rang 9/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #   $ #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #    $$ ###....#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,13) rang 10/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #    $$ ###...*#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (15,13) rang 11/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####$ ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #    $  ###..**#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,6) rang 13/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  .*#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$ $       #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #       ###****#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,8) rang 14/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  **#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  .*#
+[manque]   # #    #  ####  #*#
+[manque]   # #$         #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #       ###****#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,4) rang 15/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  .*#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  **#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  **#
+[manque]   # #    #  ####  #*#
+[manque]   # #          #  .*#
+[manque]   #    $ #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #       ###****#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,10) rang 16/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  **#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  **#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  **#
+[manque]   # #    #  ####  #*#
+[manque]   # #          #  .*#
+[manque]   #      #     #  #*#
+[manque]   #### $###    #  .*#
+[manque]      #       ###****#
+[manque]      #      ## ######
+[manque]      ########        
+[manque] SIGNALE (5,5) | but actif (16,12) rang 17/18
+[manque]   cause : ECHEC AU PAS 0 / DETOUR NON-MONOTONE REQUIS — aucune direction ne baisse la distance, meme joueur place ou l'on veut
+[manque]   plateau (lecture — pas une fixture d'ordre) :
+[manque]       ##########     
+[manque]   #####        ####  
+[manque]   #     #      #  #  
+[manque]   # ####### ####  ###
+[manque]   # #    ## #  #  **#
+[manque]   # #  $@   #  #  #*#
+[manque]   # #    #     #  **#
+[manque]   # #  ### ##     #*#
+[manque]   # ###  #  #  #  **#
+[manque]   # #    #  ####  #*#
+[manque]   # #          #  **#
+[manque]   #      #     #  #*#
+[manque]   ####  ###    #  .*#
+[manque]      #       ###****#
+[manque]      #      ## ######
+[manque]      ########        
