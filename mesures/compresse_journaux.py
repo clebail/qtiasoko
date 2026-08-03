@@ -19,8 +19,14 @@ Les blocs `[manque]` sont extraits dans `hybride_niveau_XXXX_manques.txt` plutô
 supprimés : ils portent la CAUSE d'une macro absente, et 84 d'entre eux n'existaient
 nulle part ailleurs (dont 38 sur le niveau 20, cités par plan.md).
 
-    python3 mesures/compresse_journaux.py            # rapport seul, n'écrit RIEN
-    python3 mesures/compresse_journaux.py --ecrire   # applique
+    python3 mesures/compresse_journaux.py                  # rapport seul, n'écrit RIEN
+    python3 mesures/compresse_journaux.py --ecrire         # applique, TOUS les journaux
+    python3 mesures/compresse_journaux.py 14 15 16 17 …    # limite aux niveaux cités
+
+Sans numéro, tous les journaux sont traités. Le filtre existe parce qu'un journal
+déjà compressé se fait quand même RÉÉCRIRE (à une ligne vide près) : sur un dépôt
+où seuls quelques fichiers viennent de bouger, ça noie le diff des journaux neufs
+dans vingt fichiers inchangés au fond.
 
 ⚠️ TROIS PIÈGES, tous rencontrés en écrivant ce script :
 
@@ -167,6 +173,7 @@ def parties(lignes):
 
 def main():
     ecrire = "--ecrire" in sys.argv
+    cibles = {int(a) for a in sys.argv[1:] if a.isdigit()}   # vide = tous
     total_av = total_ap = 0
     sans_gagnee, non_validees = [], []
 
@@ -174,6 +181,8 @@ def main():
         if "_intentions" in f or "_manques" in f:
             continue
         niv = int(re.search(r"(\d{4})", os.path.basename(f)).group(1))
+        if cibles and niv not in cibles:
+            continue
         with open(f, encoding="utf-8", errors="replace") as fh:
             src = fh.read().split("\n")
 
@@ -230,6 +239,9 @@ def main():
     # Les annotations ancrent leurs `coup N/M` : après compression elles pointent ailleurs.
     n = 0
     for f in sorted(glob.glob(os.path.join(RACINE, "hybride_niveau_*_intentions.txt"))):
+        niv = int(re.search(r"(\d{4})", os.path.basename(f)).group(1))
+        if cibles and niv not in cibles:     # seuls les journaux réécrits périment leurs ancres
+            continue
         with open(f, encoding="utf-8") as fh:
             t = fh.read()
         if "ANCRES PERIMEES" in t:
