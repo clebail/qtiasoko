@@ -128,5 +128,20 @@ int main(int argc, char** argv) {
 
     printf("  --- %d caisse(s) sur %d contrainte(s), %d immobile(s) des le depart\n",
            total, caisses, immobiles);
+
+    // TEST UNITAIRE DE LA GREFFE (§6.2, 2026-08-04). La contrainte n'est câblée que
+    // dans la branche ORDRE DYNAMIQUE de `butActif()` : on l'arme et on demande quel
+    // but il élit sur le plateau de DÉPART. Un but dont la porte est encore occupée ne
+    // doit pas sortir — c'est le seul point où l'on peut le vérifier sans lire une
+    // trace de plusieurs millions d'états, et le compte d'élections dans une trace ne
+    // le dit PAS (élire (12,7) une fois (10,6) dégagée est parfaitement correct).
+    Game d(g);
+    d.setOrdreDynamique(true);
+    const int actif = d.butActif();
+    if (actif < 0) { printf("  butActif (ordre dynamique) : aucun\n"); return 0; }
+    const int cell = d.getCaseBut(actif);
+    printf("  butActif (ordre dynamique) au depart : (%d,%d) rang %d — porte %s\n",
+           cell % L, cell / L, d.rangDuBut(actif),
+           d.porteBloquee(actif) ? "⚠️ BLOQUEE (la greffe ne mord pas)" : "libre");
     return 0;
 }

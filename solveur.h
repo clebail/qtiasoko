@@ -64,7 +64,26 @@ public:
         // recalculées but par but, exemptées par alignement. C'est la formulation
         // qui a survécu au juge là où celle des coins ci-dessus perd le niveau 6.
         // Règle dans game.h, câblage dans solveurastar.h.
-        AstarMacroCouplagePlongeonLoi
+        AstarMacroCouplagePlongeonLoi,
+        // ❌ RÉGIME RÉFUTÉ LE JOUR MÊME DE SA CRÉATION (2026-08-04) — conservé pour
+        // qu'il ne soit pas reproposé. Les deux moitiés du travail du jour ensemble :
+        // ordre dynamique + contrainte de porte (QUAND remplir) ET loi de l'ordre +
+        // gel hors tour (OÙ ne pas gaspiller ses caisses pendant ce temps).
+        //
+        // Canari : **les niveaux 5, 6 et 17 passent de résolus à `AUCUNE`**, le 2
+        // dérive de 131 à 141 poussées et le 7 de 88 à 92. Chacune des deux moitiés
+        // prise SEULE est saine (la loi seule ne perd que le 6, pour une raison
+        // documentée ; l'ordre dynamique seul résout les 8).
+        //
+        // La cause, mesurée : sur le 17, **233 prunes dont 2 seulement de gel** ; sur
+        // le 5, 6 565 dont 9. C'est la LOI qui coupe. Et c'est logique après coup —
+        // ses cases mortes sont indexées par le but ACTIF, or la loi n'a jamais été
+        // validée que contre l'ordre STATIQUE (le gabarit du 16 a été dessiné avec ces
+        // rangs-là, `juge_loi.py` a jugé avec eux). L'ordre dynamique rechoisit depuis
+        // l'état courant et peut revenir en arrière : une case légitimement utilisée
+        // comme garage devient morte dès que le but actif change. **Le « 0 faux
+        // positif » de la loi ne se transporte pas à un ordre qui bouge.**
+        AstarMacroCouplagePlongeonOrdreLoi
     };
 
     struct SType {

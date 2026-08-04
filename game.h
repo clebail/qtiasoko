@@ -248,6 +248,33 @@ public:
     // ⚠️ Les buts de rang INFÉRIEUR sont exemptés, comme dans la table : ceux-là
     // sont rangés à leur tour, une caisse gelée dessus est une caisse posée.
     bool geleHorsTour(int idxButActif) const;
+
+    // ── PRÉCÉDENCE CAISSE → BUT (§6.2, 2026-08-04) ──────────────────────────────
+    // Toutes les précédences du projet sont but → but. Celle-ci est d'une autre
+    // espèce, et elle sort du niveau 16 :
+    //
+    //   Soit A(C) les cases d'appui dont le joueur a besoin pour pousser la caisse C
+    //   quelque part d'UTILE. Si remplir un but G prive le joueur de TOUT A(C),
+    //   alors C doit avoir été déplacée AVANT que G ne soit rempli.
+    //
+    // `porteBloquee(G)` dit qu'une caisse occupe encore l'une de ces cases, donc que
+    // G n'est pas mûr. Sur le 16 : la caisse (10,6) n'a qu'une poussée utile — vers
+    // l'ouest, appui (11,6) — et (11,6) ne s'atteint qu'en descendant la colonne de
+    // buts x=12 ; donc (12,7), rang 0, n'est pas mûr tant que (10,6) est occupée.
+    //
+    // ⚠️ « UTILE » fait tout le travail : une poussée dont la DESTINATION est une case
+    // morte n'est pas une issue, c'est un suicide. Sans ce test la règle est muette
+    // sur le 16 — la caisse (10,6) peut aussi être poussée vers l'est, appui (9,6)
+    // trivialement atteignable, mais elle atterrit en (11,6) d'où rien ne ressort.
+    //
+    // ⚠️ N'EST PAS UN ÉLAGAGE et ne doit jamais le devenir : c'est de l'ORDONNANCEMENT
+    // (§6.2, 2026-07-30 — la précédence par paires, prise pour un test de mort, a fait
+    // 9 niveaux sur 10 en faute au juge `fp`). Ici elle ne fait que retarder un but.
+    //
+    // ⚠️ Relaxation OPTIMISTE (le BFS de marche ignore les autres caisses) : une
+    // contrainte est une PREUVE, un silence ne promet rien. Mesuré à sa création :
+    // 0 contrainte sur les 15 résolus, 2 sur 18 non résolus (16 et 30).
+    bool porteBloquee(int idxBut) const;
     // Rang de remplissage du but 'idxBut' dans `ordreButs` (l'inverse de celui-ci).
     int rangDuBut(int idxBut) const { return rangDeBut.at(idxBut); }
     // Champ de distances vers le BUT ACTIF, SPARSE : une valeur uniquement sur
@@ -622,6 +649,12 @@ private:
     QVector<bool> mortesLoi;
     QVector<int>  rangDeBut;
 
+    // PRÉCÉDENCE CAISSE → BUT (cf. porteBloquee) : les cases à dégager avant chaque
+    // but, en CSR — `porteCases` concaténées, `porteDebut` les offsets (nbButs+1).
+    // Deux vecteurs plats et non un vecteur de vecteurs : même raison que mortesLoi,
+    // le solveur copie Game par candidate.
+    QVector<int> porteCases, porteDebut;
+
     bool move(EDirection dir);
     bool moveCaisse(Level::ETypeCase *cases, QPoint playerPoint, QPoint caissePoint, SDirection direction);
     void checkVictoire();
@@ -632,6 +665,7 @@ private:
     bool isLibre(int idx) const;
     void calculCaseMorte();
     void calculCasesMortesLoi();
+    void calculPorteRequis();
     // Test de gel : une caisse est gelée si elle est bloquée sur LES DEUX axes.
     // 'enCours' est la garde de récursion (cf. game.cpp).
     bool caisseGelee(int idxCaisse, QVector<bool>& enCours) const;

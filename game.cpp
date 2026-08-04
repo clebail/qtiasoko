@@ -67,6 +67,7 @@ Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
     calculDistancePoussee();
     calculCaseMorte();
     calculCasesMortesLoi();
+    calculPorteRequis();
 }
 
 Game::Game(const Game& other)
@@ -79,7 +80,8 @@ Game::Game(const Game& other)
     regions(other.regions), nbRegions(other.nbRegions), distancePoussee(other.distancePoussee),
     distanceParBut(other.distanceParBut), nbButs(other.nbButs),
     maxRegions(other.maxRegions), ordreButs(other.ordreButs),
-    mortesLoi(other.mortesLoi), rangDeBut(other.rangDeBut)
+    mortesLoi(other.mortesLoi), rangDeBut(other.rangDeBut),
+    porteCases(other.porteCases), porteDebut(other.porteDebut)
 {
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -114,6 +116,8 @@ Game& Game::operator=(const Game& other) {
     ordreButs = other.ordreButs;
     mortesLoi = other.mortesLoi;
     rangDeBut = other.rangDeBut;
+    porteCases = other.porteCases;
+    porteDebut = other.porteDebut;
 
     if (other.cases) {
         cases = new Level::ETypeCase[size];
@@ -139,7 +143,8 @@ Game::Game(Game&& other) noexcept
       distancePoussee(std::move(other.distancePoussee)),
       distanceParBut(std::move(other.distanceParBut)), nbButs(other.nbButs),
       maxRegions(other.maxRegions), ordreButs(std::move(other.ordreButs)),
-      mortesLoi(std::move(other.mortesLoi)), rangDeBut(std::move(other.rangDeBut))
+      mortesLoi(std::move(other.mortesLoi)), rangDeBut(std::move(other.rangDeBut)),
+      porteCases(std::move(other.porteCases)), porteDebut(std::move(other.porteDebut))
 {
     other.cases = nullptr;   // sinon les deux destructeurs libéreraient le même tableau
 }
@@ -170,6 +175,8 @@ Game& Game::operator=(Game&& other) noexcept {
     ordreButs = std::move(other.ordreButs);
     mortesLoi = std::move(other.mortesLoi);
     rangDeBut = std::move(other.rangDeBut);
+    porteCases = std::move(other.porteCases);
+    porteDebut = std::move(other.porteDebut);
 
     cases = other.cases;
 
@@ -789,6 +796,99 @@ void Game::calculCasesMortesLoi() {
             if (rangDeBut[m] < rangJ)
                 mortesLoi[(qsizetype)j * size + goals[m]] = false;
     }
+}
+
+// PRÉCÉDENCE CAISSE → BUT (cf. game.h). Statique, calculée au chargement comme
+// `precedenceGlobale`. O(caisses × buts × plateau) — quelques dizaines de milliers
+// d'opérations, invisible dans le ctor.
+void Game::calculPorteRequis() {
+    porteCases.clear();
+    porteDebut = QVector<int>(nbButs + 1, 0);
+    if (nbButs == 0 || casesMortes.isEmpty()) return;
+
+    const int depart = playerPoint.x() + playerPoint.y() * largeur;
+
+    // A(C) pour chaque caisse hors but du départ. Une caisse DÉJÀ posée sur un but
+    // n'est pas concernée : si elle gèle, elle gèle sur un but.
+    QVector<int> caissesCell;
+    QVector<QVarLengthArray<int, 4>> caissesAppuis;
+    for (int c = 0; c < size; c++) {
+        if (cases[c] != Level::tcCaisse) continue;
+        const int cx = c % largeur, cy = c / largeur;
+        QVarLengthArray<int, 4> appuis;
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int ax = cx + directions[d].dx, ay = cy + directions[d].dy;
+            const int px = cx - directions[d].dx, py = cy - directions[d].dy;
+            if (ax < 0 || ax >= largeur || ay < 0 || ay >= hauteur) continue;
+            if (px < 0 || px >= largeur || py < 0 || py >= hauteur) continue;
+            const int a = ax + ay * largeur, p = px + py * largeur;
+            if (cases[a] == Level::tcMur || cases[p] == Level::tcMur) continue;
+            if (casesMortes.at(a)) continue;      // poussée suicide, pas une issue
+            appuis.append(p);
+        }
+        if (appuis.isEmpty()) continue;           // immobile d'office : autre problème
+        caissesCell.append(c);
+        caissesAppuis.append(appuis);
+    }
+
+    // Pour chaque but : quelles caisses perdraient TOUS leurs appuis s'il était posé ?
+    QVector<bool> vu(size);
+    QVarLengthArray<int, 1024> file;
+    QVector<QVector<int>> parBut(nbButs);
+    for (int b = 0; b < nbButs; b++) {
+        const int gb = goals[b];
+        for (int i = 0; i < caissesCell.size(); i++) {
+            const int cc = caissesCell[i];
+            if (cc == gb) continue;
+            if (depart == gb || depart == cc) continue;   // situation dégénérée
+
+            // Marche du joueur, murs + le but posé + la caisse elle-même interdits.
+            vu.fill(false);
+            file.clear();
+            vu[depart] = true; file.append(depart);
+            bool atteint = false;
+            for (int k = 0; k < file.size() && !atteint; k++) {
+                const int cur = file[k], x = cur % largeur, y = cur / largeur;
+                for (int d = 0; d < NB_DIRECTION; d++) {
+                    const int nx = x + directions[d].dx, ny = y + directions[d].dy;
+                    if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+                    const int n = nx + ny * largeur;
+                    if (vu[n] || cases[n] == Level::tcMur || n == gb || n == cc) continue;
+                    vu[n] = true; file.append(n);
+                }
+            }
+            for (int p : caissesAppuis[i]) if (vu[p]) { atteint = true; break; }
+            if (!atteint) parBut[b].append(cc);
+        }
+    }
+
+    int total = 0;
+    for (int b = 0; b < nbButs; b++) {
+        porteDebut[b] = porteCases.size();
+        for (int c : parBut[b]) { porteCases.append(c); total++; }
+    }
+    porteDebut[nbButs] = porteCases.size();
+
+    // Trace PASSIVE (§7) : elle n'ajoute ni ne coupe aucun comportement, donc elle ne
+    // peut pas faire diverger l'app du bench, et elle dit d'un coup d'œil si le niveau
+    // porte le motif. Muette quand il n'y en a pas, c'est-à-dire presque partout.
+    if (total) {
+        fprintf(stderr, "[PORTE] niveau %d — %d contrainte(s) caisse->but :", numNiveau, total);
+        for (int b = 0; b < nbButs; b++)
+            for (int i = porteDebut[b]; i < porteDebut[b + 1]; i++)
+                fprintf(stderr, " caisse(%d,%d) avant but(%d,%d)",
+                        porteCases[i] % largeur, porteCases[i] / largeur,
+                        goals[b] % largeur, goals[b] / largeur);
+        fprintf(stderr, "\n");
+        fflush(stderr);
+    }
+}
+
+bool Game::porteBloquee(int idxBut) const {
+    if (porteDebut.size() <= idxBut + 1) return false;
+    for (int i = porteDebut.at(idxBut); i < porteDebut.at(idxBut + 1); i++)
+        if (estCaisse(porteCases.at(i))) return true;
+    return false;
 }
 
 bool Game::geleHorsTour(int idxButActif) const {
@@ -2514,7 +2614,12 @@ int Game::butActif() const {
     // ORDRE DYNAMIQUE (§6.2, cf. game.h). Le JALON : tant que le but choisi n'est pas
     // rempli, on le rend tel quel — aucun calcul. C'est ce qui borne le coût à nbButs
     // passes par chemin au lieu d'une par état.
-    if (butCourant >= 0 && cases[goals[butCourant]] != Level::tcGoalCaisse)
+    // ⚠️ La porte fait partie du JALON, pas seulement du choix : une caisse peut venir
+    // se garer sur une case de porte APRÈS qu'on a élu le but. Sans ce test, le cache
+    // rendrait un but devenu non mûr jusqu'au prochain remplissage — c'est-à-dire
+    // exactement pendant la phase où le mal se fait.
+    if (butCourant >= 0 && cases[goals[butCourant]] != Level::tcGoalCaisse
+        && !porteBloquee(butCourant))
         return butCourant;
 
     // Jalon atteint (ou premier appel) : on rechoisit depuis l'ÉTAT COURANT.
@@ -2569,6 +2674,12 @@ int Game::butActif() const {
         const int b = ordreButs[k];
         if (cases[goals[b]] == Level::tcGoalCaisse) continue;   // déjà rangé
         if (dist[goals[b]] == -1) continue;                     // plus livrable d'ici : on PASSE
+        // PORTE (§6.2, 2026-08-04) : ce but condamnerait une caisse encore en place,
+        // qui n'a plus d'appui une fois qu'il est posé. Il n'est pas mûr — on PASSE,
+        // on ne coupe rien. Sur le 16, c'est (12,7) rang 0 tant que (10,6) est occupée.
+        // ⚠️ Placé AVANT `premierLivrable` : ce filet ne doit pas non plus le retenir,
+        // sinon le relâchement d'en dessous reposerait le but qu'on vient d'écarter.
+        if (porteBloquee(b)) continue;
         if (premierLivrable < 0) premierLivrable = b;            // filet, cf. plus bas
 
         bloque[goals[b]] = true;
@@ -2592,9 +2703,23 @@ int Game::butActif() const {
     // ignore les autres caisses comme obstacles de marche). On ne peut donc rien
     // conclure de sa négation — on retombe sur l'ordre statique plutôt que de rendre
     // -1, qui signifierait « gagné » à l'appelant.
+    // ⚠️ LA PORTE VAUT AUSSI ICI — oubli du premier jet, rattrapé sur la trace du 16 :
+    // le repli rendait `ordreButs[0]`, c'est-à-dire précisément le but que la
+    // contrainte écarte, et il le faisait PLUS souvent qu'avant la greffe (10 fois
+    // contre 7). Un test posé sur le chemin nominal et pas sur le repli ne tient pas :
+    // c'est le repli qui sert quand ça va mal, donc exactement quand la contrainte
+    // compte. On préfère donc un but non bloqué…
+    for (int k = 0; k < nbButs; k++) {
+        const int b = ordreButs[k];
+        if (cases[goals[b]] == Level::tcGoalCaisse) continue;
+        if (porteBloquee(b)) continue;
+        return choisit(b, "(REPLI STATIQUE : aucun but livrable)");
+    }
+    // … et on ne se retrouve à en rendre un bloqué que s'ils le sont TOUS. Rendre -1
+    // ici signifierait « gagné » à l'appelant : le dernier recours doit exister.
     for (int k = 0; k < nbButs; k++)
         if (cases[goals[ordreButs[k]]] != Level::tcGoalCaisse)
-            return choisit(ordreButs[k], "(REPLI STATIQUE : aucun but livrable)");
+            return choisit(ordreButs[k], "(REPLI STATIQUE : tous les buts sont bloques par une porte)");
     butCourant = -1;
     return -1;
 }

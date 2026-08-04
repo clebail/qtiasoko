@@ -21,7 +21,8 @@ QVector<Solveur::SType> Solveur::types() {
         {AstarMacroCouplagePlongeon, "A* macro — couplage + plongeon (essai)"},
         {AstarMacroCouplagePlongeonOrdre, "A* macro — couplage + plongeon + ordre dynamique (essai)"},
         {AstarMacroCouplagePlongeonCoins, "A* macro — couplage + plongeon + buts en coin dans l'ordre (essai)"},
-        {AstarMacroCouplagePlongeonLoi, "A* macro — couplage + plongeon + loi de l'ordre (essai)"}
+        {AstarMacroCouplagePlongeonLoi, "A* macro — couplage + plongeon + loi de l'ordre (essai)"},
+        {AstarMacroCouplagePlongeonOrdreLoi, "A* macro — couplage + plongeon + ordre dynamique + loi (essai)"}
     };
 }
 
@@ -60,6 +61,14 @@ Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
         // la règle repose sur la justesse de l'ordre, pas sur la géométrie.
         case AstarMacroCouplagePlongeonLoi:
             return new SolveurAStar(etatDepart, 1, true, parent, true, true, false, true);
+        // LES DEUX MOITIÉS ENSEMBLE (§6.2, 2026-08-04) : l'ordre dynamique porte la
+        // contrainte de PORTE (dans butActif), le drapeau porte la LOI et le GEL (à
+        // l'enfilage). Aucun run ne les avait jamais eues toutes les deux.
+        case AstarMacroCouplagePlongeonOrdreLoi: {
+            Game depart(etatDepart);
+            depart.setOrdreDynamique(true);
+            return new SolveurAStar(depart, 1, true, parent, true, true, false, true);
+        }
     }
     return nullptr;
 }

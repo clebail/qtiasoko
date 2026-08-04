@@ -3678,6 +3678,224 @@ en faire un test de mort).
 AU TRACÉ) + case à cocher. **Neufs** : `mesures/loi.cpp`/`.pro`, `mesures/porte.cpp`/`.pro`.
 Miroir de rejeu du journal : jetable, non versionné.
 
+#### ⏸️ Session du 2026-08-04 (suite) — LA CONTRAINTE DE PORTE GREFFÉE SUR `butActif()`
+
+**C'est l'item que la session ci-dessus laissait en tête des ouverts** : la précédence
+caisse → but existait comme DÉTECTEUR (`mesures/porte`) mais le solveur n'avait aucun moyen d'y
+obéir. Point d'accroche retenu : le régime d'essai `ordre-dyn`, où `butActif()` rend déjà le premier
+but non rempli *encore livrable* au lieu du premier tout court. On y ajoute *« … et dont la porte
+n'est plus occupée »*.
+
+**Le code, deux pièces, aucune variable d'environnement (§7) :**
+1. **`Game::calculPorteRequis()`** — statique, au chargement comme `precedenceGlobale`. Pour chaque
+   but, la liste des cases à dégager avant lui, en **CSR** (`porteCases` concaténées + `porteDebut`,
+   deux vecteurs plats) : le solveur copie `Game` par candidate, un vecteur de vecteurs coûterait
+   nbButs incréments de compteur par copie. Trace `[PORTE]` au chargement, **passive** — elle
+   n'ajoute ni ne coupe aucun comportement, donc elle ne peut pas faire diverger l'app du bench.
+2. **`porteBloquee(but)` testé à TROIS endroits** de la branche dynamique : le jalon (une caisse peut
+   venir se garer sur une case de porte APRÈS l'élection du but), la boucle d'éligibilité, et le
+   repli. Un but bloqué est **PASSÉ**, jamais coupé.
+
+⚠️ **Le défaut n'est pas concerné, par construction** : tout vit dans la branche `ordreDynamique`.
+
+**🔴 UN BUG POSÉ PUIS RATTRAPÉ, ET SA LEÇON EST GÉNÉRALE.** Premier jet : le test était sur le chemin
+nominal mais **pas sur le repli** *« aucun but livrable »*, qui rend `ordreButs[0]` en dur. Mesuré sur
+la trace du 16 : `(12,7)` — le but que la contrainte écarte — était élu **10 fois contre 7 avant la
+greffe**. La greffe empirait ce qu'elle devait corriger.
+
+> **Un garde-fou posé sur le chemin nominal et pas sur le repli ne tient pas : le repli sert quand ça
+> va mal, c'est-à-dire exactement quand la contrainte compte.**
+
+Corrigé avec un **dernier recours** qui ne peut jamais rester bloqué : si TOUS les buts sont bloqués,
+on en rend un quand même (rendre −1 signifierait « gagné » à l'appelant).
+
+⚠️ **ET LE COMPTE D'ÉLECTIONS DANS UNE TRACE NE PROUVE RIEN** : élire (12,7) une fois (10,6) dégagée
+est parfaitement correct, et la trace `[ordre]` ne porte pas la position des caisses. D'où un **test
+unitaire** ajouté à `mesures/porte` : armer l'ordre dynamique sur le plateau de DÉPART et demander
+quel but est élu. Sur le 16 il rend **(8,11) rang 11, porte libre** — plus (12,7). C'est le seul
+endroit où la greffe se vérifie sans lire une trace de plusieurs millions d'états.
+
+**Canari :**
+
+| juge | résultat |
+|---|---|
+| défaut `macro`, 0/1/2/3/5/6/7/17 | **identique** (4/14/412/499/9 123/570/24 376/24 786) |
+| **`ordre-dyn`, avant contre après**, mêmes 8 niveaux | **identique à l'unité** — inerte là où il n'y a pas de contrainte, ce qui est le cas des 15 résolus |
+
+**Le 16, à budget égal (120 s) :**
+
+| | dépilés | file | max | `rangees` courant |
+|---|---|---|---|---|
+| `ordre-dyn` seul | 3 224 000 | 3 427 037 | 8/15 | 4 |
+| **+ porte** | 2 287 000 | 3 106 289 | **9/15** | **6** |
+
+⚠️ **Ça ne prouve rien** — le §6.6 a réfuté la progression à budget borné comme prédicteur (le 10 y
+affiche 12 % et il tombe). Indice, pas verdict.
+
+**⏸️ RUN SANS BUDGET — ARRÊTÉ AU PLAFOND MÉMOIRE, AUCUN VERDICT.** Relevé final, veilleur posé à
+14 Go pour que l'arrêt soit VOLONTAIRE et laisse une trace propre plutôt que d'être subi :
+
+| | |
+|---|---|
+| durée | **1 h 27** de CPU |
+| dépilés / vus | **101 141 000** / **188 848 380** |
+| file à l'arrêt | **120 422 428**, **+1 672 par millier — elle MONTE** |
+| **max** | **11/15** |
+| footprint | 10 Go à 46 min, 11 à 1 h 20, **12 → 14 Go en une minute** à la fin |
+
+- **Le `max 11/15` est un record du projet sur ce niveau** : le plafond tenait à **7/15** depuis le
+  début du chantier, et le motif du paquet à budget 2 000 l'avait poussé à 8/15, trois fois sur trois.
+  C'est ce qui survit de ce run, et c'est tout.
+- ⚠️ **AUCUN VERDICT, DANS AUCUN SENS — cinquième application de la règle** (31, 13/r07, 11, 18, et
+  maintenant le 16 en `ordre-dyn`+porte). Ce qu'on peut écrire : *le 16 ne se résout pas en 101 M
+  dépilements dans ce régime*. Rien de plus. En particulier, **rien ne dit que la contrainte de porte
+  aide**, et rien ne dit qu'elle nuit.
+- **188,8 M états vus** : deuxième plus gros run du projet, derrière les 217 M du 18 et **au-dessus
+  des 87 M qui ont suffi à résoudre le 11**.
+- 🔴 **Le mur est la MÉMOIRE, pas le temps** — 1 h 27 seulement, et le §6.5 se re-confirme une fois
+  de plus. La montée finale est BRUTALE (12 → 14 Go en une minute) : un veilleur à intervalle d'une
+  minute est à la limite du suffisant, et attendre la pression système aurait fait perdre le relevé.
+  Les chantiers mémoire (arène — poste dominant —, hachage 128 bits, blocs pour `noeuds`/file)
+  redeviennent le facteur limitant dès qu'un run de ce niveau va au bout de ses forces.
+
+**❌ LE 30 — la greffe y est STRICTEMENT INERTE, et la prédiction le disait.** Sa contrainte porte sur
+le **rang 17**, l'avant-dernier, et le solveur y plafonne à **2/18**. Il n'approche jamais du moment
+où elle mordrait. Vérifié binaire contre binaire (worktree sur `HEAD`) : **traces `[ordre]`
+identiques**, 7 lignes de part et d'autre. ⚠️ Les comptes d'états (3,86 M contre 3,82 M) ne se
+comparent PAS — les deux runs sont tués au TEMPS, donc c'est la trace qui tranche, pas le compteur.
+**La porte reste donc un cas unique, celui du 16, où elle n'a rien prouvé.**
+
+**❌ ET LE RACCORD DES DEUX MOITIÉS EST RÉFUTÉ LE JOUR MÊME.** Constat de l'utilisateur en annotant le
+chemin du record 11/15 : *« pourquoi la caisse est poussée en (9,11) maintenant, ce n'est pas une case
+morte ? »*. Réponse : **dans `ordre-dyn`, ni la loi ni le gel ne sont câblés** — les deux moitiés du
+jour vivaient dans deux régimes disjoints, et aucun run ne les avait jamais eues ensemble. D'où un
+régime combiné, `ordre-loi`. Canari :
+
+| niv | `ordre-dyn` seul | **+ loi** |
+|---|---|---|
+| 0, 1, 3 | — | identiques |
+| **5, 6, 17** | résolus | **`AUCUNE`** |
+| 2 | 131 poussées | **141** |
+| 7 | 88 poussées | **92** |
+
+**Chacune des deux moitiés prise SEULE est saine** — la loi seule ne perd que le 6 (raison
+documentée plus haut), l'ordre dynamique seul résout les huit. C'est leur COMBINAISON qui casse.
+
+> **La cause, mesurée** : sur le 17, **233 prunes dont 2 seulement de gel** ; sur le 5, 6 565 dont 9.
+> C'est la **loi** qui coupe, pas le gel. Et c'est cohérent après coup : ses cases mortes sont
+> indexées par le but ACTIF, or elle n'a jamais été validée que contre l'ordre **STATIQUE** — le
+> gabarit du 16 a été dessiné avec ces rangs-là, `juge_loi.py` a jugé avec eux. L'ordre dynamique
+> rechoisit depuis l'état courant et peut revenir en arrière : une case légitimement utilisée comme
+> garage devient morte dès que le but actif change. **Le « 0 faux positif » de la loi ne se
+> transporte pas à un ordre qui bouge.**
+
+⚠️ **Leçon générale, et elle vaut au-delà de ce raccord** : une règle validée l'est *contre le régime
+qui a servi à la valider*. Composer deux essais sains n'est pas sûr — il faut repasser le canari, et
+ici il a suffi d'une passe de huit niveaux pour tuer l'idée. Régime conservé dans `solveur.h`, marqué
+RÉFUTÉ, pour qu'il ne soit pas reproposé.
+
+**Reste ouvert :**
+- [ ] **La contrainte n'existe que dans `ordre-dyn`**, régime qui coûte plus cher partout où il a été
+  mesuré (§6.2, 2026-07-31 : ×87 sur le 6, ×9 sur le 7). Si on veut la porte AILLEURS, il faut un
+  `butActif()` capable de passer un but SANS l'ordre dynamique complet — donc un régime de plus, et
+  cette fois en repassant le canari (cf. le raccord ci-dessus).
+- [ ] **Re-valider la loi contre un ordre qui BOUGE**, si on tient au raccord : redessiner un gabarit
+  avec l'ordre dynamique, ou juger la loi sur les états réellement traversés. Non fait, et pas
+  évident — l'ordre dynamique n'a pas de « rangs » stables à dessiner.
+
+#### 🎯 Session du 2026-08-04 (fin) — LE PLAN HUMAIN MESURÉ : ce qui sépare les résolus, et pourquoi le planificateur naïf est mort
+
+**Constat de l'utilisateur, qui ouvre la session** : *« essayer de trouver des règles à partir de
+différents cas marginaux, ça ne me paraît pas jouable […] le démêlage, le goal ordering, les portes,
+les macros, tous ces concepts sont très bons, mais je pense qu'il faut les assembler différemment. »*
+Les mesures qui suivent lui donnent raison sur le fond, et **corrigent deux fois le cadrage que je
+proposais** — c'est le fait marquant de la session.
+
+**Le corpus le permet sans écrire une ligne de solveur** : 25 parties humaines GAGNANTES rejouées
+depuis les journaux hybrides (`mesures/taches.py`, `mesures/garage.py`, rapatriés du scratchpad — la
+leçon de `juge_loi.py`, perdu le matin même). ⚠️ **Miroir validé avant lecture, sur quatre chiffres
+déjà écrits ailleurs dans ce document** : le 4 rend **415 poussées / 57 choisies** (exact), le 17
+rend **213** (l'optimum), le 9 rend **237** (le compte du solveur), le 16 rend 212 pour 213 états.
+
+**LE DÉCOUPAGE EN TÂCHES.** Une tâche = une invocation de goal macro (une livraison, marquée
+`[macro] LANCEE`/`TERMINEE` dans le journal), ou une suite maximale de poussées CHOISIES sur la même
+caisse (une manœuvre).
+
+| | tâches | manœuvres | **reprises** |
+|---|---|---|---|
+| **12 résolus** | 20 | 9,5 | **1,5** |
+| **13 non résolus** | 39 | 28 | **8** |
+
+Une **reprise** = une caisse manœuvrée dans **deux tâches séparées ou plus** : garée, puis reprise.
+
+- ❌ **CORRECTION — j'avais avancé « moins de dix décisions par partie »**, tiré des 96 annotations
+  d'intentions sur 11 niveaux, et j'en faisais l'argument porteur. **Faux d'un facteur trois** : le
+  découpage mécanique donne une médiane de **30 tâches**. Les intentions comptaient des PLANS, dont
+  chacun regroupe plusieurs manœuvres — **ce n'est pas la même unité.** Ce qui survit : 30 tâches
+  contre 10⁸ états, l'écart de représentation reste de six ordres de grandeur.
+- 🎯 **LE RÉSULTAT : les REPRISES séparent proprement, et aux deux bouts.** `reprises ≤ 2` → 8 niveaux,
+  **tous résolus** ; `reprises ≥ 8` → 8 niveaux, **tous non résolus** ; entre les deux une bande mêlée
+  (le 6 est résolu avec 4, le 12 ne l'est pas avec 3). **Ce qui sépare ce qu'on finit de ce qu'on ne
+  finit pas n'est ni la taille ni le nombre de caisses : c'est le nombre de fois qu'une caisse doit
+  être GARÉE puis REPRISE.**
+- **Et c'est exactement l'opération que rien ne représente**, ce que quatre observations indépendantes
+  disaient déjà sans qu'on les rapproche : le §4 a réfuté le découpage « une caisse à la fois »
+  *précisément* parce qu'il interdit le parking temporaire ; la variante sèche de R1 a été tuée huit
+  fois par les transits ; la macro ne connaît qu'une destination, le but actif ; et `GARER` était la
+  catégorie fourre-tout du corpus d'intentions, tombée de 10 à 1 dès que l'annotateur a vu la suite.
+
+**❌ OÙ GARE-T-ON ? LA MESURE QUI DEVAIT DÉCIDER DE L'ARCHITECTURE — et elle est NÉGATIVE.**
+L'hypothèse à tester : si les destinations de garage se concentrent sur quelques cases, une recherche
+au niveau des TÂCHES (`manœuvre(caisse, destination)`) a un branchement praticable ; sinon on a
+déplacé le mur PSPACE d'un étage sans le réduire.
+
+| | |
+|---|---|
+| garages relevés | **398** sur **297 cases distinctes** (1,34 par case) |
+| murs voisins, cases de garage | **0,74** |
+| murs voisins, toutes cases libres | **1,18** |
+| garage sur une case-but | **0 %** partout, sauf 13 (33 %), 16 (29 %), 26 (16 %) |
+
+**Aucune concentration, et on gare en espace OUVERT — l'inverse de l'intuition « une niche contre un
+mur, hors des artères ».** Le planificateur naïf est donc mort : une tâche `manœuvre(caisse,
+destination)` a un branchement de l'ordre du nombre de cases libres, et rien dans les données ne
+donne le vocabulaire qui le réduirait.
+
+⚠️ **Réserve de méthode, à ne pas cacher** : la « destination » mesurée est la case où la caisse
+s'arrête quand le joueur passe à autre chose. On mesure peut-être *où la caisse était quand
+l'attention a changé*, pas un choix délibéré — c'est la leçon du 2026-08-02, *« c'est toujours
+l'unité de mesure »*. Le chiffre des murs voisins, lui, ne dépend pas de ce découpage.
+
+**🎯 LA LECTURE QUI SURVIT, et elle est confirmée par celui qui joue :**
+
+> **On ne choisit pas OÙ poser la caisse ; on la sort de là où elle gêne, et elle s'arrête où c'est
+> commode.** — formulation retenue par l'utilisateur : *« c'est tout à fait ça »*.
+
+Si les destinations s'éparpillent ET qu'on gare en espace ouvert, c'est que **la destination est
+incidente**. Le paramètre d'une manœuvre n'est pas *où*, c'est **pourquoi** : *dégager cette case*,
+*ouvrir ce passage*. Et ce paramètre-là est petit — c'est le vocabulaire `E`/`O` que la campagne
+d'intentions a stabilisé (20 étiquettes sur 23 à `posees 0`). La destination se **calcule** alors,
+au lieu d'être cherchée : le branchement passe de « cent cases » à « quelle gêne lever ».
+
+⚠️ Ce n'est pas gratuit pour autant : une intention n'est utile que si elle se transforme en
+GÉNÉRATION de coups. En score, elle retombe dans le guidage, fermé depuis le 2026-07-21. C'est le mur
+que la campagne d'intentions n'a jamais franchi — *« ce que le corpus ne dit toujours pas, c'est à
+quoi il sert »*.
+
+**Trois exceptions qui contredisent l'éparpillement**, et ce sont trois non-résolus : sur le **25**,
+une seule case absorbe **17 garages sur 28** ; sur le **20**, 11 sur 19 ; sur le **16**, 10 sur 42.
+Là il y a bien une zone de dépôt au sens littéral — et c'est exactement le « stocker trois caisses
+dans la zone d'embut » que l'utilisateur a énoncé pour le 16.
+
+**Reste ouvert :**
+- [ ] **Refaire la mesure des destinations à une AUTRE maille** — par exemple la case où la caisse
+  reste le plus longtemps, plutôt que celle où la manœuvre s'arrête. La réserve ci-dessus dit que le
+  résultat négatif pourrait être un artefact de découpage, et c'est bon marché à retester.
+- [ ] **Les trois niveaux à zone de dépôt (16, 20, 25)** : y a-t-il une géométrie commune ? Ce serait
+  le premier motif de « garage » caractérisable, et il porterait le stock du 16.
+- [ ] ⚠️ **Ne pas relire les REPRISES comme un prédicteur** : elles se mesurent sur une partie humaine
+  gagnante, donc a posteriori. Elles disent CE QUI est dur, pas qu'un plateau donné le sera.
+
 #### 🎯 Session du 2026-07-28 — MESURE PRÉALABLE du PLONGEON (avant toute ligne de solveur)
 
 **L'outil : `bench <niv> <mode> record`** (neuf). Écrit en `.xsb` **chaque état qui bat le max de

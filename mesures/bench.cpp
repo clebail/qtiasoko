@@ -70,6 +70,7 @@ int main(int argc, char** argv) {
         (md == "coupl-plongeon")? Solveur::AstarMacroCouplagePlongeon :
         (md == "coins")   ? Solveur::AstarMacroCouplagePlongeonCoins :
         (md == "loi")     ? Solveur::AstarMacroCouplagePlongeonLoi :
+        (md == "ordre-loi")? Solveur::AstarMacroCouplagePlongeonOrdreLoi :
         (md == "ordre-dyn")? Solveur::AstarMacroCouplagePlongeonOrdre :
         (md == "pondere" || md == "2") ? Solveur::AstarPondere :
         (md == "bfs")     ? Solveur::Bfs          : Solveur::Astar;
