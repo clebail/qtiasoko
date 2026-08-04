@@ -4,6 +4,8 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QComboBox>
+#include <QInputDialog>
 #include <QKeyEvent>
 #include <QMessageBox>
 #include <QDateTime>
@@ -39,6 +41,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // texte, resetEtatMax() y revient après l'avoir suffixé du compteur (n/total).
     texteEtatMax = cbEtatMax->text();
     texteResoudre = pbResoudre->text();
+
+    // Sélecteur de record, glissé juste après cbEtatMax dans SON layout — construit
+    // par code et non déclaré dans le .ui, comme la légende : c'est un outil de
+    // chantier, il doit pouvoir disparaître sans toucher au formulaire.
+    if (auto* lay = qobject_cast<QBoxLayout*>(cbEtatMax->parentWidget()->layout())) {
+        cbRecords = new QComboBox(cbEtatMax->parentWidget());
+        cbRecords->setFocusPolicy(Qt::NoFocus);
+        cbRecords->setToolTip("Chemin du solveur vers ce record de caisses posées. "
+                              "Un run les garde tous ; C annote le coup affiché.");
+        cbRecords->hide();                       // rien à choisir tant qu'il n'y a pas 2 records
+        lay->insertWidget(lay->indexOf(cbEtatMax) + 1, cbRecords);
+        connect(cbRecords, QOverload<int>::of(&QComboBox::activated), this, [this](int i) {
+            if (i >= 0 && i < recordsVus.size())
+                chargeCheminVisionne(departSolveur, recordsVus[i].second, false);
+        });
+    }
 
     for (const Solveur::SType& t : Solveur::types()) {
         cbSolveur->addItem(t.libelle, static_cast<int>(t.type));
@@ -239,6 +257,7 @@ void MainWindow::onNiveauChange(int index) {
     // du niveau courant : faux, et parfaitement silencieux. C'est la forme
     // habituelle du piège — un état qui survit à ce qui le justifiait.
     if (journalIntentions.isOpen()) journalIntentions.close();
+    if (journalCritique.isOpen()) journalCritique.close();   // même piège, même remède
     intentionCourante.clear();
     majNavigationPas();   // le chemin du niveau précédent n'est plus navigable
     pbRevoir->setEnabled(false);
@@ -706,6 +725,24 @@ void MainWindow::resetEtatMax() {
     wGame->setMontreOrdreButs(false);
     cbEtatMax->setEnabled(false);
     cbEtatMax->setText(texteEtatMax);
+    recordsVus.clear();     // les records du run précédent ne veulent plus rien dire
+    majListeRecords();
+}
+
+// Le combo, reconstruit à chaque record. `blockSignals` : repeupler émet
+// currentIndexChanged, qui rechargerait un chemin à contretemps.
+void MainWindow::majListeRecords() {
+    if (!cbRecords) return;
+    const int garde = cbRecords->currentIndex();
+    cbRecords->blockSignals(true);
+    cbRecords->clear();
+    for (int i = 0; i < recordsVus.size(); i++)
+        cbRecords->addItem(QString("record %1/%2 — %3 coups")
+                               .arg(recordsVus[i].first).arg(gameMax.getNbButs())
+                               .arg(recordsVus[i].second.size()));
+    if (garde >= 0 && garde < recordsVus.size()) cbRecords->setCurrentIndex(garde);
+    cbRecords->blockSignals(false);
+    cbRecords->setVisible(recordsVus.size() > 1);
 }
 
 void MainWindow::onIALance() {
@@ -870,6 +907,11 @@ void MainWindow::chargeCheminVisionne(const Game& depart,
     // libellé annonce un état que la grille ne montre pas.
     posPas = 0;
     majNavigationPas();
+    // Rappel de la touche : sans lui, `C` n'est découvrable nulle part (pas de
+    // légende hors session d'annotation d'intentions).
+    qDebug().noquote() << "[chemin]" << coups.size() << "coups," << indicesPoussees.size()
+                       << "poussées —" << (estSolution ? "SOLUTION" : "état max, PAS une solution")
+                       << "| ◀ ▶ / slider / Maj pour naviguer, C = critiquer ce coup";
 }
 
 // Relit le journal hybride du niveau courant et installe sa DERNIÈRE partie GAGNÉE
@@ -982,6 +1024,64 @@ void MainWindow::noteIntention(const QString& code, const QString& libelle) {
 
     intentionCourante = code;
     majNavigationPas();               // le libellé rappelle l'intention active
+}
+
+// Une CRITIQUE du chemin du solveur, en texte libre (cf. mainwindow.h pour le
+// pourquoi du texte libre). Le journal s'ouvre à la première frappe : rien à armer,
+// donc rien à oublier d'armer — et il ne peut pas s'ouvrir sans chemin à critiquer.
+void MainWindow::noteCritique() {
+    if (derniereSolutionCoups.isEmpty()) {
+        statusBar()->showMessage("Aucun chemin à critiquer — lance un solve, "
+                                 "puis arrête-le une fois l'état max atteint.", 4000);
+        return;
+    }
+    bool ok = false;
+    const QString texte = QInputDialog::getText(
+        this, "Critique du chemin du solveur",
+        QString("Coup %1/%2 — pourquoi est-ce mauvais ?")
+            .arg(posPas).arg(derniereSolutionCoups.size()),
+        QLineEdit::Normal, QString(), &ok);
+    if (!ok || texte.trimmed().isEmpty()) return;
+
+    if (!journalCritique.isOpen()) {
+        journalCritique.setFileName(QDir::current().filePath(
+            QString("solveur_niveau_%1_critique.txt").arg(game.getNumNiveau(), 4, 10, QChar('0'))));
+        if (journalCritique.open(QIODevice::Append | QIODevice::Text)) {
+            journalCritique.write(
+                QString("\n=== niveau %1 — critique du %2 — chemin de %3 coups (%4 poussees), %5 ===\n")
+                    .arg(game.getNumNiveau())
+                    .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"))
+                    .arg(derniereSolutionCoups.size()).arg(indicesPoussees.size())
+                    .arg(cheminEstSolution ? "SOLUTION"
+                                           : QString("etat max %1/%2 — PAS une solution")
+                                                 .arg(maxRangeesVu).arg(game.getNbButs()))
+                    .toUtf8());
+        }
+    }
+    if (!journalCritique.isOpen()) return;
+
+    int posees = 0;
+    for (int k = 0; k < game.getNbButs(); k++)
+        if (game.getCase(game.getCaseBut(k)) == Level::tcGoalCaisse) posees++;
+    // Combien de POUSSÉES sont derrière nous : le numéro de coup mêle marche et
+    // poussées, or c'est la poussée qui situe l'état.
+    int pouss = 0;
+    for (int i : indicesPoussees) if (i < posPas) pouss++;
+
+    const QString ligne = QString("[critique] coup %1/%2 | poussee %3/%4 | posees %5/%6 | joueur (%7,%8)\n  %9")
+                              .arg(posPas).arg(derniereSolutionCoups.size())
+                              .arg(pouss).arg(indicesPoussees.size())
+                              .arg(posees).arg(game.getNbButs())
+                              .arg(game.getPlayerPoint().x()).arg(game.getPlayerPoint().y())
+                              .arg(texte.trimmed());
+    // Le PLATEAU avec la critique, comme les blocs [manque] : sans lui l'annotation
+    // est illisible six mois plus tard, et surtout `mort` ne peut pas la juger. C'est
+    // tout ce qui distingue cette campagne de celle des intentions — il y a un oracle,
+    // encore faut-il pouvoir le lui donner à manger.
+    journalCritique.write(ligne.toUtf8() + "\n" + plateauXsb(game).toUtf8());
+    journalCritique.flush();
+    qDebug().noquote() << ligne;
+    statusBar()->showMessage(QString("Critique notée au coup %1.").arg(posPas), 3000);
 }
 
 // Rejoue les n premiers coups depuis le départ du chemin. Jamais d'undo : on
@@ -1296,6 +1396,13 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
         // clavier, rien dans mainwindow.ui : c'est un outil de chantier, et les
         // lettres sont libres (seules les flèches et Retour arrière sont prises).
         if (keyEvent->key() == Qt::Key_L) { rejoueJournal(); wGame->update(); return true; }
+        // `C` = critiquer le chemin du SOLVEUR au coup affiché (texte libre). Elle
+        // ne vaut QUE hors session d'annotation d'intentions : les deux campagnes
+        // écrivent dans deux fichiers et ne doivent pas se mélanger dans une même
+        // session — c'est ce mélange qui rendrait les deux corpus incomparables.
+        if (keyEvent->key() == Qt::Key_C && !journalIntentions.isOpen()) {
+            noteCritique(); return true;
+        }
         // ⚠️ `Z` (bascule de la zone du joueur) RETIRÉE le jour même de son ajout,
         // sur constat utilisateur : « aucun intérêt, mais l'overlay dès qu'on a
         // chargé un rejeu avec L ». La zone sert à trancher `O` contre `E`, donc
@@ -1729,11 +1836,18 @@ void MainWindow::onNouveauMax(Game etatMax, int nbRangees, QList<Game::EDirectio
 
     // Le chemin du MEILLEUR état devient le chemin visionnable : sur un run qui
     // n'aboutira pas, c'est la seule façon de voir comment le solveur en est
-    // arrivé là. Écrasé à chaque nouveau record — c'est voulu, le dernier record
-    // est le plus intéressant. 'departSolveur' et non 'game' : l'utilisateur peut
-    // avoir navigué en pas à pas pendant le run, ce qui a déplacé 'game'.
+    // arrivé là. 'departSolveur' et non 'game' : l'utilisateur peut avoir navigué
+    // en pas à pas pendant le run, ce qui a déplacé 'game'.
     if (!chemin.isEmpty()) {
-        chargeCheminVisionne(departSolveur, chemin, false);
+        // Suivait-on le dernier record ? Décidé AVANT d'ajouter le nouveau.
+        const bool suivait = !cbRecords || recordsVus.isEmpty()
+                             || cbRecords->currentIndex() == recordsVus.size() - 1;
+        recordsVus.append(qMakePair(nbRangees, chemin));
+        majListeRecords();
+        if (suivait) {
+            if (cbRecords) cbRecords->setCurrentIndex(recordsVus.size() - 1);
+            chargeCheminVisionne(departSolveur, chemin, false);
+        }
         pbRevoir->setEnabled(true);
     }
     // Si l'utilisateur regarde déjà l'état-max, le rafraîchir en direct.

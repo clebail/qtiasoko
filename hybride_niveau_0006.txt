@@ -820,3 +820,778 @@
 [mouv] joueur (4,1)->(3,1) POUSSE caisse ->(2,1) [POSE]
 [hybride] aucun but actif (etat gagne)
 [macro] TERMINEE
+
+=== niveau 6 — partie du 2026-08-03 21:10:55 ===
+[hybride] ordre de remplissage calcule : 0:(2,5) 1:(2,4) 2:(2,3) 3:(1,5) 4:(1,4) 5:(1,3) 6:(1,2) 7:(2,2) 8:(1,1) 9:(2,1)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,1)->(9,2)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,2)->(10,2)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,2)->(10,3)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,3)->(10,4)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,4)->(10,5)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,5)->(9,5) POUSSE caisse ->(8,5)
+[rang] (9,5) Gauche | ⚠ ECARTE par le solveur : perdu (checkDefaite) | 5 autres enfants enfiles
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[mouv] joueur (10,5)->(10,6)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,6)->(9,6)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,6)->(9,7) POUSSE caisse ->(9,8)
+[rang] (9,7) Bas | rang 5/5 | h 105 f 106 | meilleur (9,4) Gauche h 103 f 104 | df +2
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,7)->(9,6)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,6)->(10,6)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,6)->(10,5)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,5)->(10,4)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,4)->(9,4) POUSSE caisse ->(8,4)
+[rang] (9,4) Gauche | rang 2/4 | h 104 f 106 | meilleur (9,8) Haut h 104 f 106 | df +0
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,4)->(9,5) POUSSE caisse ->(9,6)
+[rang] (9,5) Bas | rang 3/3 | h 105 f 108 | meilleur (9,8) Haut h 103 f 106 | df +2
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,5)->(10,5)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,5)->(10,4)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,4)->(10,3)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,3)->(10,2)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,2)->(9,2)
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,2)->(9,3) POUSSE caisse ->(9,4)
+[rang] (9,3) Bas | rang 4/5 | h 106 f 110 | meilleur (9,8) Haut h 104 f 108 | df +2
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,3) en 8 poussees (1 branche)
+[mouv] joueur (9,3)->(8,3) POUSSE caisse ->(7,3)
+[rang] (8,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (7,3) en 7 poussees (1 branche)
+[mouv] joueur (8,3)->(7,3) POUSSE caisse ->(6,3)
+[rang] (7,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (7,3)->(6,3) POUSSE caisse ->(5,3)
+[rang] (6,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (5,3) en 5 poussees (1 branche)
+[mouv] joueur (6,3)->(5,3) POUSSE caisse ->(4,3)
+[rang] (5,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (4,3) en 4 poussees (1 branche)
+[mouv] joueur (5,3)->(4,3) POUSSE caisse ->(3,3)
+[rang] (4,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 0/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (3,3) en 3 poussees (1 branche)
+[mouv] joueur (4,3)->(3,3) POUSSE caisse ->(2,3) [POSE]
+[rang] (3,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (2,3) en 2 poussees (1 branche)
+[mouv] joueur (3,3)->(2,3) POUSSE caisse ->(1,3) [POSE]
+[rang] (2,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (2,3)->(2,2)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (2,2)->(1,2)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (1,2)->(1,3) POUSSE caisse ->(1,4) [POSE]
+[rang] (1,3) Bas | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (1,3)->(1,4) POUSSE caisse ->(1,5) [POSE]
+[rang] (1,4) Bas | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (1,4)->(1,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (1,3)->(1,2)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (1,2)->(1,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (1,3)->(2,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (2,3)->(3,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (3,3)->(4,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (4,3)->(5,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (5,3)->(6,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (6,3)->(7,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (7,3)->(8,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (8,3)->(9,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,4) en 9 poussees (1 branche)
+[mouv] joueur (9,3)->(10,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (10,3)->(10,4)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (10,4)->(10,5)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (10,5)->(9,5)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,4) en 10 poussees (1 branche)
+[mouv] joueur (9,5)->(9,4) POUSSE caisse ->(9,3)
+[rang] (9,4) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (9,3) en 9 poussees (1 branche)
+[mouv] joueur (9,4)->(10,4)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (9,3) en 9 poussees (1 branche)
+[mouv] joueur (10,4)->(10,3)
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (9,3) en 9 poussees (1 branche)
+[mouv] joueur (10,3)->(9,3) POUSSE caisse ->(8,3)
+[rang] (9,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,3) en 8 poussees (1 branche)
+[mouv] joueur (9,3)->(8,3) POUSSE caisse ->(7,3)
+[rang] (8,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (7,3) en 7 poussees (1 branche)
+[mouv] joueur (8,3)->(7,3) POUSSE caisse ->(6,3)
+[rang] (7,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (7,3)->(6,3) POUSSE caisse ->(5,3)
+[rang] (6,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (5,3) en 5 poussees (1 branche)
+[mouv] joueur (6,3)->(5,3) POUSSE caisse ->(4,3)
+[rang] (5,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (4,3) en 4 poussees (1 branche)
+[mouv] joueur (5,3)->(4,3) POUSSE caisse ->(3,3)
+[rang] (4,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 1/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (3,3) en 3 poussees (1 branche)
+[mouv] joueur (4,3)->(3,3) POUSSE caisse ->(2,3) [POSE]
+[rang] (3,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (2,3) en 2 poussees (1 branche)
+[mouv] joueur (3,3)->(2,3) POUSSE caisse ->(1,3) [POSE]
+[rang] (2,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (2,3)->(2,2)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (2,2)->(1,2)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (1,2)->(1,3) POUSSE caisse ->(1,4) [POSE]
+[rang] (1,3) Bas | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (1,3)->(2,3)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (2,3)->(3,3)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (3,3)->(4,3)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (4,3)->(5,3)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (5,3)->(6,3)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (6,3)->(7,3)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (7,3)->(8,3)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (8,3)->(9,3)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (9,3)->(9,4)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (9,4)->(9,5)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,4) en 9 poussees (1 branche)
+[mouv] joueur (9,5)->(8,5)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (8,5)->(8,4) POUSSE caisse ->(8,3)
+[rang] (8,4) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,3) en 8 poussees (1 branche)
+[mouv] joueur (8,4)->(9,4)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,3) en 8 poussees (1 branche)
+[mouv] joueur (9,4)->(9,3)
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,3) en 8 poussees (1 branche)
+[mouv] joueur (9,3)->(8,3) POUSSE caisse ->(7,3)
+[rang] (8,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (7,3) en 7 poussees (1 branche)
+[mouv] joueur (8,3)->(7,3) POUSSE caisse ->(6,3)
+[rang] (7,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (7,3)->(6,3) POUSSE caisse ->(5,3)
+[rang] (6,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (5,3) en 5 poussees (1 branche)
+[mouv] joueur (6,3)->(5,3) POUSSE caisse ->(4,3)
+[rang] (5,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (4,3) en 4 poussees (1 branche)
+[mouv] joueur (5,3)->(4,3) POUSSE caisse ->(3,3)
+[rang] (4,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 2/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (3,3) en 3 poussees (1 branche)
+[mouv] joueur (4,3)->(3,3) POUSSE caisse ->(2,3) [POSE]
+[rang] (3,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (2,3) en 2 poussees (1 branche)
+[mouv] joueur (3,3)->(2,3) POUSSE caisse ->(1,3) [POSE]
+[rang] (2,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (2,3)->(3,3)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (3,3)->(4,3)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (4,3)->(5,3)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (5,3)->(6,3)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (6,3)->(7,3)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (7,3)->(8,3)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (8,3)->(9,3)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (9,3)->(10,3)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (10,3)->(10,4)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (10,4)->(10,5)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (10,5)->(10,6)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (10,6)->(10,7)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (10,7)->(9,7)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,6) en 12 poussees (1 branche)
+[mouv] joueur (9,7)->(9,6) POUSSE caisse ->(9,5)
+[rang] (9,6) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (9,5) en 11 poussees (1 branche), caisse (8,6) en 11 poussees (1 branche)
+[mouv] joueur (9,6)->(9,5) POUSSE caisse ->(9,4)
+[rang] (9,5) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (9,4) en 10 poussees (1 branche), caisse (8,6) en 11 poussees (1 branche)
+[mouv] joueur (9,5)->(9,4) POUSSE caisse ->(9,3)
+[rang] (9,4) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (9,3) en 9 poussees (1 branche)
+[mouv] joueur (9,4)->(10,4)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (9,3) en 9 poussees (1 branche)
+[mouv] joueur (10,4)->(10,3)
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (9,3) en 9 poussees (1 branche)
+[mouv] joueur (10,3)->(9,3) POUSSE caisse ->(8,3)
+[rang] (9,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,3) en 8 poussees (1 branche)
+[mouv] joueur (9,3)->(8,3) POUSSE caisse ->(7,3)
+[rang] (8,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (7,3) en 7 poussees (1 branche)
+[mouv] joueur (8,3)->(7,3) POUSSE caisse ->(6,3)
+[rang] (7,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (7,3)->(6,3) POUSSE caisse ->(5,3)
+[rang] (6,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (5,3) en 5 poussees (1 branche)
+[mouv] joueur (6,3)->(5,3) POUSSE caisse ->(4,3)
+[rang] (5,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (4,3) en 4 poussees (1 branche)
+[mouv] joueur (5,3)->(4,3) POUSSE caisse ->(3,3)
+[rang] (4,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 3/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (3,3) en 3 poussees (1 branche)
+[mouv] joueur (4,3)->(3,3) POUSSE caisse ->(2,3) [POSE]
+[rang] (3,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (2,3) en 2 poussees (1 branche)
+[mouv] joueur (3,3)->(3,4)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (2,3) en 2 poussees (1 branche)
+[mouv] joueur (3,4)->(2,4)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (2,4)->(2,3) POUSSE caisse ->(2,2) [POSE]
+[rang] (2,3) Haut | rang 2/6 | h 68 f 110 | meilleur (9,8) Haut h 68 f 110 | df +0
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (2,3)->(3,3)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 3 macros jouables : caisse (2,2) en 3 poussees (1 branche), caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (3,3)->(3,2)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 3 macros jouables : caisse (2,2) en 3 poussees (1 branche), caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (3,2)->(2,2) POUSSE caisse ->(1,2) [POSE]
+[rang] (2,2) Gauche | HORS REGIME MACRO : 3 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (2,2)->(2,3)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (2,3)->(3,3)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (3,3)->(4,3)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (4,3)->(5,3)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (5,3)->(6,3)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (6,3)->(7,3)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (7,3)->(8,3)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (8,3)->(9,3)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (9,3)->(9,4)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (9,4)->(9,5)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (9,5)->(9,6)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (9,6)->(9,7)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,6) en 11 poussees (1 branche)
+[mouv] joueur (9,7)->(8,7)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,6) en 11 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (8,7)->(8,6) POUSSE caisse ->(8,5)
+[rang] (8,6) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,5) en 10 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (8,6)->(8,5) POUSSE caisse ->(8,4)
+[rang] (8,5) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,4) en 9 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (8,5)->(8,4) POUSSE caisse ->(8,3)
+[rang] (8,4) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,3) en 8 poussees (1 branche)
+[mouv] joueur (8,4)->(9,4)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,3) en 8 poussees (1 branche)
+[mouv] joueur (9,4)->(9,3)
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,3) en 8 poussees (1 branche)
+[mouv] joueur (9,3)->(8,3) POUSSE caisse ->(7,3)
+[rang] (8,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (7,3) en 7 poussees (1 branche)
+[mouv] joueur (8,3)->(7,3) POUSSE caisse ->(6,3)
+[rang] (7,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (7,3)->(6,3) POUSSE caisse ->(5,3)
+[rang] (6,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (5,3) en 5 poussees (1 branche)
+[mouv] joueur (6,3)->(5,3) POUSSE caisse ->(4,3)
+[rang] (5,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (4,3) en 4 poussees (1 branche)
+[mouv] joueur (5,3)->(4,3) POUSSE caisse ->(3,3)
+[rang] (4,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 4/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (3,3) en 3 poussees (1 branche)
+[mouv] joueur (4,3)->(3,3) POUSSE caisse ->(2,3) [POSE]
+[rang] (3,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (2,3) en 2 poussees (1 branche)
+[mouv] joueur (3,3)->(3,4)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (2,3) en 2 poussees (1 branche)
+[mouv] joueur (3,4)->(2,4)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (2,4)->(2,3) POUSSE caisse ->(2,2) [POSE]
+[rang] (2,3) Haut | rang 2/5 | h 57 f 110 | meilleur (9,8) Haut h 57 f 110 | df +0
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (2,3)->(2,2) POUSSE caisse ->(2,1) [POSE]
+[rang] (2,2) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (2,2)->(3,2)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (3,2)->(3,1)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (3,1)->(2,1) POUSSE caisse ->(1,1) [POSE]
+[rang] (2,1) Gauche | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (2,1)->(2,2)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (2,2)->(2,3)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (2,3)->(3,3)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (3,3)->(4,3)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (4,3)->(5,3)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (5,3)->(6,3)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (6,3)->(7,3)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (7,3)->(8,3)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (8,3)->(9,3)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (9,3)->(10,3)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (10,3)->(10,4)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (10,4)->(10,5)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (10,5)->(10,6)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (10,6)->(10,7)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (10,7)->(10,8)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (10,8)->(10,9)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (10,9)->(9,9)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (8,8) en 13 poussees (1 branche), caisse (9,8) en 14 poussees (1 branche)
+[mouv] joueur (9,9)->(9,8) POUSSE caisse ->(9,7)
+[rang] (9,8) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (9,7) en 13 poussees (1 branche), caisse (8,8) en 13 poussees (1 branche)
+[mouv] joueur (9,8)->(9,7) POUSSE caisse ->(9,6)
+[rang] (9,7) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (9,6) en 12 poussees (1 branche), caisse (8,8) en 13 poussees (1 branche)
+[mouv] joueur (9,7)->(9,6) POUSSE caisse ->(9,5)
+[rang] (9,6) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (9,5) en 11 poussees (1 branche), caisse (8,8) en 13 poussees (1 branche)
+[mouv] joueur (9,6)->(9,5) POUSSE caisse ->(9,4)
+[rang] (9,5) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 2 macros jouables : caisse (9,4) en 10 poussees (1 branche), caisse (8,8) en 13 poussees (1 branche)
+[mouv] joueur (9,5)->(9,4) POUSSE caisse ->(9,3)
+[rang] (9,4) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (9,3) en 9 poussees (1 branche)
+[mouv] joueur (9,4)->(10,4)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (9,3) en 9 poussees (1 branche)
+[mouv] joueur (10,4)->(10,3)
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (9,3) en 9 poussees (1 branche)
+[mouv] joueur (10,3)->(9,3) POUSSE caisse ->(8,3)
+[rang] (9,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (8,3) en 8 poussees (1 branche)
+[mouv] joueur (9,3)->(8,3) POUSSE caisse ->(7,3)
+[rang] (8,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (7,3) en 7 poussees (1 branche)
+[mouv] joueur (8,3)->(7,3) POUSSE caisse ->(6,3)
+[rang] (7,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (7,3)->(6,3) POUSSE caisse ->(5,3)
+[rang] (6,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (5,3) en 5 poussees (1 branche)
+[mouv] joueur (6,3)->(5,3) POUSSE caisse ->(4,3)
+[rang] (5,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (4,3) en 4 poussees (1 branche)
+[mouv] joueur (5,3)->(4,3) POUSSE caisse ->(3,3)
+[rang] (4,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 5/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (3,3) en 3 poussees (1 branche)
+[mouv] joueur (4,3)->(3,3) POUSSE caisse ->(2,3) [POSE]
+[rang] (3,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (2,3) en 2 poussees (1 branche)
+[mouv] joueur (3,3)->(3,2)
+[hybride] posees 6/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (2,3) en 2 poussees (1 branche)
+[mouv] joueur (3,2)->(2,2)
+[hybride] posees 6/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (2,3) en 2 poussees (1 branche)
+[mouv] joueur (2,2)->(2,3) POUSSE caisse ->(2,4) [POSE]
+[rang] (2,3) Bas | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,5) rang 0/10 | 1 macro jouable : caisse (2,4) en 1 poussees (1 branche)
+[mouv] joueur (2,3)->(2,4) POUSSE caisse ->(2,5) [POSE]
+[rang] (2,4) Bas | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (2,4)->(2,3)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (2,3)->(3,3)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (3,3)->(4,3)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (4,3)->(5,3)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (5,3)->(6,3)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (6,3)->(7,3)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (7,3)->(8,3)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (8,3)->(9,3)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (9,3)->(9,4)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (9,4)->(9,5)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (9,5)->(9,6)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (9,6)->(9,7)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (9,7)->(9,8)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (9,8)->(9,9)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (9,9)->(8,9)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,8) en 12 poussees (1 branche)
+[mouv] joueur (8,9)->(8,8) POUSSE caisse ->(8,7)
+[rang] (8,8) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 2 macros jouables : caisse (6,7) en 9 poussees (1 branche), caisse (8,7) en 11 poussees (1 branche)
+[mouv] joueur (8,8)->(8,7) POUSSE caisse ->(8,6)
+[rang] (8,7) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 2 macros jouables : caisse (8,6) en 10 poussees (1 branche), caisse (6,7) en 9 poussees (1 branche)
+[mouv] joueur (8,7)->(8,6) POUSSE caisse ->(8,5)
+[rang] (8,6) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 2 macros jouables : caisse (8,5) en 9 poussees (1 branche), caisse (6,7) en 9 poussees (1 branche)
+[mouv] joueur (8,6)->(8,5) POUSSE caisse ->(8,4)
+[rang] (8,5) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 2 macros jouables : caisse (8,4) en 8 poussees (1 branche), caisse (6,7) en 9 poussees (1 branche)
+[mouv] joueur (8,5)->(8,4) POUSSE caisse ->(8,3)
+[rang] (8,4) Haut | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,3) en 7 poussees (1 branche)
+[mouv] joueur (8,4)->(9,4)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,3) en 7 poussees (1 branche)
+[mouv] joueur (9,4)->(9,3)
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (8,3) en 7 poussees (1 branche)
+[mouv] joueur (9,3)->(8,3) POUSSE caisse ->(7,3)
+[rang] (8,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (7,3) en 6 poussees (1 branche)
+[mouv] joueur (8,3)->(7,3) POUSSE caisse ->(6,3)
+[rang] (7,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (7,3)->(6,3) POUSSE caisse ->(5,3)
+[rang] (6,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (5,3) en 4 poussees (1 branche)
+[mouv] joueur (6,3)->(5,3) POUSSE caisse ->(4,3)
+[rang] (5,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (4,3) en 3 poussees (1 branche)
+[mouv] joueur (5,3)->(4,3) POUSSE caisse ->(3,3)
+[rang] (4,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 6/10 | but actif (2,4) rang 1/10 | 1 macro jouable : caisse (3,3) en 2 poussees (1 branche)
+[mouv] joueur (4,3)->(3,3) POUSSE caisse ->(2,3) [POSE]
+[rang] (3,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 7/10 | but actif (2,4) rang 1/10 | 2 macros jouables : caisse (2,3) en 1 poussees (1 branche), caisse (6,7) en 9 poussees (1 branche)
+[mouv] joueur (3,3)->(3,2)
+[hybride] posees 7/10 | but actif (2,4) rang 1/10 | 2 macros jouables : caisse (2,3) en 1 poussees (1 branche), caisse (6,7) en 9 poussees (1 branche)
+[mouv] joueur (3,2)->(2,2)
+[hybride] posees 7/10 | but actif (2,4) rang 1/10 | 2 macros jouables : caisse (2,3) en 1 poussees (1 branche), caisse (6,7) en 9 poussees (1 branche)
+[mouv] joueur (2,2)->(2,3) POUSSE caisse ->(2,4) [POSE]
+[rang] (2,3) Bas | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (2,3)->(3,3)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (3,3)->(4,3)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (4,3)->(5,3)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (5,3)->(6,3)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (6,3)->(7,3)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (7,3)->(8,3)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (8,3)->(8,4)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (8,4)->(8,5)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (8,5)->(8,6)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (8,6)->(8,7)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (8,7)->(8,8)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (8,8)->(7,8)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (7,8)->(6,8)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,7) en 8 poussees (1 branche)
+[mouv] joueur (6,8)->(6,7) POUSSE caisse ->(6,6)
+[rang] (6,7) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,6) en 7 poussees (1 branche)
+[mouv] joueur (6,7)->(6,6) POUSSE caisse ->(6,5)
+[rang] (6,6) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,5) en 6 poussees (1 branche)
+[mouv] joueur (6,6)->(6,5) POUSSE caisse ->(6,4)
+[rang] (6,5) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,4) en 5 poussees (1 branche)
+[mouv] joueur (6,5)->(6,4) POUSSE caisse ->(6,3)
+[rang] (6,4) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (6,4)->(6,5)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (6,5)->(6,6)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (6,6)->(6,7)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (6,7)->(6,8)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (6,8)->(7,8)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (7,8)->(8,8)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (8,8)->(9,8)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (9,8)->(9,7)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (9,7)->(9,6)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (9,6)->(9,5)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (9,5)->(9,4)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (9,4)->(9,3)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (9,3)->(8,3)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (8,3)->(7,3)
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (6,3) en 4 poussees (1 branche)
+[mouv] joueur (7,3)->(6,3) POUSSE caisse ->(5,3)
+[rang] (6,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (5,3) en 3 poussees (1 branche)
+[mouv] joueur (6,3)->(5,3) POUSSE caisse ->(4,3)
+[rang] (5,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (4,3) en 2 poussees (1 branche)
+[mouv] joueur (5,3)->(4,3) POUSSE caisse ->(3,3)
+[rang] (4,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 7/10 | but actif (2,3) rang 2/10 | 1 macro jouable : caisse (3,3) en 1 poussees (1 branche)
+[mouv] joueur (4,3)->(3,3) POUSSE caisse ->(2,3) [POSE]
+[rang] (3,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 2 macros jouables : caisse (5,6) en 9 poussees (1 branche), caisse (5,8) en 11 poussees (1 branche)
+[mouv] joueur (3,3)->(4,3)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 2 macros jouables : caisse (5,6) en 9 poussees (1 branche), caisse (5,8) en 11 poussees (1 branche)
+[mouv] joueur (4,3)->(5,3)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 2 macros jouables : caisse (5,6) en 9 poussees (1 branche), caisse (5,8) en 11 poussees (1 branche)
+[mouv] joueur (5,3)->(6,3)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 2 macros jouables : caisse (5,6) en 9 poussees (1 branche), caisse (5,8) en 11 poussees (1 branche)
+[mouv] joueur (6,3)->(6,4)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 2 macros jouables : caisse (5,6) en 9 poussees (1 branche), caisse (5,8) en 11 poussees (1 branche)
+[mouv] joueur (6,4)->(6,5)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 2 macros jouables : caisse (5,6) en 9 poussees (1 branche), caisse (5,8) en 11 poussees (1 branche)
+[mouv] joueur (6,5)->(6,6)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (5,8) en 11 poussees (1 branche)
+[mouv] joueur (6,6)->(6,7)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 2 macros jouables : caisse (5,6) en 9 poussees (1 branche), caisse (5,8) en 11 poussees (1 branche)
+[mouv] joueur (6,7)->(5,7)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (5,6) en 9 poussees (1 branche)
+[mouv] joueur (5,7)->(4,7)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 2 macros jouables : caisse (5,6) en 9 poussees (1 branche), caisse (5,8) en 11 poussees (1 branche)
+[mouv] joueur (4,7)->(4,6)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 2 macros jouables : caisse (5,6) en 9 poussees (1 branche), caisse (5,8) en 11 poussees (1 branche)
+[mouv] joueur (4,6)->(5,6) POUSSE caisse ->(6,6)
+[rang] (5,6) Droite | HORS REGIME MACRO : 2 macros engagees, le solveur ne genere aucune poussee simple
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,6) en 8 poussees (1 branche)
+[mouv] joueur (5,6)->(5,7)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,6) en 8 poussees (1 branche)
+[mouv] joueur (5,7)->(6,7)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,6) en 8 poussees (1 branche)
+[mouv] joueur (6,7)->(6,6) POUSSE caisse ->(6,5)
+[rang] (6,6) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,5) en 7 poussees (1 branche)
+[mouv] joueur (6,6)->(6,5) POUSSE caisse ->(6,4)
+[rang] (6,5) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,4) en 6 poussees (1 branche)
+[mouv] joueur (6,5)->(6,4) POUSSE caisse ->(6,3)
+[rang] (6,4) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (6,4)->(6,5)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (6,5)->(6,6)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (6,6)->(6,7)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (6,7)->(6,8)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (6,8)->(7,8)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (7,8)->(8,8)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (8,8)->(8,7)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (8,7)->(8,6)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (8,6)->(8,5)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (8,5)->(8,4)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (8,4)->(8,3)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (8,3)->(7,3)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (6,3) en 5 poussees (1 branche)
+[mouv] joueur (7,3)->(6,3) POUSSE caisse ->(5,3)
+[rang] (6,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (5,3) en 4 poussees (1 branche)
+[mouv] joueur (6,3)->(5,3) POUSSE caisse ->(4,3)
+[rang] (5,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (4,3) en 3 poussees (1 branche)
+[mouv] joueur (5,3)->(4,3) POUSSE caisse ->(3,3)
+[rang] (4,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (3,3) en 2 poussees (1 branche)
+[mouv] joueur (4,3)->(4,4)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (3,3) en 2 poussees (1 branche)
+[mouv] joueur (4,4)->(3,4)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (3,3) en 2 poussees (1 branche)
+[mouv] joueur (3,4)->(3,3) POUSSE caisse ->(3,2)
+[rang] (3,3) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (3,2) en 1 poussees (1 branche)
+[mouv] joueur (3,3)->(4,3)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (3,2) en 1 poussees (1 branche)
+[mouv] joueur (4,3)->(4,2)
+[hybride] posees 8/10 | but actif (2,2) rang 7/10 | 1 macro jouable : caisse (3,2) en 1 poussees (1 branche)
+[mouv] joueur (4,2)->(3,2) POUSSE caisse ->(2,2) [POSE]
+[rang] (3,2) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (3,2)->(4,2)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (4,2)->(4,3)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (4,3)->(5,3)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (5,3)->(6,3)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (6,3)->(6,4)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (6,4)->(6,5)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (6,5)->(6,6)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (6,6)->(5,6)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (5,6)->(4,6)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (4,6)->(4,7)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (4,7)->(4,8)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (4,8)->(4,9)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (4,9)->(5,9)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,8) en 12 poussees (1 branche)
+[mouv] joueur (5,9)->(5,8) POUSSE caisse ->(5,7)
+[rang] (5,8) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,7) en 11 poussees (1 branche)
+[mouv] joueur (5,8)->(5,7) POUSSE caisse ->(5,6)
+[rang] (5,7) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,6) en 10 poussees (1 branche)
+[mouv] joueur (5,7)->(4,7)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,6) en 10 poussees (1 branche)
+[mouv] joueur (4,7)->(5,7)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,6) en 10 poussees (1 branche)
+[mouv] joueur (5,7)->(4,7)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,6) en 10 poussees (1 branche)
+[mouv] joueur (4,7)->(4,6)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,6) en 10 poussees (1 branche)
+[mouv] joueur (4,6)->(5,6) POUSSE caisse ->(6,6)
+[rang] (5,6) Droite | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,6) en 9 poussees (1 branche)
+[mouv] joueur (5,6)->(5,7)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,6) en 9 poussees (1 branche)
+[mouv] joueur (5,7)->(6,7)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,6) en 9 poussees (1 branche)
+[mouv] joueur (6,7)->(6,6) POUSSE caisse ->(6,5)
+[rang] (6,6) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,5) en 8 poussees (1 branche)
+[mouv] joueur (6,6)->(6,5) POUSSE caisse ->(6,4)
+[rang] (6,5) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,4) en 7 poussees (1 branche)
+[mouv] joueur (6,5)->(6,4) POUSSE caisse ->(6,3)
+[rang] (6,4) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (6,4)->(6,5)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (6,5)->(6,6)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (6,6)->(6,7)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (6,7)->(6,8)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (6,8)->(7,8)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (7,8)->(8,8)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (8,8)->(8,7)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (8,7)->(8,6)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (8,6)->(8,5)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (8,5)->(8,4)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (8,4)->(8,3)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (8,3)->(7,3)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (6,3) en 6 poussees (1 branche)
+[mouv] joueur (7,3)->(6,3) POUSSE caisse ->(5,3)
+[rang] (6,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (5,3) en 5 poussees (1 branche)
+[mouv] joueur (6,3)->(5,3) POUSSE caisse ->(4,3)
+[rang] (5,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (4,3) en 4 poussees (1 branche)
+[mouv] joueur (5,3)->(4,3) POUSSE caisse ->(3,3)
+[rang] (4,3) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (3,3) en 3 poussees (1 branche)
+[mouv] joueur (4,3)->(4,4)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (3,3) en 3 poussees (1 branche)
+[mouv] joueur (4,4)->(3,4)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (3,3) en 3 poussees (1 branche)
+[mouv] joueur (3,4)->(3,3) POUSSE caisse ->(3,2)
+[rang] (3,3) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (3,2) en 2 poussees (1 branche)
+[mouv] joueur (3,3)->(3,2) POUSSE caisse ->(3,1)
+[rang] (3,2) Haut | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (3,1) en 1 poussees (1 branche)
+[mouv] joueur (3,2)->(4,2)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (3,1) en 1 poussees (1 branche)
+[mouv] joueur (4,2)->(4,1)
+[hybride] posees 9/10 | but actif (2,1) rang 9/10 | 1 macro jouable : caisse (3,1) en 1 poussees (1 branche)
+[mouv] joueur (4,1)->(3,1) POUSSE caisse ->(2,1) [POSE]
+[rang] (3,1) Gauche | HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune poussee simple
+[hybride] aucun but actif (etat gagne)

@@ -263,6 +263,24 @@ private:
     // pour rester valide tant que WGame le pointe.
     Game gameMax;
     int maxRangeesVu = 0;
+
+    // ── HISTORIQUE DES RECORDS (§6.2, 2026-08-03) ───────────────────────────────
+    // `nouveauMaxCaisses` écrasait le chemin visionné à chaque record : pour annoter
+    // le record 7 il fallait arrêter le run pile au bon moment. Et l'arrêt est
+    // DÉFINITIF — `demanderArret()` fait sortir run(), le solveur est deleteLater,
+    // file/tables/arène partent avec lui : aucune reprise possible. « S'arrêter à
+    // chaque record » aurait donc voulu dire un record par run, et sept runs pour
+    // voir sept records. On garde les chemins à la place : UN run les rend tous
+    // inspectables, et l'arrêt redevient un geste libre.
+    //
+    // Le combo N'A PAS d'état caché : s'il est sur le dernier record, il suit les
+    // nouveaux (comportement d'avant) ; dès que l'utilisateur en choisit un autre,
+    // il y reste. La sélection visible EST la règle.
+    //
+    // ⚠️ OUTIL DE CHANTIER, à retirer avec la campagne.
+    QList<QPair<int, QList<Game::EDirection>>> recordsVus;   // (caisses posées, chemin)
+    QComboBox* cbRecords = nullptr;
+    void majListeRecords();
     Solveur *solveur = nullptr;
     QTimer timerRejeu;
     QList<Game::EDirection> coupsRestants;
@@ -318,6 +336,30 @@ private:
     void majNavigationPas();
     void chargeCheminVisionne(const Game& depart, const QList<Game::EDirection>& coups,
                               bool estSolution);
+
+    // ── CRITIQUE DU CHEMIN DU SOLVEUR (§6.2, 2026-08-03) ────────────────────────
+    // Le miroir de l'annotation d'intentions : là on annote ce que le SOLVEUR fait,
+    // et pourquoi c'est mauvais. Raison d'être : le guidage est fermé depuis le
+    // 2026-07-21, l'élagage prouvé est le seul levier restant sur les gros niveaux
+    // (§6.1) — et « pourquoi cet état est fichu » est une hypothèse d'élagage, là
+    // où une intention était une hypothèse de guidage.
+    //
+    // ⚠️ TEXTE LIBRE, délibérément. La campagne d'intentions a fermé son vocabulaire
+    // AVANT de savoir ce qu'on y mettrait, et a passé deux sessions à le réparer
+    // (`GARER` de 10 à 1, `N` et `A` retirées, `T` ajoutée). Ici on écrit d'abord,
+    // on ferme ensuite — sur ce qui aura été écrit. Ce n'est pas dépouillable en
+    // l'état, et c'est assumé : quelques points de coupure sur un chemin, pas 284
+    // ancres.
+    //
+    // ⚠️ Ce que le solveur montre n'est PAS une solution : sur un run qui n'aboutit
+    // pas, c'est le chemin du meilleur état (nouveauMaxCaisses), écrasé à chaque
+    // record. Un état jugé « mort » ici n'est pas prouvé mort — il devra passer
+    // `mort` (sous-solve borné) puis `fp` avant d'approcher `checkDefaite` (§6.1,
+    // le projet s'y est fait avoir trois fois).
+    //
+    // ⚠️ OUTIL DE CHANTIER, à retirer avec la campagne.
+    QFile journalCritique;
+    void noteCritique();               // touche C
     std::chrono::time_point<std::chrono::high_resolution_clock> begin;
 };
 #endif // MAINWINDOW_H
