@@ -56,7 +56,10 @@ public:
         // n'y changera rien — aucun ordre sain complet n'existe dans ce modèle statique.
         // Décider le but suivant DEPUIS L'ÉTAT fait disparaître la question. Régime
         // d'ESSAI, jamais le défaut : le canari reste sur les régimes existants.
-        AstarMacroCouplagePlongeonOrdre
+        AstarMacroCouplagePlongeonOrdre,
+        // Régime d'essai (§6.2, 2026-08-03 — idée utilisateur) : ordre strict sur
+        // les seuls buts EN COIN. Cf. solveurastar.h pour le fondement et la limite.
+        AstarMacroCouplagePlongeonCoins
     };
 
     struct SType {

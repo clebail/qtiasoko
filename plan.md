@@ -68,6 +68,11 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | **injection d'ordre par FICHIER** | **(neuf, 2026-08-01)** `ordre_niveau_XXXX.txt` dans le répertoire courant écrase l'ordre calculé de ce niveau. Complète `ORDRE_HUMAIN`, qui est une variable d'environnement et **n'atteint donc pas l'app** lancée par un launcher (§7) : c'est le seul moyen de JOUER un ordre à la main en mode hybride et de voir où il coince. Même parseur, exemplaire unique. **Bruyant des deux côtés** (`[ORDRE_FICHIER]` sur stderr, et le journal hybride écrit `ordre de remplissage ⚠ INJECTE depuis …` au lieu de `calcule`) — un fichier oublié changerait sinon le comportement en silence, le pire cas du §7. Absent = rien ne change |
 | **rejeu de journal + INTENTIONS** (dans l'app) | **(neuf, 2026-08-01) CAPTURER LE PLAN, PAS LE COUP.** Touche `L` : relit `hybride_niveau_XXXX.txt`, en extrait la **dernière partie GAGNÉE** (les `[undo]` retirent le dernier coup) et l'installe dans le rejeu pas à pas existant — aucune mécanique de navigation en double. `N` saute à la prochaine **poussée choisie** (macros et marche franchies d'un coup). Six touches d'intention en vocabulaire **FERMÉ** : `E` écarter du chemin d'une autre caisse · `O` ouvrir un passage joueur · `G` garer pour plus tard · `A` préparer un appui · `T` **sortir pour reprendre dans l'autre sens** (= le RECUL du §3) · `R` rapprocher · `?` je ne sais pas. **Une frappe par PLAN**, valable jusqu'à la suivante — c'est l'objet même : le rang d'un coup isolé ne peut pas voir un plan sur plusieurs coups. Sortie : `hybride_niveau_XXXX_intentions.txt`, avec le **numéro de coup** (sans lui les annotations seraient orphelines). ⚠️ Flèches et Retour arrière **neutralisés** pendant une session : ils modifient le plateau sans toucher à `posPas`, et le numéro de coup écrit devient faux |
 | `diverge`, `paires`, `trace`, `passages`, `congestion` | mou de `h`, interactions de paires, solution pas à pas, cartes de trajets |
+| **historique des RECORDS + critique du solveur `C`** (dans l'app) | **(neuf, 2026-08-03) LE MIROIR DE L'ANNOTATION D'INTENTIONS, mais sur ce que le SOLVEUR fait.** Le solveur a DEUX points d'enfilage (recherche principale + `plonge()`) et `nouveauMaxCaisses` écrasait le chemin visionné à CHAQUE record — un sélecteur conserve tous les chemins d'un run, voir le record 7 ET le record 8 ne demande plus qu'un seul run. Touche `C` : boîte de texte LIBRE (pas de vocabulaire fermé — celui des intentions a mis deux sessions à se stabiliser, on ne le refait pas sans savoir ce qu'on y met), journal `solveur_niveau_XXXX_critique.txt`, plateau `.xsb` joint à chaque entrée pour que `mort`/A\* puisse juger l'état après coup. `C` inerte pendant une session d'intentions (deux journaux distincts, ne pas mélanger) |
+| `bench <fichier.xsb> record` → `.chemin` | **(neuf, 2026-08-03)** à côté de chaque `.xsb` exporté, une lettre par coup (H/D/B/G, ordre de `EDirection`) : permet de rejouer le chemin d'un record HORS de l'app, pour le passer à `mort`/`fp` |
+| `paquet <niv> [depiles] [budget] [mode]` | **(neuf, 2026-08-03)** fréquence + coût du motif « paquet de caisses hors but non livrable » (cf. §6.1). `paquet <fichier.xsb> [budget]` = mode JUGE, verdict MORT/vivant/inconnu sur UN plateau — sert de `fp` pour ce motif |
+| `gabarit.py <niv>` | **(neuf, 2026-08-03, scratchpad)** un plateau ASCII par but ACTIF (buts déjà remplis affichés comme posés, rien pré-rempli) — support pour DESSINER une règle de cases mortes à la main sans que l'instrument ne suggère le vocabulaire (cf. §6.2) |
+| `juge_loi.py` | **(neuf, 2026-08-03, scratchpad)** juge une loi de cases mortes contre TOUTES les parties humaines gagnantes d'un coup (murs seuls, ordre injectable) : toute caisse sur une case déclarée morte est un faux positif PROUVÉ. A validé la loi du §6.2 sur 21/24 parties, et localisé les 3 exceptions à des ordres faux |
 
 **Règles de mesure, non négociables :**
 - **Comparer un binaire à un AUTRE binaire** (ancien reconstruit depuis `HEAD` via
@@ -1219,6 +1224,111 @@ dépendre d'une variable d'environnement (§7).
   périodiquement avec la jauge est un ajout de trois lignes, sans effet sur aucun verdict.
 - [ ] **11 et 32 laissés de côté** (décision utilisateur) : leurs runs `CORRAL=0` sont d'ordre de
   grandeur inconnu et un run interrompu ne rendrait aucun verdict.
+
+#### ✅⚠️ Session du 2026-08-03 — LE PAQUET NON LIVRABLE : un motif d'élagage SOUND, trouvé par la CRITIQUE du chemin du solveur
+
+**L'origine, et c'est une inversion de la campagne hybride** (idée utilisateur) : au lieu d'annoter
+ce que l'humain fait, annoter ce que le **solveur** fait — *« pourquoi c'est de la merde »*. Le
+raisonnement qui l'a fait retenir : une intention est une hypothèse de **guidage**, et le guidage
+est fermé depuis le 2026-07-21 ; « pourquoi cet état est fichu » est une hypothèse d'**élagage**,
+le seul levier que le §6.1 laisse ouvert. **Et cette fois il y a un ORACLE** — `mort` / A\* pur
+peut contredire le jugement humain, ce que la campagne d'intentions n'a jamais pu faire (sept
+observables essayés le 2026-08-02, six réfutés, un silencieux).
+
+**LE MOTIF, énoncé par l'utilisateur puis formalisé :**
+
+> Un groupe de caisses **8-connexe, hors but**, dont on retire TOUTES les autres caisses du plateau
+> en gardant TOUS les buts, ne peut pas être entièrement posé ⇒ **l'état réel est MORT**.
+
+**Sound par construction** : retirer des caisses ne fait qu'augmenter la liberté du joueur et des
+caisses restantes ; garder tous les buts leur laisse toutes leurs destinations. Point clé vérifié
+dans le code : **`checkVictoire` teste « aucune caisse hors but », pas « tous les buts remplis »** —
+c'est ce qui rend l'instance relâchée valide et la réduction rigoureuse plutôt qu'argumentée.
+
+**LA MÉTHODE DE RÉDUCTION est de l'utilisateur, et c'est elle qui a tout débloqué** : *« pour le
+16, ne garde que les caisses en haut à gauche, tu verras 2 poussées max ⇒ deadlock »*. Mesuré :
+`CORRAL=0 bench fixture.xsb astar` → **`AUCUNE` en 3 états explorés**, soit l'état de départ plus
+exactement deux poussées. La prédiction était juste au chiffre près. Là où l'A\* pleine taille
+n'avait rendu aucun verdict après 48 M et 60 M d'états, la fixture conclut en une seconde.
+
+**SIX DIAGNOSTICS HUMAINS, SIX CONFIRMATIONS, ZÉRO RÉFUTATION** (états annotés en mode critique
+sur les chemins de record des niveaux 14, 15, 16) :
+
+| état | prédiction utilisateur | verdict oracle |
+|---|---|---|
+| 16 #1 (poussée 8) | mort, sûr | ✅ MORT — par réduction, 3 états |
+| 16 #4 (poussée 21) | mort, sûr | ✅ MORT — prouvé avec ET sans corral |
+| 15 #1 (poussée 60) | mort assurée | ✅ MORT — prouvé deux fois |
+| 14 #5 (poussée 37) | deadlock à coup sûr | ✅ MORT — paquet de 9 caisses |
+| 14 #6 (poussée 39) | deadlock à coup sûr | ✅ MORT — même paquet |
+| 16, coup 18 du record 7/15 | « deadlock futur, (9,4) et (10,5) » | ✅ MORT — **et le bon paquet**, {(8,4),(9,4),(10,5)} |
+
+Les « incertain » de l'utilisateur sont restés inconnus des deux côtés — aucune de ses hésitations
+n'a été comptée comme une affirmation, ce qui rend le score lisible.
+
+**FRÉQUENCE MESURÉE** (outil neuf `mesures/paquet`, sur les états RÉELLEMENT dépilés, donc déjà
+passés à travers `checkDefaite`, le corral unitaire, la pince et le corral-N) :
+
+| niveau | morts non détectés par l'élagage actuel | coût / état jugé | amortissement cache |
+|---|---|---|---|
+| **16** | **71,4 %** (28 574 / 40 000) | 7,8 états de sous-solve | ×645 |
+| 4 | 24,5 % | 22,4 | ×316 |
+| 17 | 16,5 % | 28,2 | ×223 |
+| 14 | 7,6 % | 5,8 | ×1040 |
+| 15 | 1,0 % | 10,3 | ×991 |
+
+**Et la profondeur est bonne là où la fréquence est haute** — c'est le chiffre qui décide (§6.1,
+`corral.cpp`) : sur le 16, **52 % des états à UNE caisse rangée sont déjà morts**, 71 % à deux,
+84,6 % à trois ; sur le 4, les 24,5 % sont **tous à 0 caisse rangée**. Cas « continent », pas
+« brindille ». Le 14 est l'inverse (rien avant 3/18, pic à 7/18) et le 15 est plat à 1 %.
+
+**PAS DE FAUX POSITIF** : le juge `fp` étendu — rejeu des **213 états de la partie humaine gagnante
+du 16**, tous solubles par construction — rend **0 MORT**, 94 vivants, 119 inconnus (budget, donc
+sans danger). ⚠️ **Première fois que `fp` tourne sur un niveau NON RÉSOLU** : ce sont les parties à
+la main qui le permettent.
+
+**CÂBLÉ derrière `PAQUET=1`** (défaut inactif, cf. `solveurastar.h`). Canari **intact** sur onze
+niveaux : 4 / 97 / 131 / 134 / 357 / 151 / 110 / 90 / 240 / 237 / 213 poussées, inchangées.
+
+⚠️ **UN BUG DE CÂBLAGE, TROUVÉ PAR L'UTILISATEUR EN LANÇANT L'UI** (« je l'ai lancé avec PAQUET=1,
+même erreur au coup 18 »). **Le solveur a DEUX points d'enfilage** — la recherche principale et
+`plonge()`, qui a sa propre copie des élagages. Le test n'était câblé qu'au premier, donc le
+plongeon explorait librement des états que la recherche refusait, et `nouveauMaxCaisses` enregistre
+les records **d'où qu'ils viennent**. **Toutes les mesures prises avant le correctif sont fausses**,
+y compris un balayage de budget complet et un « 8/15 sur le 16 » annoncé puis retiré puis
+re-confirmé. Corrigé : `cachePaquet` est passé à `plonge()` comme l'est déjà `cacheEnclos`.
+
+**BALAYAGE DU BUDGET, après correctif** (le 9 est le juge : à budget trop haut il cesse de se
+résoudre) :
+
+| budget | niv 4 | niv 17 | **niv 9** | niv 16 (300 s) |
+|---|---|---|---|---|
+| *défaut* | 40 408 | 24 813 | 83 029 | max 7/15 |
+| 50 | 17 641 | 21 642 | ✅ 80 352 | max 7/15 |
+| 500 | 140 670 | 20 774 | ✅ 78 516 | — |
+| 1 000 | 21 694 | 20 774 | ✅ 78 010 | — |
+| **2 000** | 9 302 | 20 733 | ❌ **non fini** | **max 8/15** (3 fois sur 3) |
+
+- **La régression du 9 n'est pas le motif, c'est le budget** : il a **33 000 paquets distincts**
+  (contre 423 sur le 16), donc le cache n'amortit rien et on paie le budget plein tarif à chaque
+  fois — 28,8 M états de sous-solve à 2 000, **1,6 M à 50**.
+- **Le 8/15 du 16 se reproduit trois fois sur trois à budget 2 000**, jamais à 50 ni au défaut.
+  Le plafond de 7/15 tenait depuis le début du chantier.
+- ⚠️ **Le compte d'états en `coupl-plongeon` est du bruit** : le 4 fait 17 641 → 188 105 → 140 670
+  → 21 694 → 9 302 entre budgets voisins, sans tendance. Seuls « ça finit / ça ne finit pas » et
+  les poussées y sont robustes.
+
+**⚠️ RIEN N'EST PROMU.** Le motif est sound et bon marché, mais **le réglage n'est pas tranché** :
+50 sauve le 9 et perd le 8/15 du 16, 2 000 fait l'inverse. Conditionner demanderait un critère, et
+un seuil calé sur deux niveaux est exactement ce qui a fait promouvoir le corral-N trop tôt le
+2026-07-28. **Observable prometteur, lisible en vol et gratuit : le taux d'amortissement du cache**
+(×19 181 sur le 16 contre ×3,9 sur le 9, cinq ordres de grandeur) — à mesurer sur les quinze
+résolus avant d'en faire quoi que ce soit.
+
+**Reste ouvert :**
+- [ ] Le réglage du budget, ou un gate fondé sur l'amortissement.
+- [ ] **Le motif ne débloque PAS le 16** : 8/15 au lieu de 7/15, le niveau reste non résolu.
+- [ ] `paquet <fichier.xsb> [budget]` juge un plateau isolé — c'est ce mode qui a servi de juge `fp`.
 
 ### 6.2 Ordre de remplissage — multi-salles
 
@@ -3231,6 +3341,130 @@ de `prochainCoupChoisi()`, retrait de `A`, reformulation de `?`, `journalSignale
 changement de niveau, `lbPas` descendu dans la barre d'état (il élargissait la fenêtre) ;
 `wgame.cpp`/`.h` — `showZoneJoueur()`, `setPousseeCourante()`, `setApercuSuite()`. **Rien dans le
 solveur, aucune variable d'environnement** (§7). Tout ceci part avec la campagne.
+
+#### 🎯 Session du 2026-08-03 — QUATRE NIVEAUX GAGNÉS À LA MAIN (14, 15, 16, 17), et LA LOI DE L'ORDRE ENFIN TROUVÉE
+
+**Quatre parties humaines gagnantes de plus** : 14, 15, 16 (non résolus) et **17** (résolu, 213
+poussées — l'optimum exact). Journaux compressés (`compresse_journaux.py`, filtre de niveaux
+ajouté : `python3 compresse_journaux.py 14 15 16 17 --ecrire`, sans quoi les 24 journaux sont
+tous réécrits). Trois nouveaux outils dans l'UI : sélecteur d'HISTORIQUE DES RECORDS (le solveur a
+DEUX points d'enfilage — recherche principale et plongeon — un record écrase l'ancien chemin
+visionné, donc voir le record 7 ET le record 8 d'un même run demandait de les conserver tous),
+touche **`C`** = critique du chemin du SOLVEUR en texte libre (miroir de l'annotation d'intentions,
+mais sur ce que le solveur fait, journal `solveur_niveau_XXXX_critique.txt`, plateau joint).
+
+**LE GRADIENT « HORS RÉGIME MACRO »** — part des poussées CHOISIES que le générateur du solveur ne
+produit PAS du tout (ligne `[rang]`) :
+
+| niveau | résolu ? | hors régime | `df = 0` (même palier que le meilleur frère) | poussées de macro |
+|---|---|---|---|---|
+| 14 | non | **100 %** | — | 17 % |
+| 15 | non | 78 % | 51 % | 12 % |
+| 16 | non | 35 % | 76 % | 36 % |
+| **17** | **oui** | **4 %** | **94 %** | **46 %** |
+
+Monotone sur les quatre. Sur le niveau que le solveur sait finir, 96 % des coups humains sont dans
+son générateur et 94 % au même `f` que le meilleur frère ; sur celui qu'il ne finit pas du tout,
+aucun. ⚠️ Quatre points, un seul résolu — piège §11.4, à ne pas graver, mais premier candidat qui
+ordonne des niveaux SANS les résoudre.
+
+**LE 16 EST UN CONTRÔLE QUI FERME LA QUESTION DE L'ORDRE** : ordre humain = ordre calculé, **15/15**
+buts au même rang. Et le solveur plafonne quand même à 7/15 sur 9,7 M dépilements. **L'ordre n'est
+pas la variable** sur ce niveau — c'est l'acheminement. (Sur le 14 et le 15, l'ordre humain diffère
+du calculé, injecté et mesuré : +3 caisses au plafond sur le 14, mais −2 sur le 15 — pas de loi.)
+
+**ZÉRO FAUX POSITIF D'ÉLAGAGE**, vérifié en rejouant les `[undo]` des quatre parties (1280 + 987 +
+1050 + 553 coups) : aucune ligne `⚠ ECARTE par le solveur` ne survit dans le chemin gagnant.
+`checkDefaite` et le corral-N sans faute sur trois niveaux NON résolus — première fois que `fp`
+peut être étendu à du non-résolu.
+
+---
+
+**🎯 LA LOI DE L'ORDRE — trouvée en fin de session, par itération avec l'utilisateur sur le 16.**
+
+**Point de départ : « les poussées simples ne respectent PAS l'ordre de remplissage »**, constaté
+par l'utilisateur sur un plateau exporté du 16 (record 7/15, coup 18) : `(8,11)` posé au rang 11
+alors que les rangs 0 à 3 sont vides. `ordreButs` PILOTE la macro mais rien n'interdit une poussée
+SIMPLE de déposer une caisse sur n'importe quel but.
+
+**QUATRE FORMULATIONS RÉFUTÉES avant la bonne, chacune par la mesure ou par le juge `fp` :**
+
+1. **Ordre strict sur TOUS les buts** — repose sur « interdire de remplir dans le désordre », déjà
+   réfuté au §4 (rend le niveau 1 insoluble : atteindre (17,6) exige de faire ÉTAPE sur (16,6), qui
+   est un but). Confirmé à nouveau : réfuté par la propre partie de l'utilisateur sur le 16 (35 et
+   36 états où (8,9) et (9,9), rangs 13-14, sont remplis bien avant leur tour).
+2. **Buts EN COIN seulement** (aucune poussée sortante, testable sur les murs seuls) — codé en
+   régime séparé `AstarMacroCouplagePlongeonCoins` (`PAQUET`-like, `qgetenv`). Canari : **9/11
+   niveaux identiques, mais le NIVEAU 6 PASSE DE RÉSOLU À `AUCUNE`**. Cause : l'ordre CALCULÉ du 6
+   remplit la colonne 2 avant la colonne 1, alors que (1,5) ne s'atteint qu'EN TRAVERSANT la
+   colonne 2 — même piège que le niveau 1, sur un vrai plateau cette fois.
+3. **`casesMortes` recalculée avec UN SEUL but** (« vu du solveur, seul le but actif existe, le
+   reste est du sol ») — mesuré : tue **cinq buts futurs sur la ligne 11** du 16, dont trois cases
+   de TRANSIT ((9,11)(10,11)(11,11)) — casse l'acheminement.
+4. **`casesMortes` avec TOUS les buts restants (rang ≥ actif)** — sûr, mais **une case-but n'est
+   JAMAIS morte** dans cette vue (elle est sa propre graine du BFS à rebours) : ne coupe RIEN de ce
+   qui posait problème. Confirmé par l'utilisateur : *« une case but n'est jamais morte »*.
+
+**LA LOI QUI SURVIT, obtenue par un GABARIT DE DESSIN** (`gabarit_niveau_0016.txt`, script
+`scratchpad/gabarit.py` — un plateau par but actif, `A`=actif, `*`=but déjà rempli, chiffre=rang,
+rien pré-rempli). L'utilisateur a dessiné les cases mortes sur les 15 plateaux, corrigé deux fois,
+et énoncé la loi en trois temps :
+
+> **1.** Les cases mortes se calculent **tous les buts supprimés SAUF l'actif** — sinon une case-but
+>    est vivante d'office et la table ment (`checkVictoire` ne compare qu'aux caisses, aucune
+>    protection naturelle contre ça).
+> **2.** Une case ainsi morte redevient **du SOL** si elle est **ALIGNÉE** (même ligne OU même
+>    colonne) avec le but actif.
+> **3.** Le reste est inchangé (murs, buts déjà remplis = obstacles).
+
+**Vérifiée exactement sur les 15 plateaux du gabarit** (script `scratchpad/juge_loi.py`) :
+
+```
+rang  0 (12,7)  predit [(8,11)(9,11)(10,11)(11,11)]  == dessin utilisateur
+…
+rang 14 (8,9)   predit []                             == dessin utilisateur
+   🎯 LOI VÉRIFIÉE SUR LES 15 PLATEAUX
+```
+
+**PUIS PASSÉE AU JUGE SUR 24 PARTIES HUMAINES GAGNANTES** (`fp` étendu, murs seuls, ordre calculé
+sauf mention) :
+
+| | niveaux |
+|---|---|
+| **0 faux positif** (19 niveaux) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 16, 17, 19, 20, 23, 24, 25 |
+| faux positifs, **guéris par l'ORDRE HUMAIN injecté** | **12** (108→0), **14** (147→0), **15** (151→0) |
+| faux positifs, ordre non vérifié | 18 (93), 22 (406), 26 (14) |
+
+**Les trois seuls faux positifs vérifiables sont EXACTEMENT les trois niveaux dont on savait par
+ailleurs que l'ordre calculé est faux** (le 12 par la session du 2026-07-31, le 14/15 par le
+gradient ci-dessus). ⚠️ **La loi n'est donc PAS un test d'ordre absolu — c'est un test de
+COHÉRENCE entre un ordre et une partie**, prouvé sur le niveau 6 : deux parties humaines gagnantes
+existent, colonne 2 d'abord (2026-08-01) et colonne 1 d'abord (2026-08-03, rejouée exprès pour ce
+test) — **chacune valide SON ordre (0 FP) et condamne l'autre (62-78 FP)**. Le 6 admet deux ordres
+de remplissage valides ; la loi ne sait pas trancher entre eux, elle sait seulement dire si un
+ordre donné est conforme à une partie donnée.
+
+**Conséquence pour 18/22/26** : ne PAS lire leurs faux positifs comme « ordre calculé faux » sans
+vérifier — il faudrait, comme sur le 6, REJOUER l'ordre calculé à la main pour savoir s'il est
+seulement DIFFÉRENT ou réellement infaisable.
+
+**⚠️ RIEN N'EST CODÉ NI PROMU.** La loi est validée en JUSTESSE (0 FP partout où l'ordre et la
+partie s'accordent), PAS en GAIN — aucune mesure d'états épargnés. Prochaine étape convenue :
+câbler en régime séparé (comme le motif du §6.1), canari sur les 15 résolus, PUIS mesurer le gain
+sur 12/14/15/16 avec leur ordre humain injecté.
+
+**Outils neufs, tous dans `scratchpad/` (à rapatrier si retenus) :**
+- `gabarit.py <niv>` — un plateau par but actif, rien pré-rempli, pour dessiner une règle sans que
+  l'instrument ne la suggère (leçon du 2026-08-02 sur l'échec de la fiche « bénéficiaire »).
+- `juge_loi.py` — juge une loi de cases mortes sur TOUTES les parties humaines gagnantes du
+  répertoire, avec option d'ordre injecté. Réutilisable pour toute règle future du même genre.
+
+**Reste ouvert :**
+- [ ] Coder la loi en régime séparé et mesurer le GAIN (états épargnés) sur 12/14/15/16.
+- [ ] Vérifier 18, 22, 26 en rejouant leur ordre CALCULÉ à la main (pas en le condamnant sur écart).
+- [ ] Réparer les 284 ancres `coup N/M` périmées des fichiers d'intentions (2026-08-02) — calculable
+  exactement, testé reproductible sur 5 niveaux depuis `f3bf1fb`, ZÉRO ancre perdue. Non fait
+  aujourd'hui, la session a bifurqué sur la critique du solveur.
 
 #### 🎯 Session du 2026-07-28 — MESURE PRÉALABLE du PLONGEON (avant toute ligne de solveur)
 

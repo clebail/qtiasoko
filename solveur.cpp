@@ -19,7 +19,8 @@ QVector<Solveur::SType> Solveur::types() {
         {AstarMacroCouplage, "A* macro — but du couplage"},
         {AstarMacroPlongeon, "A* macro — plongeon sur record (essai)"},
         {AstarMacroCouplagePlongeon, "A* macro — couplage + plongeon (essai)"},
-        {AstarMacroCouplagePlongeonOrdre, "A* macro — couplage + plongeon + ordre dynamique (essai)"}
+        {AstarMacroCouplagePlongeonOrdre, "A* macro — couplage + plongeon + ordre dynamique (essai)"},
+        {AstarMacroCouplagePlongeonCoins, "A* macro — couplage + plongeon + buts en coin dans l'ordre (essai)"}
     };
 }
 
@@ -48,6 +49,11 @@ Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
             depart.setOrdreDynamique(true);
             return new SolveurAStar(depart, 1, true, parent, true, true);
         }
+        // BUTS EN COIN DANS L'ORDRE (§6.2, 2026-08-03) : une caisse ne peut pas se
+        // poser sur un but en coin dont le rang dépasse l'actif. Régime d'ESSAI :
+        // la règle repose sur la justesse de l'ordre, pas sur la géométrie.
+        case AstarMacroCouplagePlongeonCoins:
+            return new SolveurAStar(etatDepart, 1, true, parent, true, true, true);
     }
     return nullptr;
 }
