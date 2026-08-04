@@ -20,7 +20,8 @@ QVector<Solveur::SType> Solveur::types() {
         {AstarMacroPlongeon, "A* macro — plongeon sur record (essai)"},
         {AstarMacroCouplagePlongeon, "A* macro — couplage + plongeon (essai)"},
         {AstarMacroCouplagePlongeonOrdre, "A* macro — couplage + plongeon + ordre dynamique (essai)"},
-        {AstarMacroCouplagePlongeonCoins, "A* macro — couplage + plongeon + buts en coin dans l'ordre (essai)"}
+        {AstarMacroCouplagePlongeonCoins, "A* macro — couplage + plongeon + buts en coin dans l'ordre (essai)"},
+        {AstarMacroCouplagePlongeonLoi, "A* macro — couplage + plongeon + loi de l'ordre (essai)"}
     };
 }
 
@@ -54,6 +55,11 @@ Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
         // la règle repose sur la justesse de l'ordre, pas sur la géométrie.
         case AstarMacroCouplagePlongeonCoins:
             return new SolveurAStar(etatDepart, 1, true, parent, true, true, true);
+        // LOI DE L'ORDRE (§6.2, 2026-08-03) : une caisse ne peut pas se tenir sur une
+        // case morte vue du BUT ACTIF. Régime d'ESSAI, même raison que ci-dessus —
+        // la règle repose sur la justesse de l'ordre, pas sur la géométrie.
+        case AstarMacroCouplagePlongeonLoi:
+            return new SolveurAStar(etatDepart, 1, true, parent, true, true, false, true);
     }
     return nullptr;
 }

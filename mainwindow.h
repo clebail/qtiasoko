@@ -281,6 +281,9 @@ private:
     QList<QPair<int, QList<Game::EDirection>>> recordsVus;   // (caisses posées, chemin)
     QComboBox* cbRecords = nullptr;
     void majListeRecords();
+    // Bascule de l'overlay gris des cases mortes de la loi de l'ordre (cf. wgame.h).
+    // ⚠️ OUTIL DE CHANTIER, à retirer avec le régime d'essai.
+    QCheckBox* cbMortesLoi = nullptr;
     Solveur *solveur = nullptr;
     QTimer timerRejeu;
     QList<Game::EDirection> coupsRestants;

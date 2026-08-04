@@ -73,3 +73,6 @@
 [manque]      #  ##@  #
 [manque]      #########
 [intention] coup 186/368 | RAPPROCHER (du but) | posees 5/10 | joueur (8,8)
+
+=== niveau 6 — annotation du 2026-08-04 11:04:30 — 328 coups (0 par macro) ===
+[intention] coup 0/328 | ECARTER (du chemin d'une autre caisse) | posees 0/10 | joueur (9,1)

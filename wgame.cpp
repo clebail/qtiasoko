@@ -266,6 +266,12 @@ void WGame::paintEvent(QPaintEvent *event) {
     QVector<bool> zoneJoueur;
     if (showZone) game->getZoneJoueur(zoneJoueur);
 
+    // CASES MORTES DE LA LOI DE L'ORDRE — même parti que la zone ci-dessus : lues
+    // sur le Game affiché, à chaque tracé. La tranche dépend du BUT ACTIF, donc elle
+    // change dès qu'un but se remplit ; la stocker la rendrait fausse en silence.
+    QVector<bool> mortesLoi;
+    if (showMortesLoi) mortesLoi = game->casesMortesLoi(game->butActif());
+
     for (int y = 0; y < hauteur; y++) {
         for (int x = 0; x < largeur; x++) {
             const int idx = x + y * largeur;
@@ -309,6 +315,36 @@ void WGame::paintEvent(QPaintEvent *event) {
             // nulle part ailleurs, et 100 d'alpha se voit sans masquer le sprite.
             // Ce qu'on vient y lire, c'est la DIFFÉRENCE entre deux instants :
             // quelles cases s'ouvrent quand une caisse bouge (compte « Zj »).
+            // CASES MORTES — aplat gris, peint EN PREMIER de toutes les surcouches.
+            // C'est une propriété du décor (« ici une caisse serait perdue »), pas un
+            // événement : elle doit passer SOUS le trajet d'une macro ou la zone du
+            // joueur, qui eux se lisent par-dessus. Gris neutre, seule teinte encore
+            // libre — bleu = macro, violet = zone, vert = caisse amorçable, rouge =
+            // case signalée.
+            //
+            // DEUX GRIS, et la distinction est le fond de l'affaire (constat
+            // utilisateur, 2026-08-04 : « c'était bien de voir TOUTES les cases mortes
+            // du plateau, pas seulement les dynamiques ») :
+            //   PÂLE  = la table ORDINAIRE, vraie pour toute la partie. C'est là que
+            //           vivent les coins qui ne sont pas des buts — rien n'en sort,
+            //           donc ils n'atteignent aucun but, donc ils y sont depuis
+            //           toujours. Ne bouge jamais.
+            //   FONCÉ = le SURPLUS de la loi de l'ordre, qui dépend du but ACTIF et
+            //           change donc à chaque but rempli. C'est ce qu'on vient lire.
+            // Les afficher du même gris rendrait la loi illisible : ses quelques cases
+            // se noieraient dans un décor permanent qui, lui, n'apprend rien.
+            // ⚠️ Restreint à l'INTÉRIEUR du plateau : tout le remplissage hors contour
+            // est mort dans la table ordinaire (il n'atteint évidemment aucun but), et
+            // le peindre passerait tout le pourtour au gris pour ne rien dire.
+            if (showMortesLoi && interieur.value(idx, false) && game->caseMorteOrdinaire(idx)) {
+                painter.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
+                                  QColor(0x90, 0x90, 0x90, 90));
+            }
+            if (idx < mortesLoi.size() && mortesLoi[idx]) {
+                painter.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
+                                  QColor(0x30, 0x30, 0x30, 150));
+            }
+
             if (idx < zoneJoueur.size() && zoneJoueur[idx]) {
                 painter.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
                                   QColor(0x9c, 0x27, 0xb0, 100));

@@ -62,6 +62,16 @@ public:
     void showZoneJoueur(bool on) { showZone = on; update(); }
     bool zoneJoueurVisible() const { return showZone; }
 
+    // CASES MORTES DE LA LOI DE L'ORDRE (2026-08-03) : aplat GRIS sur les cases où
+    // une caisse serait condamnée VU DU BUT ACTIF (règle et portée dans game.h).
+    // Sert à suivre la loi en direct pendant le rejeu du chemin du solveur — c'est
+    // la seule façon de voir POURQUOI elle couperait un état, et de repérer une
+    // règle trop mordante avant de la mesurer.
+    // ⚠️ Recalculé AU TRACÉ depuis le Game affiché, jamais stocké : la table change
+    // à chaque but rempli, et une surcouche périmée ne se voit pas — le même piège
+    // que la zone du joueur, et que la zone du 1ᵉʳ pas de la macro (§6.3).
+    void showCasesMortesLoi(bool on) { showMortesLoi = on; update(); }
+
     // LA POUSSÉE COURANTE EST-ELLE ANNOTABLE ? (2026-08-02, constat utilisateur :
     // « si une poussée n'est pas la mienne, il faut que je le voie en interface, je
     // ne peux pas le deviner »). idxCase = la caisse qui vient d'être poussée, -1
@@ -174,6 +184,7 @@ private:
     bool montreOrdreButs = false;
     QVector<bool> arbreMacro;
     bool showZone = false;
+    bool showMortesLoi = false;
     int  caissePoussee = -1;
     bool pousseeChoisie = false;
     QVector<int>  apercuOrdre;

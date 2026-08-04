@@ -26,9 +26,19 @@ static bool compare(const SolveurAStar::SElement& a, const SolveurAStar::SElemen
 }
 
 SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, bool macro, QObject *parent,
-                           bool macroCouplage, bool plongeon, bool ordreCoins)
+                           bool macroCouplage, bool plongeon, bool ordreCoins, bool loiOrdre)
     : Solveur(etatDepart, parent), poids(poids), macro(macro), macroCouplage(macroCouplage),
-      ordreCoins(ordreCoins), plongeon(plongeon) {
+      ordreCoins(ordreCoins), loiOrdre(loiOrdre), plongeon(plongeon) {
+}
+
+// rangDeCase[cell] : rang de remplissage du but occupant cette case, -1 si ce n'est
+// pas un but. Une seule table pour les deux régimes qui en ont besoin.
+void SolveurAStar::construitRangDeCase(const Game& g) {
+    if (!rangDeCase.isEmpty()) return;                  // déjà construite
+    rangDeCase.fill(-1, g.getLargeur() * g.getHauteur());
+    const QVector<int>& ordre = g.getOrdreButs();
+    for (int k = 0; k < ordre.size(); k++)
+        rangDeCase[g.getCaseBut(ordre[k])] = k;
 }
 
 // ── BUTS EN COIN (régime 'ordreCoins', cf. solveurastar.h) ────────────────────
@@ -40,13 +50,12 @@ SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, bool macro, QObjec
 // faut la case d'arrivée ET la case d'appui libres de mur, sur le même axe.
 void SolveurAStar::construitTablesCoins(const Game& g) {
     const int L = g.getLargeur(), H = g.getHauteur(), N = L * H;
-    rangDeCase.fill(-1, N);
+    construitRangDeCase(g);
     coinDeCase.fill(false, N);
     const QVector<int>& ordre = g.getOrdreButs();
     static const int dxx[4] = {1, -1, 0, 0}, dyy[4] = {0, 0, 1, -1};
     for (int k = 0; k < ordre.size(); k++) {
         const int cell = g.getCaseBut(ordre[k]);
-        rangDeCase[cell] = k;
         const int x = cell % L, y = cell / L;
         bool sortie = false;
         for (int d = 0; d < 4 && !sortie; d++) {
@@ -76,6 +85,59 @@ bool SolveurAStar::coinTropTot(const Game& e, int arrivee) const {
     if (actif < 0) return false;                       // plus de but : état gagnant
     const int cellActif = e.getCaseBut(actif);
     return rangDeCase[arrivee] > rangDeCase[cellActif];
+}
+
+// ── LOI DE L'ORDRE (régime 'loiOrdre') ────────────────────────────────────────
+// Stats de chantier, mêmes raisons que StatsCorral/StatsPaquet : runtime, lues sans
+// recompiler. 'balayages' compte les passes complètes — c'est lui qui dit si le coût
+// est resté là où on l'a voulu.
+struct StatsLoi { qint64 enfilages = 0, prunes = 0, balayages = 0, gel = 0; };
+static StatsLoi& statsLoi() { static StatsLoi s; return s; }
+
+// Vrai = une caisse se tient sur une case morte vue du but actif → on coupe.
+//
+// QUELLES CAISSES SONT JUGÉES. Toutes, sans exception ici : l'exemption des buts
+// déjà remplis (« buts déjà remplis = obstacles ») est portée par la TABLE, qui les
+// rend vivants d'office. Elle a d'abord été écrite à cet endroit-ci, en double — le
+// juge du gabarit a montré que la table devait la porter de toute façon, sans quoi
+// l'overlay de l'UI ne montrait pas la même règle que le solveur appliquait. Un seul
+// exemplaire, dans game.cpp.
+//
+// POURQUOI ON NE BALAIE PAS TOUTES LES CAISSES À CHAQUE FOIS. Si le parent
+// satisfaisait déjà la règle, seule la caisse déplacée peut la violer — sauf si le
+// BUT ACTIF a changé, auquel cas toutes changent de juge d'un coup. Or l'actif ne
+// change que lorsqu'un but vient d'être rempli, c'est-à-dire quand la caisse arrivée
+// se pose sur un but. Ce test-là est local et gratuit, donc le balayage complet ne
+// se paie qu'une poignée de fois par chemin au lieu d'une fois par enfilage.
+bool SolveurAStar::loiTropTot(const Game& e, int arrivee) const {
+    if (!loiOrdre) return false;
+    const int actif = e.butActif();
+    if (actif < 0) return false;                        // plus de but : état gagnant
+    StatsLoi& s = statsLoi();
+    s.enfilages++;
+
+    auto condamne = [&](int cell) { return e.caseMorteLoi(actif, cell); };
+
+    if (arrivee >= 0 && condamne(arrivee)) { s.prunes++; return true; }
+
+    if (arrivee >= 0 && e.getCase(arrivee) == Level::tcGoalCaisse) {
+        s.balayages++;
+        const int N = e.getLargeur() * e.getHauteur();
+        for (int c = 0; c < N; c++) {
+            const Level::ETypeCase t = e.getCase(c);
+            if (t != Level::tcCaisse && t != Level::tcGoalCaisse) continue;
+            if (condamne(c)) { s.prunes++; return true; }
+        }
+    }
+
+    // SECONDE MOITIÉ DE LA LOI — le gel hors tour (cf. game.h). Testé à CHAQUE
+    // enfilage et pas seulement quand le but actif change : une caisse posée hors
+    // tour peut geler à tout moment, dès qu'une AUTRE caisse vient se coller à elle.
+    // C'est le cas du bloc 2×2 du 2026-08-04, dont les quatre caisses étaient libres
+    // une par une et mortes ensemble.
+    if (e.geleHorsTour(actif)) { s.gel++; s.prunes++; return true; }
+
+    return false;
 }
 
 #ifdef DUMP_DEV
@@ -387,6 +449,7 @@ int SolveurAStar::plonge(const Game& etatDepart, int gDepart, int idxNoeudDepart
             if (inf.dursMorts > 0) return;
         }
         if (coinTropTot(c, arrivee)) return;
+        if (loiTropTot(c, arrivee)) return;
         // PAQUET NON LIVRABLE — même test qu'à l'enfilage principal, même cache.
         // Sans lui le plongeon explorait des états que la recherche refusait.
         if (paquetActif() && arrivee >= 0) {
@@ -554,6 +617,20 @@ void SolveurAStar::run() {
     // soutenable malgré 10-21 % d'enfilages qui déclenchent une preuve. Local au
     // run : rien à réinitialiser d'un solve à l'autre.
     if (ordreCoins) construitTablesCoins(etat);
+    if (loiOrdre) {
+        // La densité de la table DÉCIDE si le régime peut rapporter quoi que ce
+        // soit : à 0 case morte par but il ne coupera rien, et il vaut mieux le lire
+        // au démarrage que de l'apprendre après une heure de solve.
+        qint64 total = 0;
+        const int N = etat.getLargeur() * etat.getHauteur();
+        for (int j = 0; j < etat.getNbButs(); j++)
+            for (int c = 0; c < N; c++) if (etat.caseMorteLoi(j, c)) total++;
+        fprintf(stderr, "[LOI] regime loiOrdre ACTIF — %.1f cases mortes par but "
+                        "en moyenne (%d buts, %d cases).\n",
+                etat.getNbButs() ? (double)total / etat.getNbButs() : 0.0,
+                etat.getNbButs(), N);
+        fflush(stderr);
+    }
     QHash<QByteArray,Game::VerdictEnclos> cacheEnclos;
     // Mémoïsation du paquet non livrable (chantier PAQUET=1). Même argument que
     // cacheEnclos : le verdict ne dépend que du paquet trié. Mesuré ×223 à ×1040
@@ -677,6 +754,18 @@ void SolveurAStar::run() {
             // de run() : un run tué (c'est le cas de tous les non-résolus, donc de
             // toutes les cibles) n'en rendait aucune. Même trou que [CORRAL-N] et que
             // le profilage du §6.6 — seul ce qui part en continu se relève.
+            if (loiOrdre) {
+                const StatsLoi& l = statsLoi();
+                fprintf(stderr, "[LOI] enfilages=%lld PRUNES=%lld (%.2f%%)"
+                                " dont GEL hors tour=%lld"
+                                " | balayages complets=%lld (%.2f%% des enfilages)\n",
+                        (long long)l.enfilages, (long long)l.prunes,
+                        l.enfilages ? 100.0 * (double)l.prunes / (double)l.enfilages : 0.0,
+                        (long long)l.gel,
+                        (long long)l.balayages,
+                        l.enfilages ? 100.0 * (double)l.balayages / (double)l.enfilages : 0.0);
+                fflush(stderr);
+            }
             if (paquetActif()) {
                 const StatsPaquet& p = statsPaquet();
                 const qint64 calculs = p.testes - p.cacheHits;   // vrais sous-solves
@@ -813,6 +902,7 @@ void SolveurAStar::run() {
                 if (inf.dursMorts > 0) { sd.enfilagesPrunes++; return; }
             }
             if (coinTropTot(e, arrivee)) return;
+            if (loiTropTot(e, arrivee)) return;
             // PAQUET NON LIVRABLE (chantier, PAQUET=1 — cf. solveurastar.h).
             // Vient APRÈS le corral : ce qu'il attrape est précisément ce que le
             // corral laisse passer, et le mesurer derrière lui donne le surplus.

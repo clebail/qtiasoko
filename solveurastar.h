@@ -193,9 +193,18 @@ public:
     // le canari des résolus ne doit jamais en dépendre. Même statut que le
     // plongeon et le pondéré.
     // ⚠️ Sans effet sur 3 niveaux (0, 13, 29) : aucun but en coin.
+    //
+    // 'loiOrdre' (régime d'essai, §6.2, 2026-08-03) : LA LOI DE L'ORDRE, la
+    // formulation qui a survécu là où celle des coins ci-dessus tombe (le niveau 6
+    // y passe de résolu à AUCUNE). Une caisse ne peut pas se tenir sur une case
+    // MORTE VUE DU BUT ACTIF — les autres buts étant du sol, et l'alignement avec
+    // l'actif rendant la case au sol. La règle et sa portée sont dans game.h ; ici
+    // ne vit que son câblage. Même statut que 'ordreCoins' : régime séparé, jamais
+    // le défaut, le canari des résolus ne doit pas en dépendre.
     explicit SolveurAStar(const Game& etatDepart, int poids = 1, bool macro = false,
                           QObject* parent = nullptr, bool macroCouplage = false,
-                          bool plongeon = false, bool ordreCoins = false);
+                          bool plongeon = false, bool ordreCoins = false,
+                          bool loiOrdre = false);
 
 protected:
     void run() override;
@@ -220,13 +229,21 @@ private:
     const bool macro;
     const bool macroCouplage;
     const bool ordreCoins;
-    // Tables du régime 'ordreCoins', remplies une fois au début de run() depuis
-    // l'API publique de Game : rien n'est ajouté à Game, rien n'est maintenu en
-    // double. rangDeCase[cell] = rang de remplissage du but, -1 si pas un but.
+    const bool loiOrdre;
+    // Tables remplies une fois au début de run() depuis l'API publique de Game :
+    // rien n'est ajouté à Game, rien n'est maintenu en double.
+    // rangDeCase[cell] = rang de remplissage du but occupant cette case, -1 sinon.
+    // PARTAGÉE par 'ordreCoins' et 'loiOrdre' : les deux ont besoin de comparer le
+    // rang d'une case au rang du but actif, et deux copies dériveraient (§7).
     QVector<int>  rangDeCase;
     QVector<bool> coinDeCase;
+    void construitRangDeCase(const Game& g);
     void construitTablesCoins(const Game& g);
     bool coinTropTot(const Game& e, int arrivee) const;
+    // LOI DE L'ORDRE : vrai si une caisse se tient sur une case morte vue du but
+    // actif. Appelée aux DEUX points d'enfilage — la leçon du 2026-08-03 sur le
+    // paquet, où le plongeon explorait ce que la recherche refusait.
+    bool loiTropTot(const Game& e, int arrivee) const;
     const bool plongeon;
 };
 

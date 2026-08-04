@@ -59,7 +59,12 @@ public:
         AstarMacroCouplagePlongeonOrdre,
         // Régime d'essai (§6.2, 2026-08-03 — idée utilisateur) : ordre strict sur
         // les seuls buts EN COIN. Cf. solveurastar.h pour le fondement et la limite.
-        AstarMacroCouplagePlongeonCoins
+        AstarMacroCouplagePlongeonCoins,
+        // Régime d'essai (§6.2, 2026-08-03) : LA LOI DE L'ORDRE — cases mortes
+        // recalculées but par but, exemptées par alignement. C'est la formulation
+        // qui a survécu au juge là où celle des coins ci-dessus perd le niveau 6.
+        // Règle dans game.h, câblage dans solveurastar.h.
+        AstarMacroCouplagePlongeonLoi
     };
 
     struct SType {

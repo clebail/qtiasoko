@@ -56,6 +56,25 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             if (i >= 0 && i < recordsVus.size())
                 chargeCheminVisionne(departSolveur, recordsVus[i].second, false);
         });
+
+        // Cases mortes de la LOI DE L'ORDRE (§6.2, 2026-08-03), en gris sur le
+        // plateau. Une CASE À COCHER et non un armement automatique au rejeu :
+        // trois surcouches ont déjà survécu à ce qui les justifiait (la zone armée
+        // hors rejeu, la marque de poussée hors annotation, le journal d'intentions
+        // par-dessus un changement de niveau), et à chaque fois parce que leur état
+        // était implicite. Ici la case cochée EST la règle, elle se voit.
+        cbMortesLoi = new QCheckBox("Cases mortes (loi de l'ordre)", cbEtatMax->parentWidget());
+        cbMortesLoi->setFocusPolicy(Qt::NoFocus);
+        cbMortesLoi->setToolTip("Gris PÂLE : cases mortes ordinaires, vraies toute la partie "
+                                "(dont les coins qui ne sont pas des buts).\n"
+                                "Gris FONCÉ : le surplus de la loi de l'ordre — une caisse "
+                                "posée là n'atteindrait plus le BUT ACTIF, les autres buts "
+                                "comptant pour du sol, sauf si la case est alignée avec lui "
+                                "sans mur entre les deux. Suit le but actif en direct.");
+        lay->insertWidget(lay->indexOf(cbEtatMax) + 2, cbMortesLoi);
+        connect(cbMortesLoi, &QCheckBox::toggled, this, [this](bool on) {
+            wGame->showCasesMortesLoi(on);
+        });
     }
 
     for (const Solveur::SType& t : Solveur::types()) {

@@ -72,7 +72,9 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `bench <fichier.xsb> record` → `.chemin` | **(neuf, 2026-08-03)** à côté de chaque `.xsb` exporté, une lettre par coup (H/D/B/G, ordre de `EDirection`) : permet de rejouer le chemin d'un record HORS de l'app, pour le passer à `mort`/`fp` |
 | `paquet <niv> [depiles] [budget] [mode]` | **(neuf, 2026-08-03)** fréquence + coût du motif « paquet de caisses hors but non livrable » (cf. §6.1). `paquet <fichier.xsb> [budget]` = mode JUGE, verdict MORT/vivant/inconnu sur UN plateau — sert de `fp` pour ce motif |
 | `gabarit.py <niv>` | **(neuf, 2026-08-03, scratchpad)** un plateau ASCII par but ACTIF (buts déjà remplis affichés comme posés, rien pré-rempli) — support pour DESSINER une règle de cases mortes à la main sans que l'instrument ne suggère le vocabulaire (cf. §6.2) |
-| `juge_loi.py` | **(neuf, 2026-08-03, scratchpad)** juge une loi de cases mortes contre TOUTES les parties humaines gagnantes d'un coup (murs seuls, ordre injectable) : toute caisse sur une case déclarée morte est un faux positif PROUVÉ. A validé la loi du §6.2 sur 21/24 parties, et localisé les 3 exceptions à des ordres faux |
+| `juge_loi.py` | **(neuf, 2026-08-03, scratchpad)** juge une loi de cases mortes contre TOUTES les parties humaines gagnantes d'un coup (murs seuls, ordre injectable) : toute caisse sur une case déclarée morte est un faux positif PROUVÉ. A validé la loi du §6.2 sur 21/24 parties, et localisé les 3 exceptions à des ordres faux. ⚠️ **PERDU avec le scratchpad de sa session** — les scratchpads sont éphémères, tout outil qui doit resservir se rapatrie dans `mesures/` le jour même |
+| `loi <niv> [gabarit.txt]` | **(neuf, 2026-08-04)** LE JUGE DE LA LOI DE L'ORDRE (§6.2). Sans argument : la table des cases mortes but par but. Avec un gabarit : compare la table CALCULÉE au dessin FAIT À LA MAIN, case par case, et sort non nul au moindre écart — la loi n'étant dérivée d'aucun théorème, ce dessin est sa seule vérité de référence, et le canari ne verrait jamais un écart (un élagage trop mordant ne casse que des niveaux qu'on ne finit pas). Compare le **SURPLUS** (loi moins table ordinaire). Accepte aussi un `.xsb` : verdict `geleHorsTour` + cases mortes sur un plateau isolé |
+| `porte <niv>` | **(neuf, 2026-08-04) LA PRÉCÉDENCE CAISSE → BUT** — d'espèce neuve, toutes les autres sont but → but. *Si remplir G prive le joueur de TOUS les appuis d'une caisse C, alors C doit avoir bougé avant G.* Statique, O(caisses × buts × plateau), relaxation optimiste (une contrainte est une preuve, un silence ne promet rien). ⚠️ Une poussée dont la destination est une case MORTE ne compte pas comme une issue — sans ce test l'outil est muet. Rend **0 sur les 15 résolus**, et 2 sur 18 non résolus : le 16 (avant le rang 0) et le 30 |
 
 **Règles de mesure, non négociables :**
 - **Comparer un binaire à un AUTRE binaire** (ancien reconstruit depuis `HEAD` via
@@ -3465,6 +3467,216 @@ sur 12/14/15/16 avec leur ordre humain injecté.
 - [ ] Réparer les 284 ancres `coup N/M` périmées des fichiers d'intentions (2026-08-02) — calculable
   exactement, testé reproductible sur 5 niveaux depuis `f3bf1fb`, ZÉRO ancre perdue. Non fait
   aujourd'hui, la session a bifurqué sur la critique du solveur.
+
+#### 🎯 Session du 2026-08-04 — LA LOI CODÉE ET JUGÉE, le GEL HORS TOUR, et une précédence d'espèce neuve
+
+**Trois choses, dans cet ordre : la loi du 2026-08-03 passe du dessin au code ; sa seconde moitié
+(le gel) apparaît en cours de route ; et la bisection d'une partie humaine du 16 produit une règle
+CAISSE → BUT que le projet n'avait pas.**
+
+---
+
+**LA LOI, CODÉE — et elle était presque GRATUITE.** `distanceParBut` fait **déjà** un BFS à rebours
+**par but**, sur les murs seuls (aucune caisse, aucun autre but en obstacle) — soit exactement la vue
+sous laquelle la loi a été dessinée et jugée. Il ne restait qu'une réduction booléenne au chargement,
+`mortesLoi[BUT * size + CASE]`, plus `rangDeBut`. Table PLATE et non un vecteur de vecteurs : le
+solveur copie `Game` par candidate, un `QVector<QVector<bool>>` coûterait nbButs incréments de
+compteur par copie là où la table plate n'en coûte qu'un.
+
+**La règle finale, en quatre temps** (les trois derniers sont des précisions de l'utilisateur, données
+à l'écran sur des captures du 16 puis du 6) :
+1. **cases mortes calculées tous les buts supprimés SAUF l'actif** ;
+2. une case ainsi morte redevient du sol si elle est **ALIGNÉE** avec le but actif — et
+   **l'alignement s'arrête au premier MUR** : « aligné » veut dire qu'on pourrait encore pousser en
+   ligne droite jusqu'au but ;
+3. **la mort dynamique ne concerne QUE les cases-buts.** Une case ordinaire qui n'atteint pas le but
+   actif reste un garage licite : la caisse qui s'y trouve attendra le but qu'elle sait servir. La
+   condamner serait le §4 en énième déguisement ;
+4. les buts de rang **inférieur** à l'actif sont **exemptés** (rangés à leur tour, donc obstacles).
+
+⚠️ **Un coin n'est jamais exempté par l'alignement** : d'un coin on ne pousse nulle part, l'exemption
+n'a donc pas de sens là. Sans ce point la loi ratait précisément les BUTS en coin, seuls endroits où
+le corner deadlock n'est pas déjà connu — un but est sa propre graine du BFS à rebours, donc jamais
+mort dans la table ordinaire.
+
+⚠️ **RIEN NE DÉPARTAGE ENCORE LES DEUX VERSIONS DE L'ALIGNEMENT** — vérifié, pas supposé : le gabarit
+du 16 rend **15 plateaux sur 15 avec l'arrêt au mur COMME avec la version littérale**. La version
+retenue tient de l'énoncé de son auteur, pas d'un juge, et c'est la plus mordante des deux. Un niveau
+où elles diffèrent reste à trouver.
+
+**LE JUGE — `mesures/loi` (NEUF).** `loi <niv> <gabarit.txt>` compare la table CALCULÉE au dessin
+FAIT À LA MAIN, case par case, et sort non nul au moindre écart. Il a trouvé un vrai bug : le
+quatrième temps (buts déjà remplis = obstacles) n'était câblé que dans le SOLVEUR, si bien que
+**l'overlay de l'UI montrait une autre règle que celle que le solveur appliquait**. Porté dans la
+table, en un seul exemplaire. ⚠️ Ce juge compare le **SURPLUS** (loi moins table ordinaire) : c'est
+ce que l'utilisateur a dessiné, le reste étant coupé par `checkDefaite` depuis toujours.
+
+⚠️ **Le gabarit du 16 ne valide plus la loi, et c'est voulu** : 8 écarts, tous exactement les deux
+buts en coin ajoutés à la demande — (12,11) aux rangs 0-3, (8,11) aux rangs 6-9. **Le dessin du
+3 août est antérieur à la précision du 4.** À redessiner si on veut garder un juge vert.
+
+---
+
+**LE GEL HORS TOUR — la seconde moitié, et elle ne coûte rien à écrire.** Constat utilisateur sur un
+plateau exporté du 16 : *« quatre caisses collées les unes aux autres sur du sol, c'est mort
+assuré »*. Elles étaient sur des BUTS (rangs 10, 12, 13, 14) alors que l'actif était le rang 0 — donc
+sur du **sol**, au sens de la loi. Or `caisseGelee`/`bloqueeSurAxe` travaillent déjà sur
+`estCaisse()`, qui couvre `tcCaisse` **et** `tcGoalCaisse` : le seul obstacle était la boucle de
+`checkDefaite`, qui ne présente que les `tcCaisse`. `Game::geleHorsTour(butActif)` lève cette
+exemption pour les buts de rang supérieur. **Rien de neuf n'est calculé.**
+
+Pourquoi les trois détecteurs existants sont aveugles à ce motif, chacun pour une raison juste au
+niveau de la CAISSE et fausse au niveau de la RÉGION :
+
+| détecteur | la ligne |
+|---|---|
+| `checkDefaite` (game.cpp:213) | « ne teste que les tcCaisse : une caisse gelée SUR un but est un morceau de la solution » |
+| gate du corral-N (game.cpp:1126) | `if (frontHorsBut == 0) continue;` — les caisses-frontière étaient sur des buts, **la région est abandonnée avant toute preuve** |
+| motif du paquet | défini sur un groupe de caisses **hors but** |
+
+**Le plateau était bien MORT** : réduit à UNE caisse hors but (méthode de réduction de l'utilisateur,
+2026-08-03), l'A\* pur épuise l'espace en **10 états**. Le juge `paquet` rendait « inconnu ».
+
+⚠️ **Ce n'est pas une preuve** : une caisse gelée sur un but de rang supérieur remplit quand même ce
+but, la partie reste gagnable dans l'absolu. Même statut que la loi — une exigence d'ORDRE — donc
+régime séparé.
+
+⚠️ **PREMIÈRE FOIS QUE L'ORACLE NE CONFIRME PAS UN DIAGNOSTIC HUMAIN** (le plan comptait 6 sur 6). Un
+premier état annoté « deadlock créé, les caisses (8,10) et (9,10) ne peuvent plus être bougées » ne
+tenait pas : les deux étaient poussables, `paquet` rendait inconnu, les réductions à 1-3 caisses
+étaient toutes solubles, et A\* posait **6 caisses de plus** depuis là. L'utilisateur en a convenu et
+a exporté le bon plateau. **Le mécanisme qui a permis de trancher est la réduction, pas l'A\* complet.**
+
+---
+
+**LE RÉGIME `loi` — canari, binaire contre binaire, hors du répertoire du projet :**
+
+| niv | `coupl-plongeon` | `loi` + gel | |
+|---|---|---|---|
+| 0-5, 17 | — | **identiques, poussées intactes** | |
+| **7** | 24 989 / 90 | **24 400 / 90** | **247 prunes de GEL** |
+| 9 | 83 029 / 237 | **82 106** / 237 | 860 prunes de loi |
+| **6** | 570 / 110 | **AUCUNE** | gel = **0** |
+
+**Le 6 est perdu par la LOI, pas par le gel, et la loi a raison sur le fond.** Son ordre calculé pose
+(2,5), (2,4), (2,3) aux rangs 0-1-2, or **on n'entre en (1,y) qu'en poussant vers l'ouest depuis
+(2,y)** : colonne 2 remplie, la colonne 1 est inatteignable. La loi tue donc toute la colonne 1 dès
+le rang 0. Cet ordre **est** infaisable — le 6 rejoint 12/14/15, les niveaux dont la loi détecte que
+l'ordre calculé est faux. Le prix : en régime `loi` avec l'ordre par défaut, le 6 n'est plus résolu.
+
+🔴 **UN VERDICT PUBLIÉ PUIS RETIRÉ, ET LE §7 EN EST LA CAUSE.** « Le 6 tombe à cause de la règle des
+coins » a été annoncé, puis retiré, puis re-établi autrement — parce que **`ordre_niveau_0006.txt`
+traînait à la racine et s'injectait dans tout run du 6 lancé de là**, et que son contenu a changé
+entre deux séries. Deux mesures du même niveau, incomparables, sans que rien ne le signale. C'est
+exactement ce que l'entrée du §1 redoutait pour ce mécanisme (« bruyant des deux côtés » — la ligne
+`[ORDRE_FICHIER]` était bien là, personne ne l'a lue). **Toute mesure sur un niveau doit se lancer
+d'un répertoire sans fichier d'ordre**, ou vérifier la ligne d'en-tête.
+
+---
+
+**LE 16 BISECTÉ — et le témoin d'incomplétude le plus net du projet.**
+
+L'utilisateur joue le 16 en hybride et exporte deux positions. Miroir Python du parseur de journal,
+**validé avant lecture** : rejeu des 238 coups de la dernière partie (45 poussées, 6 `[undo]`
+appliqués), plateau final **identique à l'octet** à l'export. Puis une position par poussée, et une
+bisection au solveur (`coupl-plongeon`, 30 s) :
+
+| position | verdict |
+|---|---|
+| p45 (fin) | ✅ **résolu — 45 états, 147 poussées** |
+| **p44** | ❌ **`AUCUNE` en UN SEUL état exploré** |
+| p01, p23, p34, p39, p42, p43 | non résolues |
+
+> **Le régime d'engagement de la macro n'enfile AUCUN enfant depuis p44, alors qu'une poussée légale
+> mène à p45, qu'il résout en 45 états.** Le §6.0 énonce l'incomplétude du régime depuis toujours ;
+> ici elle est démontrée **à un coup près**, sur un témoin minimal et reproductible. (A\* pur, complet,
+> confirme que p44 est vivant : 5 M états, file qui monte, `max 9/15`.)
+
+⚠️ Ces plateaux rechargent leur statique (§7) — mais le but actif recalculé est **(12,7) rang 0** sur
+p043, p044 ET p045, donc la comparaison porte bien sur la même question.
+
+**La poussée qui bascule tout** : `joueur (11,6)->(10,6) POUSSE caisse ->(9,6)`. Le joueur, venu par
+le couloir droit jusqu'en (11,6), déloge la caisse de **(10,6) vers l'ouest**.
+
+**LES DEUX SUBTILITÉS DU 16, énoncées par l'utilisateur et vérifiées :**
+1. **Il faut STOCKER trois caisses** en (11,10), (9,10) et (9,9) avant de boucher la colonne. C'est
+   une contrainte d'exécution, pas une préférence : aucune caisse n'entre par le couloir droit (elle
+   mourrait en (11,6)), donc les trois arrivent par la gauche et remontent la colonne une par une —
+   (12,10) → (12,9) → (12,8) → (12,7) — et **une fois (12,9) posée, plus rien ne remonte**. La
+   rangée 11 ne sert à rien pour ça : rien n'en sort (la rangée 12 est un mur continu, donc aucune
+   poussée vers le nord n'a d'appui), une caisse qui y descend n'en repart jamais. **La loi disait
+   déjà exactement ça** — pour le but actif (12,7) elle déclare morte toute la rangée 11 et rien
+   d'autre. Premier endroit du projet où une règle calculée énonce une stratégie humaine.
+2. **La caisse (3,6) sert de passage entre le bas et le haut** et doit être manipulée plusieurs fois.
+   Test à une seule variable : remise en (3,6) dans la position gagnante, celle-ci **redevient dure**
+   (4,5 M dépilés, `max 12/15`, non résolue) là où elle se résolvait en 45 états.
+
+⚠️ **Le stock N'EST PAS le verrou** : depuis la position de stock réellement jouée, `coupl-plongeon`
+ET `loi` plafonnent au **même 8/15** en 180 s (file −22 % pour la loi, 879 081 prunes dont 4 440 gels
+— son premier vrai terrain). La difficulté est en aval du stock.
+
+---
+
+**🎯 LA RÈGLE QUI EN SORT — PRÉCÉDENCE CAISSE → BUT.** Toutes les précédences du projet sont
+but → but. Celle-ci est d'une autre espèce :
+
+> **Soit une caisse C, et A(C) l'ensemble des cases d'appui dont le joueur a besoin pour la pousser
+> dans une direction quelconque. Si remplir un but G prive le joueur de TOUT A(C), alors C doit avoir
+> été déplacée AVANT que G ne soit rempli** — sinon elle gèle à vie, sur du sol, hors but.
+
+Statique, `O(caisses × buts × plateau)`, calculable au chargement comme `precedenceGlobale`.
+**Relaxation optimiste** (le BFS de marche ignore toutes les autres caisses) : une contrainte trouvée
+est une PREUVE, un silence ne promet rien.
+
+⚠️ **LE RAFFINEMENT SANS LEQUEL ELLE NE VOIT RIEN, et il tient en une ligne : une poussée qui TUE la
+caisse n'est pas une issue.** Premier jet : 0 contrainte sur le 16. La caisse (10,6) a deux poussées
+géométriques, et celle vers l'est — appui (9,6), trivialement atteignable — masquait tout ; mais elle
+la dépose en (11,6), d'où rien ne sort jamais. En excluant les destinations qui sont des **cases
+mortes**, la contrainte apparaît.
+
+**Ce qu'elle rend (`mesures/porte`, NEUF) :**
+
+| | résultat |
+|---|---|
+| **les 15 RÉSOLUS** (témoins) | **0 contrainte partout** |
+| **les 18 non résolus** | **2 seulement** : le **16** (avant le rang **0**) et le **30** ((15,10) avant (16,8), rang 17) |
+| sur le 16 | `caisse (10,6) : à dégager AVANT (12,7)r0 (12,8)r1 (12,9)r2 (12,10)r3` |
+| **la partie humaine du 16** | ✅ **la respecte** — les quatre buts de la colonne sont VIDES au moment où (10,6) est dégagée |
+
+**C'est la stratégie de l'utilisateur, redérivée mécaniquement en quelques millisecondes.** Et la
+validation ne se limite pas au silence sur les témoins : une solution réelle vérifie la contrainte,
+sur le seul niveau où la règle parle.
+
+⚠️ **Muette sur 16 des 18 non résolus** — un motif précis, pas l'explication du mur. Ne pas
+généraliser (§11.4, commis trois fois le 2026-08-01).
+⚠️ **Elle ne doit JAMAIS couper** : c'est de l'ORDONNANCEMENT, pas de la solubilité (§6.2,
+2026-07-30 — la précédence par paires a fait 9 niveaux sur 10 en faute au juge `fp` quand on a voulu
+en faire un test de mort).
+
+**Reste ouvert :**
+- [ ] **Le solveur n'a aucun moyen d'obéir à cette précédence.** `ordreButs` ordonne des buts ; ici la
+  contrainte dit « dégage telle caisse d'abord » — c'est la catégorie `OUVRIR` du corpus d'intentions,
+  que rien dans le solveur n'exprime. **Point d'accroche existant** : le régime `ordre-dyn`, où
+  `butActif()` rend le premier but non rempli *encore livrable*. Y ajouter « … et dont la contrainte
+  de porte est satisfaite » rendrait (12,7) non éligible tant que (10,6) est en place. Petit, LOUD,
+  mesurable sur le 16 immédiatement.
+- [ ] **Le GAIN de la loi n'est mesuré nulle part** : 247 prunes de gel sur le 7 (−2,4 % d'états),
+  860 sur le 9, file ÷1,3 sur le 16 — aucun niveau débloqué. La loi est validée en JUSTESSE, pas en
+  RENDEMENT, et c'était déjà la réserve du 2026-08-03.
+- [ ] **Redessiner le gabarit du 16** avec la règle des coins, sinon `mesures/loi` reste rouge et ne
+  juge plus rien.
+- [ ] **Le 6 en régime `loi`** : accepter la perte (l'ordre calculé est réellement infaisable) ou
+  corriger l'ordre du 6. C'est le même arbitrage que 12/14/15.
+- [ ] **Le 30** est le seul autre niveau à contrainte de porte, et elle y est souple (rang 17). À
+  regarder si on cherche un second cas.
+
+**État du code** (non commité) : `game.cpp`/`game.h` — `mortesLoi`/`rangDeBut`/`calculCasesMortesLoi`,
+`casesMortesLoi` (le surplus, pour l'affichage), `caseMorteOrdinaire`, `geleHorsTour` ;
+`solveurastar.*` — régime `loiOrdre`, `loiTropTot` aux DEUX points d'enfilage, stats `[LOI]` ;
+`solveur.*` — type `AstarMacroCouplagePlongeonLoi` ; `mesures/bench.cpp` — mode `loi` ; `wgame.*` /
+`mainwindow.*` — overlay **deux gris** (pâle = table ordinaire, foncé = surplus de la loi, recalculé
+AU TRACÉ) + case à cocher. **Neufs** : `mesures/loi.cpp`/`.pro`, `mesures/porte.cpp`/`.pro`.
+Miroir de rejeu du journal : jetable, non versionné.
 
 #### 🎯 Session du 2026-07-28 — MESURE PRÉALABLE du PLONGEON (avant toute ligne de solveur)
 
