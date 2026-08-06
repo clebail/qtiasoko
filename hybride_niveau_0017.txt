@@ -1349,3 +1349,7 @@
 [mouv] joueur (7,3)->(6,3) POUSSE caisse ->(5,3) [POSE]
 [hybride] aucun but actif (etat gagne)
 [macro] TERMINEE
+
+=== niveau 17 — partie du 2026-08-06 12:09:06 ===
+[hybride] ordre de remplissage calcule : 0:(4,1) 1:(4,2) 2:(4,3) 3:(5,1) 4:(5,2) 5:(5,3)
+[hybride] posees 0/6 | but actif (4,1) rang 0/6 | 0 macro jouable -> POUSSEES SIMPLES

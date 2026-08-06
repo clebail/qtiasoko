@@ -267,7 +267,7 @@ void MainWindow::onNiveauChange(int index) {
     coupsMacro.clear();
     indicesPoussees.clear();
     posPas = 0;
-    wGame->showZoneJoueur(false);   // la zone n'est armée que par un rejeu (touche L)
+    wGame->showZoneJoueur(true);
 
     // ⚠️ FERMER LE JOURNAL D'INTENTIONS AU CHANGEMENT DE NIVEAU (2026-08-02). Il
     // n'était fermé que dans rejoueJournal(), donc il restait OUVERT sur le fichier

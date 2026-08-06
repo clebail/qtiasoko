@@ -1615,3 +1615,7 @@
 [hybride] aucun but actif (etat gagne)
 [macro] TERMINEE
 [hybride] aucun but actif (etat gagne)
+
+=== niveau 9 — partie du 2026-08-06 12:21:03 ===
+[hybride] ordre de remplissage calcule : 0:(15,1) 1:(14,1) 2:(15,2) 3:(14,2) 4:(15,3) 5:(15,4) 6:(14,4) 7:(15,5) 8:(14,5) 9:(13,1) 10:(13,2) 11:(13,3) 12:(13,4) 13:(13,5)
+[hybride] posees 0/14 | but actif (15,1) rang 0/14 | 0 macro jouable -> POUSSEES SIMPLES

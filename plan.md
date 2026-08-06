@@ -273,6 +273,15 @@ Histogramme des `f` au dépilement (`INSTRUM_F`) :
   l'ordre. **Aucun guidage n'y touche** — seule une `h` plus serrée OU un **élagage prouvé**
   les enlève. C'est ce qui domine les gros niveaux (2, 11, 17).
 
+> ⚠️ **`f = C*` est NÉCESSAIRE, pas SUFFISANT — mesuré le 2026-08-06** (§6.2). Ce paragraphe et le
+> tableau du guidage par portes (2026-07-21) se lisent comme un **prédicteur** (« le gain suit la
+> masse `f = C*`, ligne pour ligne »). C'est faux dans ce sens-là : en réordonnant les chiffres du
+> score lexicographique, **trois runs à ≥ 99,6 % de `f = C*` rendent ÷1,90 (1 astar), une PERTE
+> (6 astar) et zéro exactement (4 macro)**. Il faut en plus que le comparateur ait des **ex æquo à
+> départager** — ce que le régime d'engagement de la macro supprime presque (une poignée d'enfants
+> par état). Ce qui reste vrai, et c'est l'essentiel : un tie-break ne peut rien gagner **là où
+> `f < C*` domine**.
+
 ---
 
 ## 4. Ce qui a été réfuté (avec la raison mesurée)
@@ -3895,6 +3904,610 @@ dans la zone d'embut » que l'utilisateur a énoncé pour le 16.
   le premier motif de « garage » caractérisable, et il porterait le stock du 16.
 - [ ] ⚠️ **Ne pas relire les REPRISES comme un prédicteur** : elles se mesurent sur une partie humaine
   gagnante, donc a posteriori. Elles disent CE QUI est dur, pas qu'un plateau donné le sera.
+
+#### 📖 Session du 2026-08-04 (lecture) — LES GADGETS DE CULBERSON, et le vocabulaire qui manquait au verrou
+
+**Source** : Jonathan Laurent, *Complexité du jeu de Sokoban* (TIPE ENS, 18 juin 2012) — une
+démonstration originale du résultat de Culberson (1997), lu par l'utilisateur puis discuté et
+reconnecté au chantier du jour. Fichier local : `~/Documents/sokoban.pdf`.
+
+**Le principe de la preuve.** Sokoban est PSPACE-complet parce qu'on peut émuler N'IMPORTE QUEL
+automate linéairement borné (une machine de Turing à ruban fini) par un niveau : le niveau est soluble
+ssi la machine accepte. La construction s'appuie sur des **gadgets** — des assemblages de cellules à
+bornes d'accès, dont le comportement se caractérise entièrement par une fonction de transition
+`f_G : États × Bornes → 𝒫(États × Bornes)` (un ensemble puissance : un gadget peut offrir un CHOIX,
+pas seulement une trajectoire forcée). Le ressort qui force la simulation à être fidèle est la
+**configuration irrécupérable** : le niveau est bâti pour qu'une solution puisse toujours défaire ses
+propres poussées, donc toute poussée non réversible condamne la partie — c'est le même objet que nos
+« deadlocks », vu depuis l'autre bout.
+
+**LES QUATRE GADGETS, avec leur fonction de transition (extraite au format, `pdftotext -layout`
+après `brew install poppler` — la première extraction, sans rendu propre, mélangeait les colonnes) :**
+
+```
+              a    b              a    b    r                a    a'   l   l'   r
+         0    b0   -         0    -    -    r1        0      -    -    l'0  -   r1
+         1    -    a0        1    b0   -    r1        1     {a'0,a'1} -  l'0  -  r1
+
+        Diode          Inverseur         Transistor              Verrou
+```
+
+- **Diode** — UN seul état. `a→b` (reste en 0), `b→-` (bloqué). Sens unique pur, rien à retenir.
+- **Inverseur** — deux états, alternance stricte. `0: a→b(→1), b→-` puis `1: a→-, b→a(→0)`.
+- **Transistor** — deux états. `0: a→-, b→-, r→r(→1)` puis `1: a→b(→0), b→-, r→r(→1)`. Verrouillé,
+  rien ne passe sauf visiter R (déverrouille). Déverrouillé, UN passage A→B consomme le déverrouillage
+  et referme.
+- **Verrou** — celui qui a résisté à la première lecture. La ligne `{a'0, a'1}` porte tout : en état
+  1 (déverrouillé), passer par `a→a'` a **deux issues possibles**, écrites dans la fonction de
+  transition elle-même — rester déverrouillé OU se reverrouiller. C'est le joueur qui choisit.
+  `l→l'` vaut `l'0` sur les DEUX lignes : franchir L→L′ **verrouille toujours**, quel que soit l'état
+  de départ — un second mécanisme, indépendant du couple A/A′, dédié à la remise à zéro.
+
+**LE LIEN DIRECT AVEC LE CHANTIER DU JOUR :**
+
+- **(10,6) du niveau 16 EST un transistor**, formalisé : état 0 = verrouillé (aucune sortie utile,
+  cf. §6.2 « précédence caisse → but »), R = descendre le couloir droit jusqu'en (11,6), état 1 = un
+  seul passage A→B possible ensuite (la caisse quitte définitivement (10,6)). `porteBloquee()` en est
+  une version dégénérée : un booléen figé au chargement, là où le gadget est une fonction d'un état
+  qui ÉVOLUE.
+- **La rangée 11 du 16 est une diode dégénérée** : passage permis dans un seul sens (on y entre),
+  aucun état à stocker (on n'en ressort jamais, il n'y a pas de second usage à préserver). C'est
+  cohérent avec ce que la loi de l'ordre dit déjà de cette rangée pour le but actif (12,7).
+- **Le VERROU est le vocabulaire qui manque au projet.** Tous nos détecteurs — corral unitaire,
+  pince, paquet non livrable, gel hors tour, loi de l'ordre — sont des transistors ou des diodes :
+  des booléens figés, jamais un composant à ÉTAT INTERNE qu'on peut re-basculer à volonté. La salle
+  d'embut du 16 (« stocker trois caisses », §6.2) a la forme d'un verrou à PLUSIEURS crans plutôt
+  qu'à deux états — un compteur borné, pas un binaire.
+
+**CE QUE ÇA ÉCLAIRE DANS LES RÉSULTATS DU JOUR, sans rien changer à ce qui est déjà écrit :**
+
+- **Pourquoi il n'existe pas de liste finie de règles locales** (le constat de l'utilisateur qui a
+  ouvert la session du soir, « essayer de trouver des règles à partir de cas marginaux, ça ne me
+  paraît pas jouable ») a un théorème derrière lui : la PSPACE-complétude EST l'énoncé qu'aucune
+  collection finie de détecteurs locaux ne peut capturer le problème en général. Le §3 le disait déjà
+  pour `h` (« toute borne qui capturerait le mou devrait résoudre un ordonnancement optimal ») ; c'est
+  la même chose, dite au niveau des règles plutôt que de la fonction heuristique.
+- **Le 192 plus DUR que le 190** en retirant des murs (§6.2, 2026-07-20) cesse d'être une surprise :
+  Hearn–Demaine (2005, reformulation de Culberson via NCL) montrent que le résultat tient MÊME SANS
+  AUCUN MUR INTÉRIEUR — la dureté ne vient donc pas de la géométrie des murs, mais de la RÉVERSIBILITÉ
+  disponible dans l'espace ouvert.
+- **Les REPRISES** (mesure du soir même, 1,5 sur les résolus contre 8 sur les non-résolus) sont
+  exactement le pendant humain de la configuration irrécupérable : un niveau facile est un niveau où
+  l'humain peut se permettre BEAUCOUP de garer-reprendre (verrous), un niveau dur est un niveau où
+  chaque manœuvre est proche de l'irréversible (diodes, transistors qui ne se referment pas).
+
+**⚠️ Ce que ça ne dit PAS.** La PSPACE-complétude est une borne PIRE CAS sur des instances
+ADVERSARIALES — les niveaux de Culberson sont construits pour encoder une machine, les nôtres sont
+dessinés par des humains pour être jouables. Rien n'interdit de résoudre le 16 ; ça interdit une
+méthode générale et efficace, pas celle-ci en particulier.
+
+**Reste ouvert :**
+- [ ] **Décomposer 2 ou 3 niveaux à la main en gadgets** (transistor / diode / verrou), et compter la
+  taille de l'espace d'états ABSTRAIT qui en résulte. C'est le test le moins cher pour juger si une
+  recherche au niveau du « plan de tâches » (§ session du soir) est praticable : si le 16 fait 3-4
+  composants à une poignée d'états chacun, la piste est réelle ; si ça part à vingt, on a déplacé le
+  mur PSPACE d'un étage sans le réduire.
+- [ ] Lire la construction du pont plan (§4.3 du document, croisement de deux couloirs) — non fait,
+  hors sujet immédiat mais c'est la pièce qui manque pour route un circuit complexe sur un plateau 2D.
+
+#### 🎯 Session du 2026-08-05 — LE 16 DÉCOMPOSÉ EN GADGETS (partiel) : deux transistors vérifiés, le stock encore un trou
+
+**Reprise du premier item ouvert de la session lecture** (« décomposer 2-3 niveaux à la main en gadgets,
+compter l'espace d'états ABSTRAIT qui en résulte »). Fait à la main sur le **16** (le plus avancé),
+en recoupant trois sources déjà là : la géométrie brute (murs seuls du `.xsb`, script jetable), le
+journal humain `hybride_niveau_0016.txt` (209 Ko, deux parties, 2026-08-03 et 2026-08-04), et les
+résultats déjà mesurés le 2026-08-04 (`mesures/porte`, bisection p44/p45 du §6.2). **Aucune ligne de
+solveur touchée** — c'est de la lecture de plateau et de journal, pas du code.
+
+**Mesure 0, la plus utile : la constriction initiale.** Sur 81 cases de sol, **7 seulement sont
+atteignables sans pousser une seule caisse** (flood-fill trivial, boîtes traitées comme obstacles).
+Et sur le graphe de sol PUR (boîtes ignorées, murs seuls), **un seul point d'articulation existe dans
+tout le niveau**. Autrement dit : ce plateau n'a presque aucun goulot de MUR — tous ses vrais goulots
+sont des caisses assises sur un couloir à une case de large, sans détour possible. C'est une
+illustration directe, chiffrée, du point Hearn–Demaine relevé dans la session lecture (« la dureté ne
+vient pas de la géométrie des murs, mais de la réversibilité disponible dans l'espace ouvert ») — sur
+CE niveau précis, pas sur l'énoncé général de la preuve.
+
+**Gadget 1 — TRANSISTOR (10,6), déjà prouvé le 2026-08-04, maintenant relu à la lettre dans le
+journal.** `mesures/porte` avait établi la contrainte caisse→but ; le journal confirme le mécanisme
+géométrique exact : la SEULE case d'appui pour pousser C vers l'ouest est (11,6), et la SEULE façon
+d'atteindre (11,6) est de monter la colonne VIDE (12,10)→(12,9)→(12,8)→(12,7)→(11,7)→(11,6) — donc de
+passer PAR le but même qu'on n'a pas encore le droit de remplir. Le journal montre cette route au
+mot près, à `posees 3/15` : `joueur (12,10)->(12,9)`, …, `(11,7)->(11,6)`, puis
+`(11,6)->(10,6) POUSSE caisse ->(9,6)`. **Deux états abstraits** : {C bloque / C dégagée}. Une fois
+dégagée, le gadget est consommé — pas de troisième état, pas de retour en arrière possible (rejouer
+depuis là ne repropose jamais la question).
+
+**Gadget 2 — TRANSISTOR (3,4)/(4,4), non documenté avant aujourd'hui.** Même forme que le gadget 1,
+trouvé par la même méthode (constriction initiale) : la salle du haut (lignes 0-4, caisses
+(2,3)(3,4)(4,4)(6,4)(6,5)(10,4)) est inatteignable depuis le départ (3,5) sans pousser (3,4) ou (4,4)
+au nord au préalable — ce sont exactement 2 des 3 caisses candidates parmi les 7 cases de départ.
+Confirmé par l'ordre réel : **la toute première poussée du journal** est exactement `joueur
+(3,5)->(3,4) POUSSE caisse ->(3,3)`, et la caisse (4,4) est poussée à son tour quelques coups plus
+tard (`(4,5)->(4,4) POUSSE caisse ->(4,3)`), dans la même phase d'ouverture avant toute autre action.
+**Deux états abstraits**, même famille que le gadget 1 : binaire, jamais reverrouillé.
+
+**Élément 3 — DIODE, rangée 11 (confirmé, pas nouveau).** Les 5 buts de rang 6, 7, 8, 9, 11
+((12,11)(11,11)(10,11)(9,11)(8,11)) : descendre y est permis, remonter non — la rangée 12 est un mur
+plein sur toute la largeur, donc aucun appui pour repousser une caisse vers le nord depuis la rangée
+11. Pas un composant réutilisable au sens du gadget : un compteur monotone 0→5, déjà énoncé par la
+loi de l'ordre du 2026-08-03/04. Mentionné ici pour mémoire, pas remesuré.
+
+**Élément 4 — VERROU présumé sur (3,7)/(3,6), rôle NON tranché.** Le journal confirme que cette
+caisse est bien manipulée plusieurs fois (poussée au nord vers (3,6), puis reposée au sud) — ce que
+le §6.2 du 2026-08-04 disait déjà. Mais la géométrie brute montre un CONTOURNEMENT : la colonne 2
+((2,6)-(2,7)-(2,8)) atteint (3,8) sans jamais toucher (3,7) — donc ce n'est PAS un verrou d'ACCÈS pur
+comme les gadgets 1 et 2, la case n'est jamais strictement obligatoire pour la connexité. Hypothèse
+non vérifiée : un verrou sur le TEMPS plutôt que l'espace (la caisse doit être hors d'un chemin
+précis À UN INSTANT donné du plan, pas hors d'un chemin en général). **Laissé ouvert plutôt que forcé
+dans un moule** — mieux vaut un gadget non classé qu'un mal classé.
+
+**Élément 5 — le « stock » (11,10)(9,10)(9,9), TOUJOURS UN TROU.** Réel : `stock16.xsb` (position
+jouée) capture exactement ces 3 buts remplis alors que le gadget 1 n'est PAS ENCORE franchi (la
+caisse (10,6) y est toujours présente). Mais **aucun modèle d'états qui tienne** n'en est sorti
+aujourd'hui : le journal montre au moins DEUX stratégies différentes pour amener une caisse en tête
+de colonne — une route directe `(9,10)→(10,10)→(11,10)→(12,10)→…` vue dans un essai à `posees 2/15`
+via `[macro] LANCEE`, et le détour par le gadget 1 vu dans la partie qui a fini par gagner. Un
+automate écrit à partir de ça aujourd'hui serait de la fiction. Et c'est très exactement la pièce que
+le 2026-08-04 avait déjà signalée comme le vrai mur : *« le stock N'EST PAS le verrou … la difficulté
+est en aval du stock »*.
+
+**Verdict provisoire (dépassé plus bas dans la même session) :** les DEUX gadgets semblaient totaliser
+**2 × 2 = 4 états abstraits** — une poignée. Le dépouillement mécanique qui suit corrige ce chiffre.
+
+---
+
+**SUITE, LE JOUR MÊME — dépouillement mécanique du journal, et DEUX CORRECTIONS.** Premier item ouvert
+ci-dessus, fait dans la foulée : script jetable (`scratchpad/gates16.py`) qui rejoue TOUS les `[mouv]`
+de la session 1 du journal (**964 coups, 2026-08-03** — c'est bien celle que l'en-tête des intentions
+citait), gère les `[undo]` par une pile d'opérations (annule exactement le dernier pas, poussée ou
+marche), et recalcule la taille de la région atteignable par flood-fill **après chaque poussée**
+(les marches seules ne peuvent pas la changer). Validé par construction : chaque poussée vérifie que
+la caisse existe bien à la case attendue avant de la déplacer (assertion, pas de correction silencieuse).
+
+**Résultat : 124 poussées sur 964 changent la taille de la région atteignable** — la session
+s'arrête à `posees 9/15`, soit une progression aux deux tiers de la partie. Deux corrections aux
+gadgets écrits plus haut, IMPORTANTES :
+
+1. **❌ Le gadget 2 n'est PAS un transistor à 2 états, jamais reverrouillé — c'est un CONVOYEUR
+   PARTAGÉ.** Le couloir (2,4)-(3,4)-(4,4)-(5,4)-(6,4)-(7,4) s'ouvre et se ferme **au moins cinq fois**
+   dans les 964 coups (pas `571-574`, `651-654`, `727-730`, `794-796`, `832`), avec des amplitudes de
+   +48 à +59 cases à chaque fois. Ce n'est pas UNE caisse qu'on pousse une fois pour de bon : c'est un
+   couloir à une case de large que **CHAQUE caisse de la salle du haut doit traverser à son tour** pour
+   rejoindre la salle des buts — la salle du haut contient 6 caisses ((2,3)(3,4)(4,4)(6,4)(6,5)(10,4)),
+   et le couloir est retraversé une fois par livraison. Un vrai transistor se consomme ; celui-ci se
+   RECHARGE à chaque caisse suivante. Requalifié : **CONVOYEUR À UNE VOIE, un état par caisse encore à
+   faire passer** (6 états, pas 2).
+2. **✅ Le gadget 4 — (3,7)/(3,6) — EST un verrou réel, confirmé plutôt qu'hypothétique.** Basculé
+   **dix fois** dans les 964 coups (`46,194,231,236,379,384,433,438,485,490,529,534,605,610,685,690,
+   759,764,825,830`), amplitude stable (~25-29 cases) à chaque bascule — signature d'un vrai verrou
+   binaire réutilisé, pas d'un artefact de style de jeu. Le contournement par la colonne 2 que
+   j'avais relevé (accès à (3,8) sans toucher (3,7)) n'empêche donc pas cette caisse d'être
+   fonctionnellement un verrou : elle sert à autre chose que la connexité de (3,8), très probablement
+   au même rôle que le gadget 2 — laisser passer, une par une, les caisses qui descendent de la salle
+   du haut vers (8,6)/(9,6).
+3. **⚠️ Le gadget 1 — (10,6) — n'est pas « consommé pour de bon » comme écrit plus haut.** La caisse
+   *initiale* de (10,6) EST bien dégagée une fois pour toutes au pas 78 (`+27`, `10,6→9,6`) — ce que
+   `mesures/porte` avait prouvé reste exact. Mais **la CASE (10,6) est réoccupée par une AUTRE caisse
+   dès le pas 221** (`10,5→10,6`, `−38`) puis re-dégagée au pas 256 (`+27`) : elle sert de RELAIS de
+   passage à répétition pour le trafic du couloir (8,6)/(9,6), au même titre que les gadgets 2 et 4.
+   La contrainte prouvée par `porte` (cette caisse-LÀ, avant CE but-LÀ) reste vraie ; l'image du
+   « transistor isolé, 2 états, fini » qui l'accompagnait ne l'est pas.
+4. **Troisième corridor, non repéré à la première lecture** : (8,8)-(8,9)-(9,9), utilisé comme
+   parking juste à l'entrée de la salle des buts, bascule **au moins 17 fois** avec des amplitudes de
+   ±7 à ±45 — plus petit que les deux premiers mais avec la même signature répétitive.
+
+**LA VRAIE FORME DU NIVEAU 16, donc, n'est pas « 3-4 transistors indépendants ».** C'est **UNE seule
+voie physique** (la chaîne (2,4)…(7,4) → (8,6)/(9,6) → (10,6) → (8,8)/(8,9)/(9,9) → salle des buts)
+que **chacune des 15 caisses doit franchir séquentiellement**, une à la fois — le mou n'est pas dans
+le CHOIX d'un chemin (il n'y en a qu'un), il est dans **l'ORDRE et l'ENTRELACEMENT** des passages.
+C'est cohérent avec la mesure 0 (un seul point d'articulation de mur) : le niveau n'a pas plusieurs
+portes indépendantes, il a UN goulot que le trafic complet doit remonter, encore et encore.
+
+⚠️ **Ce que ça change pour le compte d'états abstrait** : ce n'est plus un produit de quelques
+automates à 2 états chacun (4, 8, 16…) — c'est plus proche d'un problème d'ORDONNANCEMENT sur une
+ressource unique (la voie), avec 15 tâches en compétition pour l'emprunter. La taille abstraite
+plausible n'est donc pas 2ⁿ mais plutôt de l'ordre du nombre de **permutations partielles** compatibles
+avec la loi de l'ordre déjà connue — nettement plus que 4, mais potentiellement bien en-dessous des
+10⁸ états bruts si la voie unique réduit chaque décision à « qui passe ensuite », un choix parmi les
+caisses encore à livrer plutôt qu'un choix de destination.
+
+**Reste ouvert :**
+- [ ] **Corriger le vocabulaire** dans une relecture future de cette session (les gadgets 1/2/4 ne
+  sont pas trois transistors isolés : c'est UN convoyeur à trois relais). Laissé tel quel ici — c'est
+  la trace de la correction elle-même qui a de la valeur, pas une réécriture propre.
+- [ ] **Modéliser le convoyeur comme un problème d'ORDONNANCEMENT à une ressource** (15 tâches, 1
+  ressource partagée, précédences partielles déjà connues via la loi de l'ordre) plutôt que comme un
+  produit de gadgets indépendants — c'est la vraie forme qui ressort du dépouillement.
+- [ ] **L'élément 5 (stock) reste non modélisé** — mais il faut maintenant le relire à la lumière du
+  convoyeur : peut-être n'est-ce pas un composant séparé, plutôt le point où le convoyeur alimente la
+  colonne du gadget 1 pendant que d'autres livraisons continuent d'y transiter.
+- [ ] Refaire la mesure 0 ET le dépouillement mécanique sur un DEUXIÈME niveau (14 ou 15, déjà gagnés
+  à la main le 2026-08-03) pour savoir si « une seule voie, tout le trafic dessus » est une propriété
+  du 16 ou du générateur de niveaux en général — c'est maintenant la question qui compte, pas la
+  constriction initiale seule.
+- [x] Script `scratchpad/gates16.py` — généralisé et rejoué sur 14/15/17 le jour même, cf. ci-dessous.
+
+---
+
+**SUITE, LE JOUR MÊME — 14, 15 ET 17 REJOUÉS AU MÊME SCRIPT, SUR UN CONSTAT À L'ŒIL DE
+L'UTILISATEUR.** Constat qui ouvre cette suite : *« le 14 et le 15 ont un accès d'acheminement
+principal, et 1 ou 2 [routes] pour 1 ou 2 caisses. Le 17 n'en a qu'un seul. »* Script généralisé
+(`scratchpad/gates_generic.py`, prend niveau/plateau/journal en paramètres), rejoué sur la session la
+plus avancée de chaque niveau (14 : 1216 coups, max 17/18 ; 15 : 889 coups, max 14/15 ; 17 : 551
+coups, max 5/6 — toutes des parties de la campagne du 2026-08-03). Puis regroupement des paires de
+cases rejouées ≥1 fois en composantes connexes (union-find), pour distinguer un vrai COULOIR (une
+chaîne de cases) d'une coïncidence de deux gates isolées à la même case.
+
+| niveau | sol atteignable au départ | composantes « PRINCIPAL » (≥5 traversées) | « secondaire » (3-4) | « mineur » (1-2, une route par caisse) |
+|---|---|---|---|---|
+| **17** (résolu) | 5/87 (6 %) | **2** (23 et 8 cases, jusqu'à ×11 et ×6) | 0 | 1 |
+| **16** (non résolu) | 7/81 (9 %) | **2** (14 et 14 cases, jusqu'à ×20 et ×10) | 1 | 2 |
+| **15** (non résolu) | 12/104 (12 %) | 0 | **1** (26 cases, jusqu'à ×4) | 7 |
+| **14** (non résolu) | 53/121 (44 %) | 0 | **1** (6 cases, jusqu'à ×3) | 6 |
+
+**LE CONSTAT À L'ŒIL TIENT, MESURÉ.** 17 et 16 sont dominés par un petit nombre de COULOIRS lourdement
+réutilisés (jusqu'à ×20) et presque aucune route à usage unique ; 14 et 15 sont l'inverse — une seule
+route un peu plus fréquentée que les autres (×3 à ×4, pas plus), et six à sept routes dédiées à une
+ou deux caisses chacune. La bascule est nette, pas un dégradé bruité : aucun niveau n'est entre les
+deux.
+
+⚠️ **Mais ça ne sépare PAS résolu de non-résolu.** Le 17 (résolu) et le 16 (non résolu) sont dans la
+MÊME catégorie structurelle (convoyeur dominant) ; le 14 et le 15 (tous deux non résolus) sont dans
+l'autre. Ce qui sépare le 17 des trois autres, c'est sa taille — **6 caisses contre 15 à 18** — pas la
+forme de son réseau de couloirs. **La structure du réseau et la difficulté sont deux axes
+différents.**
+
+**CE QUE ÇA DIT POUR LA QUESTION DE LA SESSION PRÉCÉDENTE** (« le modèle d'ordonnancement à ressource
+partagée généralise-t-il ? ») : **partiellement, et pas uniformément.** Sur 16 et 17, oui — la quasi-
+totalité du trafic passe par deux couloirs, un modèle « qui emprunte le couloir, dans quel ordre »
+capture l'essentiel. Sur 14 et 15, non — la majorité des cases-gates ne sont traversées qu'une ou
+deux fois : ce sont des portes ponctuelles (plus proches du gadget « transistor à 2 états, consommé
+une fois » de la toute première lecture) plutôt qu'une ressource partagée à ordonnancer. **Les deux
+familles de gadgets coexistent dans le même niveau 33 pièces** — le bon modèle n'est pas UN choix
+entre convoyeur et transistor, c'est de reconnaître LEQUEL s'applique à quelle case, plateau par
+plateau.
+
+**Reste ouvert :**
+- [ ] **Vérifier si la catégorie (convoyeur-dominant / transistors-dominants) est stable entre deux
+  parties humaines gagnantes DIFFÉRENTES du même niveau** — ici chaque niveau n'a qu'une seule partie
+  dépouillée. Si un second joueur du 16 route autrement et n'a presque aucun couloir réutilisé, la
+  catégorie mesure le STYLE de jeu, pas la géométrie du plateau (même piège que le §6.2, 2026-08-03,
+  sur les deux ordres valides du niveau 6).
+- [ ] **Chercher ce qui, dans le PLATEAU SEUL (murs, sans jouer), prédit la catégorie** — la
+  constriction initiale (mesure 0) ne suffit pas : 15 et 17 sont tous deux très constreints au départ
+  (12 % et 6 %) mais dans des catégories opposées. Un candidat pas testé : le nombre de points
+  d'articulation de mur (mesure 0 du 2026-08-05) rapporté au nombre de caisses.
+- [ ] `scratchpad/gates_generic.py` — même sort que `gates16.py`, à rapatrier dans `mesures/` si
+  cette lecture reprend sur d'autres niveaux, sinon perdu avec le scratchpad.
+
+---
+
+#### ⏸️ Session du 2026-08-05 (fin) — LE FIL GADGETS REFERMÉ, faute de pouvoir séparer
+
+**Verdict de l'utilisateur sur les trois sessions du jour, et il est juste : « ça ne fait pas avancer
+le schmilblick ».** Bilan honnête : le vocabulaire gadget (transistor/diode/verrou/convoyeur) est
+réel et mesuré, mais **il ne sépare pas résolu de non-résolu** (17 et 16 dans la même famille
+structurelle malgré des issues opposées) et **aucun chiffre d'espace d'états abstrait n'en est
+jamais sorti** — la question posée par la session lecture du 2026-08-04 (« 3-4 composants ou vingt »)
+reste sans réponse, et la piste s'arrête là faute de mieux. Fermé, pas effacé — comme le reste de ce
+document quand une piste ne paie pas.
+
+**REPRISE DU FIL QUI, LUI, SÉPARAIT : les REPRISES (§ session du 2026-08-04 fin, plus haut).** Rappel
+du résultat qui tient toujours, non contredit depuis : `reprises ≤ 2` → 8 niveaux, **tous résolus** ;
+`reprises ≥ 8` → 8 niveaux, **tous non résolus**. Une reprise = une caisse manœuvrée dans deux tâches
+séparées ou plus (garée, puis reprise plus tard). C'est le seul signal du projet à ce jour qui
+sépare proprement aux deux bouts sur un découpage mécanique (`mesures/taches.py`), pas une lecture à
+l'œil.
+
+**LA QUESTION À REPRENDRE, telle que laissée ouverte le 2026-08-04** : *pourquoi une caisse est-elle
+reprise plutôt que livrée directement, et est-ce que ça se prédit AVANT de jouer* (depuis le plateau
+seul, ou tôt dans une recherche) plutôt qu'a posteriori sur une partie gagnante. Deux réserves déjà
+posées à ne pas oublier en repartant :
+- ⚠️ **Les reprises se mesurent a posteriori** (§2026-08-04 fin) — sur une partie humaine gagnante,
+  donc après coup. Elles disent CE QUI est dur, pas qu'un plateau donné le sera : ne pas les relire
+  comme un prédicteur sans l'avoir vérifié.
+- ⚠️ **La mesure des destinations de garage était NÉGATIVE** (même session) : pas de concentration
+  sur quelques cases, on gare en espace ouvert. Donc la reprise n'est pas un problème de « où » —
+  c'est un problème de « pourquoi » (dégager, ouvrir un passage), déjà rapproché du vocabulaire
+  `E`/`O`/`G`/`A`/`T`/`R` de la campagne d'intentions.
+
+**Reste ouvert, hérité tel quel de la session du 2026-08-04 (fin), à attaquer en premier :**
+- [ ] Refaire la mesure des destinations à une AUTRE maille (case où la caisse reste le plus
+  longtemps, plutôt que celle où la manœuvre s'arrête) — pas cher, pourrait changer le verdict négatif.
+- [ ] Les trois niveaux à zone de dépôt repérée (16, 20, 25) : géométrie commune ?
+- [ ] **Nouveau, posé aujourd'hui** : une reprise est-elle détectable AU MOMENT où elle a lieu (le
+  coup qui gare une caisse "trop tôt") plutôt qu'après coup sur toute la partie ? Si oui, c'est un
+  signal exploitable en cours de recherche, pas seulement un diagnostic rétrospectif.
+
+#### 🎉 Session du 2026-08-06 — LE 27 TOMBE PAR L'ORDRE, et « trop tôt » est un problème de BUT, pas de CAISSE
+
+**Point de départ, une question de l'utilisateur en lisant le premier cours** : *« le couplage
+hongrois et le goal-ordering n'entreraient-ils pas en conflit ? »* La réponse tenait en trois
+étages (les deux premiers déjà au plan, le troisième non) et a ouvert toute la journée.
+
+---
+
+**❌ LE TIE-BREAK ALIGNÉ SUR `ordreButs` — CODÉ, MESURÉ, RÉFUTÉ, RESTAURÉ.**
+
+Constat de départ, vérifié au code : le score de départage de `getHeuristique` (game.cpp:1049)
+prend les buts **dans leur ordre d'INDEX** — c'est-à-dire l'ordre où ils apparaissent dans le
+`.xsb`. Il y a donc **trois ordres de remplissage** dans le solveur, et ils ne se parlent pas :
+
+| ordre | qui le lit | d'où il vient |
+|---|---|---|
+| `ordreButs` | la macro seule, via `butActif()` | précédence + contiguïté, prouvé |
+| l'appariement hongrois | `h`, le tie-break, la macro en régime `coupl-` | coût minimal, sans notion d'ordre |
+| **l'index des buts** | le tie-break lexicographique | **l'ordre de déclaration dans le fichier** |
+
+Essai : émettre les chiffres du score dans l'ordre de `ordreButs` au lieu de l'index (6 lignes).
+Pur tie-break, donc optimalité intacte par construction. Binaire contre binaire, même arbre, une
+seule variable, déterminisme vérifié en double tirage des deux côtés.
+
+| run | `f = C*` | ref | modifié | effet |
+|---|---|---|---|---|
+| **1 astar** | 99,9 % | 1 755 | **926** | **÷1,90** |
+| **6 astar** | **99,6 %** | 502 634 | 503 515 | **PERTE 0,18 %** |
+| **4 macro** | **100,0 %** | 55 560 | 55 560 | **identique à l'unité** |
+| 190 macro | 85,5 % | 145 368 | 146 252 | perte 0,6 % |
+| 6 macro | 50,9 % | 570 | 545 | −4,4 % |
+| 2 macro | 19,7 % | 412 | 406 | −1,5 % |
+| 17 astar / 17 macro / 2 astar / 9 macro | 5,4 / 2,9 / 0,2 / 0,0 % | — | — | ±0,2 % |
+
+**Canari intact partout** (4/97/131/134/355/143/110/90/237/213, 190=220, 191=250).
+
+> ⚠️ **ET ÇA RÉFUTE LE PRÉDICTEUR DU §3.** Le plan lit la masse `f = C*` comme *« le gain suit la
+> masse `f = C*`, ligne pour ligne »*. **Trois runs à ≥ 99,6 % rendent ÷1,90, une perte, et zéro
+> exactement.** `f = C*` est une condition **nécessaire** — un tie-break ne peut rien gagner
+> ailleurs — mais elle **n'est pas suffisante** : encore faut-il que le comparateur ait des ex æquo
+> à départager. Le 4 en macro n'en a quasiment pas (le régime d'engagement n'enfile qu'une poignée
+> d'enfants par état) ; le 1 en A\* pur en a plein.
+
+Confondant vérifié avant de conclure : sur le 4, `ordreButs` **n'est pas** la permutation identité
+(carte des rangs `f210/g543/h876/iba9/jedc`), donc le score a réellement changé. Le « identique à
+l'unité » n'est pas un no-op déguisé. **`game.cpp` restauré à l'identique** (vérifié par `diff`).
+Une seule orientation testée (premier-à-remplir = chiffre le plus significatif) ; l'inverse n'a pas
+de sens.
+
+---
+
+**🎉 LE 27 EST RÉSOLU AVEC L'ORDRE HUMAIN INJECTÉ — deuxième niveau dont l'ordre est le verrou.**
+
+Partie gagnée à la main en hybride (365 poussées, 20/20, rejeu validé contre `taches.rejoue()`),
+ordre de pose définitif extrait, injecté par fichier, `coupl-plongeon` sans budget :
+
+| | ordre injecté | témoin (ordre calculé) |
+|---|---|---|
+| dépilements | **332 359** ✅ **RÉSOLU**, 363 poussées | 31 648 000 — arrêté à la main |
+| états vus | 567 115 | **87 490 395** |
+| max | 20/20 | 17/20, **aucun record battu depuis 2,1 M** |
+
+- ⚠️ **PAS une ligne de [scores.md](scores.md)** : obtenu par injection, donc **non reproductible
+  avec le binaire par défaut**. Même statut que le 12 depuis juillet. Ce qui est prouvé, c'est que
+  l'ordre était le verrou ; pas que le solveur sache résoudre le 27.
+- ⚠️ **363 poussées n'est pas un canari** (régime plongeon, cf. le 21 : ±18 poussées en coupant le corral).
+- ⚠️ **Le témoin n'a AUCUN verdict** — 6ᵉ application de la règle (31, 13/r07, 11, 18, 16, 27).
+  87,5 M états vus, c'est l'ordre de grandeur du run qui a résolu le 11.
+
+**LE DÉFAUT DE L'ORDRE CALCULÉ, et le défaut de juillet n'est plus celui-là.** L'ordre du 27 met
+désormais (6,2) au rang **19** et non plus 16 : le tri topologique du 2026-07-30 a corrigé le
+murage diagnostiqué le 2026-07-29. **Le défaut restant est ailleurs :**
+
+```
+CALCULÉ : (6,4)(6,3) | (5,4)(5,3) | (4,4)(4,3) | … — des PAIRES DE COLONNES, rangées 3 et 4 entrelacées
+HUMAIN  : (6,4)(5,4)(4,4)(1,4)(3,4)(2,4) | (1,3)(2,3)(3,3)(4,3) | … — rangée 4 EN ENTIER, puis rangée 3
+```
+
+51 paires en désaccord sur 190. Et le calcul pose **(6,3) au rang 1 et (5,3) au rang 3**, alors que
+ces cases absorbent **19 transits** pendant les dix premières poses : il bouche le couloir d'entrée
+à la deuxième pose. **Les trois tests de précédence sont muets** (0 violation locale, globale et
+par paires) — boucher un couloir de transit ne viole aucune arête, puisqu'une arête parle de
+*faisabilité*, pas de *trafic*.
+
+> **CANDIDAT, pas une loi (§11.4) : sur le 12 comme sur le 27, le calcul ENTRELACE deux lignes
+> parallèles de buts là où l'humain en termine une avant d'attaquer l'autre.** Sur le 12 c'est le
+> sens de la colonne 15, sur le 27 le découpage rangées/colonnes. Deux cibles mesurables pour la
+> contiguïté de run, au lieu d'une.
+
+⚠️ **UNE ERREUR DE DÉPOUILLEMENT COMMISE PUIS CORRIGÉE, et c'est encore l'UNITÉ DE MESURE.** Le
+premier tableau annonçait « 14 buts sur 14 posés hors de leur rang » sur le chemin du record 10/20.
+Faux : sur un chemin **inachevé**, « dernière arrivée sur un but » n'est pas « pose » — la caisse
+peut repartir. Corrigé, les **10 poses sont le PRÉFIXE EXACT** `[0,1,2,3,4,5,6,7,8,9]` de l'ordre
+injecté, **0 paire en désaccord** ; les 4 buts « hors rang » sont des **transits purs** — (6,2) 10
+arrivées, (5,2) 9, (5,3) 9, (6,3) 1. **45 transits pour 10 poses.** C'est la neuvième mise à mort
+de la variante sèche de R1, et la première sur une sortie de SOLVEUR (les huit autres venaient de
+parties humaines).
+
+---
+
+**🎯 LE CORPUS ENTIER : sur 26 niveaux gagnés à la main, 9 ont un ordre calculé ≠ ordre joué.**
+
+Comparaison à l'ordre calculé **d'aujourd'hui** (`mesures/ordre`), surtout pas à celui inscrit dans
+les journaux — ceux-ci sont des traces de binaires d'avant le correctif multi-salles.
+
+| | niveaux |
+|---|---|
+| **ordre identique (17)** | 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, **16**, 17, **19, 20, 23, 24, 25** |
+| **ordre DIFFÉRENT (9)** | **6, 12, 13, 14, 15, 18, 22, 26, 27** |
+
+Inversions : 22 → **148/351**, 13 → 52/120, 27 → 51/190, 15 → 41/105, 18 → 26/55, 14 → 24/153,
+6 et 12 → 16, 26 → 1.
+
+- ✅ **RECOUPEMENT INDÉPENDANT AVEC LA LOI DE L'ORDRE.** Le 2026-08-03, la loi passée sur 24 parties
+  humaines trouvait des faux positifs sur exactement **12, 14, 15, 18, 22, 26**. **Les six sont dans
+  ces neuf.** Deux instruments sans rapport, même verdict. Les trois que la liste ajoute ont chacun
+  leur raison : le **6** (deux ordres valides, la partie du journal suit le sien), le **13** (la loi
+  est muette malgré 52 inversions), le **27** (hors de cette campagne).
+- 🎯 **ET LE SIGNAL EST FRANC :**
+
+  | | ordre identique | ordre différent |
+  |---|---|---|
+  | **résolus par le solveur** | **11** | **1** (le 6) |
+  | non résolus | 6 | 8 |
+
+  Les six non-résolus à ordre identique sont **16, 19, 20, 23, 24, 25** — très exactement le
+  « groupe qui interroge le plus » du 2026-08-01, qui ne reposait que sur 19/20/23. **Porté à six,
+  et obtenu mécaniquement : leur verrou n'est pas l'ordre.**
+- ⚠️ **Réserve sérieuse** : l'ordre calculé était **AFFICHÉ** pendant le jeu, donc « identique »
+  mesure en partie la conformité volontaire (réserve déjà posée le 2026-08-01 pour 1/2/3/4). Ce qui
+  la tempère : l'utilisateur a dévié sur neuf niveaux, l'instrument n'est pas purement
+  auto-confirmant. Et 26 niveaux, pas 33 — pas de journal gagnant pour 0, 21, 28 à 33, ni le 29.
+
+---
+
+**❌ QUATRE INJECTIONS DE PLUS (14, 15, 22, 26) — AUCUNE NE RÉSOUT.** Ordres humains extraits des
+journaux, injectés, `coupl-plongeon`, arrêtés à la main. Prédiction faite **avant** le lancement à
+partir des reprises (§2026-08-04) : le 14 (5 reprises) avait la meilleure chance, le 22 (12) et le
+15 (11) la moins bonne.
+
+| niv | reprises | dépilements | états vus | max | verdict des plongeons |
+|---|---|---|---|---|---|
+| 14 | 5 | 18,9 M | 51,2 M | 15/18 | records **12, 13, 14, 15/18 MORTS** (A\* pur, `CORRAL=0`) |
+| 15 | 11 | 12,7 M | 28,1 M | 10/15 | record 10/15 **MORT** (`échec en 1 état` sur budget 96 944) |
+| 22 | 12 | 18,5 M | 56,4 M | 4/27 | budgets épuisés — aucun verdict |
+| 26 | 8 | 31,3 M | 51,2 M | 7/13 | record 7/13 **MORT** (`échec en 2 états` sur budget 1 372) |
+
+- 🎯 **Le 14 accumulait des records dans une lignée CONDAMNÉE depuis 9 785 dépilements** : ses
+  quatre derniers records rejoués seuls rendent `AUCUNE 0` — mort à la racine, zéro état exploré,
+  **identique avec `CORRAL=0`** donc pas un faux positif du corral. Même motif que le 27 en juillet
+  (record 17/20 « de bon espoir », mort à la racine).
+- **Le 22 passe de 1/27 à 4/27** — l'ordre injecté le décoince du démarrage, ce que rien d'autre
+  n'avait obtenu. Il reste Groupe A.
+- **Bilan de la campagne d'injection : 2 réussites (12, 27), 1 échec net (13, l'ordre humain fait
+  PERDRE), 5 sans verdict (14, 15, 18, 22, 26).** « Ordre différent » n'est donc pas un prédicteur
+  de déblocage — c'est une condition qui, seule, ne suffit pas.
+
+---
+
+**❌ UNE MÉTRIQUE PROPOSÉE ET TUÉE PAR SON CONFONDANT, dans l'heure.** Constat utilisateur sur le
+14 : *« les caisses en (9,2) et (11,2) peuvent rester sans qu'on ne les ait touchées avant »*.
+Vérifié, et c'est spectaculaire :
+
+| caisse | 1ʳᵉ poussée | % de la partie écoulé | rang de pose |
+|---|---|---|---|
+| **(9,2)** | coup **229**/247 | **93 %** | 14/17 |
+| **(11,2)** | coup **238**/247 | **96 %** | 16/17 |
+| (15,7) | coup 243/247 | 98 % | 17/17 |
+
+Trois caisses ne bougent pas d'un pouce pendant 93 % de la partie puis rentrent d'un trait (4 à 5
+poussées). À l'autre bout, (2,3) part au coup 1 et n'arrive qu'au coup 185. **Deux populations :
+une RÉSERVE et un JEU DE TRAVAIL.**
+
+D'où une métrique « % de caisses jamais manœuvrées à la main », qui donnait **53 % sur les résolus
+contre 15 % sur les non-résolus**. ❌ **Sans valeur : Spearman 0,91 avec le simple « % de poussées
+faites par macro ».** Elle ne dit rien de plus que « sur les résolus, la macro fait le travail ».
+La bonne maille reste celle laissée ouverte le 2026-08-05 (fraction de la partie passée sur la case
+de DÉPART), indépendante de la disponibilité de la macro. Non faite.
+
+---
+
+**🎯 LE RÉSULTAT DE LA SESSION — « TROP TÔT » EST UN PROBLÈME DE BUT, PAS DE CAISSE.**
+
+Question de l'utilisateur, qui est la bonne : *« je ne vois pas comment dire au solveur : il y a une
+macro jouable sur cette caisse, mais c'est trop tôt »*. Avant de chercher un prédicat, on compte le
+phénomène — le mode hybride journalise à chaque état le nombre de macros jouables, et on sait quelle
+poussée a été jouée. **Vérité terrain gratuite, jamais dépouillée.**
+
+⚠️ **Et l'utilisateur a désamorcé le piège avant qu'on y tombe** : *« sur le 14, le goal ordering
+n'était pas bon, donc la macro déclenchait probablement à tort »*. C'est le **FAIT 6** (§7) — sans
+séparer les deux populations, on mesurerait l'écart à `ordreButs`, pas le report.
+
+| échantillon | macros offertes puis DÉCLINÉES | médiane par niveau |
+|---|---|---|
+| **ordre identique (17 niveaux)** | **82 / 1 139 poussées choisies = 7 %** | **0 %** |
+| ordre différent (9 niveaux) | 1 197 / 1 506 = **79 %** | **89 %** |
+
+Sur le 14 : **205 refus sur 205**. Sur le 27 : 93 %. Sur le 18 : 92 %. Sur le 13 : 89 %.
+
+> **Quand le but actif est le bon, la macro offerte est la bonne et on la joue — médiane 0 % de
+> refus sur dix-sept niveaux.** Le prédicat de report par CAISSE que la question appelait n'a
+> presque rien à attraper. Ce qui paie, c'est l'ordre. Et ça consolide tout le reste de la journée :
+> le 12 et le 27 tombent quand on corrige l'ordre, et les neuf niveaux à ordre différent sont
+> exactement ceux où la macro tire à côté en permanence.
+
+**MAIS IL RESTE UN SPÉCIMEN PUR, ET C'EST LE 16.** Ordre calculé **== ordre joué, 15/15 buts au même
+rang**, et pourtant **50 refus sur 132 poussées choisies — 38 %**, contre 14 % au plus partout
+ailleurs dans l'échantillon propre.
+
+Discriminant appliqué aux 82 refus — la poussée jouée porte-t-elle sur la **même** caisse que celle
+que la macro proposait (route refusée) ou sur une **autre** (moment refusé) ?
+
+| | même caisse | autre caisse |
+|---|---|---|
+| **total corpus propre** | **7** (dont 5 sur le seul 17) | **75** |
+| dont le 16 | **0** | **50** |
+
+**Le détail du 16 donne le mécanisme complet.** La macro est offerte sur **la même caisse, (5,10),
+trente-trois fois d'affilée**, de `posees 3` à `posees 10` — pendant que l'utilisateur répète
+
+```
+(7,4)→(8,4)  (8,4)→(9,4)  (9,4)→(9,5)  (9,5)→(9,6)  (9,6)→(8,6)
+```
+
+c'est-à-dire **le CONVOYEUR du 2026-08-05**, la voie unique que chacune des 15 caisses doit
+franchir à son tour.
+
+> 🔴 **ET VOILÀ POURQUOI LE 16 PLAFONNE.** `solveurastar.cpp:1061` ne génère les poussées simples
+> que si `macrosOk == 0`. Tant que la macro sur (5,10) aboutit, **aucune** poussée simple n'est
+> enfilée : le solveur est *forcé* de livrer (5,10) et **ne peut structurellement pas jouer le
+> convoyage**. Ce n'est pas qu'il classe mal ces coups — **il ne les engendre pas.** Même
+> diagnostic que le 13 (89 % hors régime), mais ici avec l'ordre **hors de cause** et sur une seule
+> caisse identifiable.
+
+C'est le spécimen que le plan cherchait depuis le 2026-08-04 (*« le stock reste non modélisé »*,
+*« la difficulté est en aval du stock »*) : un seul niveau, une contrainte connue, 50 cas étiquetés.
+
+**LE MÉCANISME POUR DIRE « PLUS TARD » EXISTE DÉJÀ, et il tient en une ligne** : refuser une macro
+laisse `macrosOk` à 0, donc le repli sur les poussées simples s'enclenche tout seul. Et cette
+famille de levier a la propriété qui manque à toutes les autres — **elle est LOUD et ne peut pas
+mentir** : une macro refusée à tort ne produit jamais de fausse solution, elle ralentit
+visiblement. C'est l'inverse exact de la variante sèche de R1, qui coupe et qu'on a tuée neuf fois.
+Deux points d'accroche, un seul construit :
+
+| dire « plus tard » sur… | état |
+|---|---|
+| un **BUT** — `butActif()` le saute | ✅ construit — c'est `porteBloquee()` dans `ordre-dyn` (2026-08-04) |
+| une **CAISSE** — refuser la macro alors que le but est actif | ❌ pas construit ; le plus proche est `couplage`, qui *préfère* et se replie |
+
+⚠️ **Le trou est le PRÉDICAT, pas le câblage** — et son coût est réel : pendant le report, le
+solveur retombe sur les poussées simples, c'est-à-dire l'explosion combinatoire que le régime
+d'engagement existe pour éviter. Sur le 16 ça porterait sur les états à `posees 3-10`, une bonne
+part du run. **Le gain n'est pas acquis ; ce qui est acquis, c'est de savoir quoi tenter et où le
+mesurer.**
+
+---
+
+**Reste ouvert :**
+- [ ] **Le 16 est le terrain du report.** Sortir les 50 refus (caisse offerte, but actif, coup joué)
+  et chercher ce qui, statiquement, distingue (5,10) d'une caisse livrable. Dépouillement, pas du code.
+- [ ] **Corriger la contiguïté de run** — deux cibles mesurables désormais (12 et 27), même motif :
+  ne pas entrelacer deux lignes parallèles de buts. C'est ce qui rendrait le 12 et le 27
+  reproductibles **sans injection**, donc éligibles à [scores.md](scores.md).
+- [ ] **Le 18 : son murage a BOUGÉ**, rang 10 → **rang 6, sur (6,6)**, bouché par (5,6)/(6,4)/(6,5)
+  aux rangs 2/3/4. C'est le correctif multi-salles qui l'a déplacé, et l'item *« 18, 24, 25, 26 non
+  mesurés »* du 2026-08-01 est donc fait pour le 18. `ordre` le classe **famille A** — *« un défaut
+  de `ordreParPrecedence`, corrigeable »*. ⚠️ **Ça met en cause la conclusion du 2026-07-31**
+  (*« le 18 restera muré quoi qu'on fasse, aucun ordre sain complet n'existe »*), qui portait sur
+  l'ordre d'AVANT et n'a jamais été refaite. À reprendre avant de la citer.
+- [ ] **Le 22 n'a pas de verdict** (budgets épuisés partout) et reste le plus gros désaccord d'ordre
+  du corpus (148 inversions). Son ordre injecté le fait passer de 1/27 à 4/27.
+- [ ] La maille « fraction de la partie passée sur la case de départ », qui remplacerait la métrique
+  réfutée ci-dessus. Toujours pas faite.
+
+**État du code** : ⚠️ **RIEN.** L'essai de tie-break a été **restauré** (`diff` vérifié), les runs
+sont partis de répertoires isolés. Ce qui a changé dans le dépôt : **`ordre_niveau_0012.txt` et
+`ordre_niveau_0027.txt` posés à la RACINE** à la demande de l'utilisateur (le 12 porte l'ordre de
+**juillet**, colonne 15 bas→haut, le seul des deux qui résout). ⚠️ Avec `ordre_niveau_0006.txt` qui
+y était déjà, **trois niveaux voient désormais tout `bench` lancé depuis la racine tourner à ordre
+injecté** — bruyamment (`[ORDRE_FICHIER]` sur stderr), mais c'est le mécanisme qui a fait publier
+puis retirer un verdict le 2026-08-04.
+
+⚠️ **Outils de dépouillement écrits ce jour et restés dans le SCRATCHPAD** — `corpus_ordre.py`
+(ordre calculé contre ordre joué sur tout le corpus), `decline.py` (macros offertes puis déclinées),
+`refus.py` (même caisse / autre caisse), `pose27.py`. **C'est exactement le sort de `juge_loi.py`,
+perdu le 2026-08-03** ; la règle du §1 dit de les rapatrier dans `mesures/` le jour même. **Non
+fait.** Tous réutilisent le parseur de `mesures/taches.py` (`parties`/`rejoue`) plutôt que d'en
+écrire un second, et chacun se valide en reproduisant son compte de poussées.
 
 #### 🎯 Session du 2026-07-28 — MESURE PRÉALABLE du PLONGEON (avant toute ligne de solveur)
 
