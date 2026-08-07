@@ -9,6 +9,35 @@
 > plus rien est pire que pas de renvoi. Les sessions restent dans l'ordre chronologique
 > où elles ont été écrites.
 
+
+
+
+
+
+<!-- INDEX DES SESSIONS -->
+
+**13 sessions.** Verdict en tête : ✅ acquis · ❌ réfuté · ⏸️ sans verdict ·
+🎯 résultat marquant · 🎉 niveau tombé · ⚠️ correction · 📖 lecture. Les titres sont
+exacts, une recherche sur la date ou sur un mot du sujet tombe dessus.
+
+| | date | sujet |
+|---|---|---|
+| ✅ | 2026-07-20 suite 3 | mesure du gain deadlock (outil `mort`, branche `gain-deadlock`) |
+| ❌ | 2026-07-21 | le test par-but CÂBLÉ, MESURÉ, RÉFUTÉ (et le §6.1 de la veille avec) |
+| ❌ | 2026-07-21 suite | GUIDAGE PAR PORTES codé, mesuré, RÉFUTÉ, reverté |
+| ✅ | 2026-07-24 suite 2 | CORRAL UNITAIRE : le PREMIER élagage deadlock sûr du projet |
+| ✅ | 2026-07-27 | CORRAL UNITAIRE terminé, MESURÉ en USok, PROMU en défaut |
+| ✅ | 2026-07-27 suite | MOTIF 2, « la PINCE » : première extension par la liste de motifs |
+| ✅ | 2026-07-27 suite 3 | CORRAL-N par STRIP + A\* BORNÉ : le premier levier `f<C*` |
+| ✅ | 2026-07-28 | CORRAL-N PROMU EN DÉFAUT (et l'écart bench/UI expliqué) |
+| ✅ | 2026-07-29 1/2 | LA CLÉ DU CACHE SANS LE JOUEUR : mesurée en deux étages |
+| ⚠️➡️❌ | 2026-07-29 2/2 | LE CORRAL-N COÛTE ×7 à ×25 SUR LES GROS NIVEAUX |
+| ✅ | 2026-07-30 fin | LE CORRAL-N PAIE, et le run BORNÉ le sous-estime STRUCTURELLEMENT |
+| ✅ | 2026-07-31 | L'ITEM FERMÉ, et l'ÉTAGE N SÉPARÉ DE L'UNITAIRE+PINCE |
+| ✅⚠️ | 2026-08-03 | LE PAQUET NON LIVRABLE : un motif d'élagage SOUND, trouvé par la CRITIQUE du chemin du solveur |
+
+<!-- FIN INDEX -->
+
 ### 6.1 Détection de deadlock — le levier rouvert par §5
 
 > ⚠️ Terrain du faux positif : le projet s'y est fait avoir 3 fois (gel naïf, `h` qui
@@ -510,7 +539,7 @@ le rejouer sur les fixtures (`level0195` vivant, `level0196` mort).
   elle **épuise** l'espace sous un petit budget est une **preuve** (pas une heuristique) → sûre.
   Reste à voir le coût par nœud (ne pas la lancer sur chaque état).
 
-#### ✅ Session du 2026-07-29 — LA CLÉ DU CACHE SANS LE JOUEUR : mesurée en deux étages
+#### ✅ Session du 2026-07-29 (1/2) — LA CLÉ DU CACHE SANS LE JOUEUR : mesurée en deux étages
 
 **La réserve** (posée le 2026-07-28, correction reportée) : `sousSolveEnclos` part de `playerPoint`,
 donc son verdict dépend de la position du joueur — mais le cache est indexé par la **seule frontière
@@ -594,7 +623,7 @@ mesurerait un autre solveur.
   l'arbitrage. **Elle ne fait que COMPTER** — elle n'ajoute ni ne coupe aucun comportement, donc elle
   ne peut pas faire diverger l'app du bench (§7). À retirer une fois l'étage 2 tranché.
 
-#### ⚠️➡️❌ Session du 2026-07-29 — LE CORRAL-N COÛTE ×7 à ×25 SUR LES GROS NIVEAUX
+#### ⚠️➡️❌ Session du 2026-07-29 (2/2) — LE CORRAL-N COÛTE ×7 à ×25 SUR LES GROS NIVEAUX
 
 > ❌ **LA LIGNE DU 10 EST FAUSSE, corrigée le 2026-07-31.** Le bloc `[CORRAL-N]` d'où viennent ses
 > 55 001 399 états de sous-solve et ses 23,6 % de durs morts **n'appartient pas au run du 10** :

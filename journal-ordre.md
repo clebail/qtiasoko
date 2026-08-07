@@ -9,6 +9,33 @@
 > plus rien est pire que pas de renvoi. Les sessions restent dans l'ordre chronologique
 > où elles ont été écrites.
 
+
+
+
+
+
+<!-- INDEX DES SESSIONS -->
+
+**11 sessions.** Verdict en tête : ✅ acquis · ❌ réfuté · ⏸️ sans verdict ·
+🎯 résultat marquant · 🎉 niveau tombé · ⚠️ correction · 📖 lecture. Les titres sont
+exacts, une recherche sur la date ou sur un mot du sujet tombe dessus.
+
+| | date | sujet |
+|---|---|---|
+| ❌ | 2026-07-19 | tout reverté, aucune approche ne reproduit l'ordre humain du 11 |
+| ✅ | 2026-07-20 | l'ordre humain est TROUVÉ, mesuré, et il paie |
+| ⏸️ | 2026-07-20 suite | la règle codée, testée, PAS ENCORE bonne. À reprendre. |
+| ✅ | 2026-07-20 suite 2 | ordre CODÉ, mesuré, PROMU en défaut. Chantier bouclé. |
+| 🎯 | 2026-07-29 | LE GOAL-ORDERING N'AVAIT PAS FINI SON TRAVAIL (outil `ordre`) |
+| ✅ | 2026-07-29 suite | FAMILLE A CORRIGÉE : le glouton ne force plus, il recule |
+| ✅ | 2026-07-30 | FAMILLE B PORTÉE DANS LE SOLVEUR (précédence globale) |
+| ❌ | 2026-07-30 suite | LE 13 JUGÉ : ordre SAIN, niveau muré quand même |
+| ⏸️ | 2026-07-31 | LE TEST EN DUR RETIRÉ, l'escalade RÉFUTÉE, la piste déplacée |
+| ⏸️ | 2026-07-31 soir | ORDRE DYNAMIQUE, MASQUAGE, INJECTION : où on en est |
+| ❌ | 2026-07-31 nuit | L'ORDRE HUMAIN DU 13 : relevé sur partie gagnante, et il fait PERDRE |
+
+<!-- FIN INDEX -->
+
 ### 6.2 Ordre de remplissage — multi-salles
 
 `ordreButs` (rebours) sait vider **une** salle (« fond → entrée »). Sur plusieurs salles —
@@ -274,11 +301,11 @@ complet, 522 coups, 188 poussées, 43 arrivées sur but) :**
   `ORDRE_TB` est retiré, et le tie-break retenu ne produit jamais de fausse « aucune solution »
   (garde anti-échouage + fallback candidats). Non re-creusé, non reproduit avec la règle finale.
 
-**État du code en fin de session (non commité)** : `game.cpp`/`game.h` contiennent la règle,
-l'oracle (§ ci-dessus) et le debug de trace. `mainwindow.cpp`/`.h` contiennent le qDebug de
-mouvements (gardé) et un correctif `#include <cmath>` / `std::ceil` nécessaire à la compilation
-sur Linux (absent avant, faute préexistante à `HEAD`, sans rapport avec le solveur).
-**Reprendre ici** : détection de couloirs, avec 191 comme juge (28 états = objectif).
+**État du code** — commité depuis. Deux choses qui ne se lisent pas dans `git log` : le **qDebug de
+mouvements** de `mainwindow.cpp` est **gardé** (c'est lui qui a servi deux fois, cf. 2026-07-31
+nuit), et le `#include <cmath>` / `std::ceil` corrige une faute **préexistante** de compilation sur
+Linux, sans rapport avec le solveur. ~~**Reprendre ici** : détection de couloirs~~ — ✅ **réglé à la
+session suivante**, et autrement que prévu : la contiguïté de run a suffi, sans détecter de couloir.
 
 #### ✅ Session du 2026-07-20 (suite 2) — ordre CODÉ, mesuré, PROMU en défaut. Chantier bouclé.
 
@@ -750,11 +777,9 @@ répondable. Le 18 cesse d'être un problème par disparition de la question.
 - [ ] **Le 18 restera muré quoi qu'on fasse** au modèle statique : son espace de recherche est
   réellement épuisé à budget 200 (il n'escalade pas). Aucun ordre sain complet n'y existe.
 
-**État du code, non commité** (branche `ordre-dynamique`) : `butActif` dynamique + garde
-anti-échouage + trace `[ordre]` (`game.cpp`/`game.h`) ; régime d'essai `ordre-dyn` (`solveur.*`,
-`mesures/bench.cpp`) ; **injection `ORDRE_HUMAIN`** (`game.cpp`, outil de chantier, jetable) ;
-affichage UI du but actif en bleu et des autres en sable sur l'état-max (`goal.cpp`, `wgame.*`,
-`mainwindow.cpp`).
+**État du code** — commité depuis. Ce qui reste utile à savoir : le régime d'essai **`ordre-dyn`**
+et l'**injection `ORDRE_HUMAIN`** sont des outils de **chantier**, jetables, à retirer avec la
+campagne.
 
 #### ❌ Session du 2026-07-31 (nuit) — L'ORDRE HUMAIN DU 13 : relevé sur partie gagnante, et il fait PERDRE
 

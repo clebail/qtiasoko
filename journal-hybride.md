@@ -9,7 +9,40 @@
 > plus rien est pire que pas de renvoi. Les sessions restent dans l'ordre chronologique
 > où elles ont été écrites.
 
-#### 🎯 Session du 2026-08-01 — LE MODE HYBRIDE : cinq niveaux rejoués à la main, annotés par le solveur
+
+
+
+
+
+<!-- INDEX DES SESSIONS -->
+
+**17 sessions.** Verdict en tête : ✅ acquis · ❌ réfuté · ⏸️ sans verdict ·
+🎯 résultat marquant · 🎉 niveau tombé · ⚠️ correction · 📖 lecture. Les titres sont
+exacts, une recherche sur la date ou sur un mot du sujet tombe dessus.
+
+| | date | sujet |
+|---|---|---|
+| 🎯 | 2026-08-01 1/7 | LE MODE HYBRIDE : cinq niveaux joués à la main, le solveur en tient le LOG |
+| ❌ | 2026-08-01 2/7 | LE RANG DU COUP HUMAIN : le démêlage n'est PAS un problème de CLASSEMENT |
+| 🎯 | 2026-08-01 3/7 | LE 13 GAGNÉ EN HYBRIDE : 89 % de la solution N'EST PAS DANS L'ARBRE |
+| 🎉 | 2026-08-01 4/7 | LE 20 GAGNÉ À LA MAIN : le 13 est une SINGULARITÉ, et le détour non-monotone est CONFIRMÉ |
+| 🎉 | 2026-08-01 5/7 | SEPT NON-RÉSOLUS GAGNÉS À LA MAIN, et trois généralisations mortes |
+| ✅ | 2026-08-01 6/7 | LE CORRECTIF MULTI-SALLES CODÉ ET PROMU : ×7,5 sur le 10 |
+| ❌ | 2026-08-01 7/7 | LE 12 : c'est le SENS de parcours qui décide, pas le groupement |
+| ✅ | 2026-08-02 | LE CORPUS D'INTENTIONS SUR 8 NIVEAUX : le vocabulaire fermé TIENT |
+| 🎯 | 2026-08-02 suite | ONZE NIVEAUX RÉ-ANNOTÉS : l'instrument décidait du vocabulaire |
+| 🎯 | 2026-08-03 | QUATRE NIVEAUX GAGNÉS À LA MAIN (14, 15, 16, 17), et LA LOI DE L'ORDRE ENFIN TROUVÉE |
+| 🎯 | 2026-08-04 1/4 | LA LOI CODÉE ET JUGÉE, le GEL HORS TOUR, et une précédence d'espèce neuve |
+| ⏸️ | 2026-08-04 2/4 | LA CONTRAINTE DE PORTE GREFFÉE SUR `butActif()` |
+| 🎯 | 2026-08-04 3/4 | LE PLAN HUMAIN MESURÉ : ce qui sépare les résolus, et pourquoi le planificateur naïf est mort |
+| 📖 | 2026-08-04 4/4, lecture | LES GADGETS DE CULBERSON, et le vocabulaire qui manquait au verrou |
+| 🎯 | 2026-08-05 | LE 16 DÉCOMPOSÉ EN GADGETS (partiel) : deux transistors vérifiés, le stock encore un trou |
+| ⏸️ | 2026-08-05 fin | LE FIL GADGETS REFERMÉ, faute de pouvoir séparer |
+| 🎉 | 2026-08-06 | LE 27 TOMBE PAR L'ORDRE, et « trop tôt » est un problème de BUT, pas de CAISSE |
+
+<!-- FIN INDEX -->
+
+#### 🎯 Session du 2026-08-01 (1/7) — LE MODE HYBRIDE : cinq niveaux joués à la main, le solveur en tient le LOG
 
 **L'outil** (§1, idée utilisateur) : on joue à la main pendant que l'UI rejoue à chaque coup le
 **régime d'engagement du solveur** et affiche l'ordre de remplissage sur les buts. Tout est
@@ -129,13 +162,11 @@ c'est la première fois qu'on sait **ce qu'il achète**.
   est **gagné à la main** et 89 % de cette partie est hors de l'arbre du solveur. **Le 12 reste à
   faire**, et c'est maintenant le plus intéressant des deux : son ordre humain, lui, RÉSOUT.
 
-**État du code** (non commité, branche `ordre-dynamique`) : `mainwindow.ui` (case `cbHybride`),
-`mainwindow.*` (surcouches, journal, exécution de macro, marche au clic, rapport `[manque]`,
-`plateauXsb` factorisé avec l'export), `wgame.*` (rangs des buts, macros jouables, cases signalées,
-clic droit). `solveur.h` : `appuis` passée de `protected` à `public` — l'UI descend les poussées en
-coups de marche par la même recette que `reconstruire()`, exemplaire unique. **Rien dans le
-solveur**, aucune variable d'environnement (§7). Canari vérifié après coup : 4/97/131/134/213
-poussées, 4/14/412/499/24 786 états.
+**État du code** — commité depuis, `git log` fait foi ; seul le point de conception est gardé ici.
+`solveur.h` expose `appuis` (`protected` → `public`) pour que l'UI descende les poussées en coups de
+marche par la **même recette** que `reconstruire()`, en exemplaire unique. **Rien dans le solveur**,
+aucune variable d'environnement (§7). Canari vérifié après coup : 4/97/131/134/213 poussées,
+4/14/412/499/24 786 états.
 ➡️ ⚠️ **« Rien dans le solveur » n'est plus vrai depuis la session ci-dessous** (2026-08-01,
 suite) : deux constantes (`CORRAL_BUDGET`, `corralActif`) sont passées de `solveurastar.cpp` à
 `solveurastar.h` pour que le miroir de l'UI ne puisse pas dériver. Aucun changement de
@@ -146,7 +177,7 @@ comportement, vérifié binaire contre binaire.
   l'échec (un cas lent n'émet jamais « aucune solution »). Borne surtout le temps des cas
   lents (8, 9).
 
-#### ❌ Session du 2026-08-01 (suite) — LE RANG DU COUP HUMAIN : le démêlage n'est PAS un problème de CLASSEMENT
+#### ❌ Session du 2026-08-01 (2/7) — LE RANG DU COUP HUMAIN : le démêlage n'est PAS un problème de CLASSEMENT
 
 **La question, et pourquoi elle valait d'être posée.** Le FAIT 4 ci-dessus disait « le trou de
 démêlage est un trou de GUIDAGE » — les poussées simples ne lisent jamais `ordreButs`, les
@@ -261,7 +292,7 @@ l'en-tête, sans changement de comportement, pour que l'UI passe le MÊME budget
 d'élagage que le solveur (deux copies de `150` dériveraient sans que rien ne le signale, §7).
 Harnais de rejeu des journaux : **jetable, non versionné** (scratchpad).
 
-#### 🎯 Session du 2026-08-01 (fin) — LE 13 GAGNÉ EN HYBRIDE : 89 % de la solution N'EST PAS DANS L'ARBRE
+#### 🎯 Session du 2026-08-01 (3/7) — LE 13 GAGNÉ EN HYBRIDE : 89 % de la solution N'EST PAS DANS L'ARBRE
 
 **C'est l'item que la session ci-dessus réclamait comme seul juge** (« rejouer un NON-RÉSOLU en mode
 hybride »). Fait sur le 13, et la réponse déborde la question posée.
@@ -407,7 +438,7 @@ même journal, c'est ce qui a sauvé la mesure** — même leçon que `POUSSE ca
   repose que sur **2 cas**. ⚠️ Le **12 est à +0,61** : le trafic ne voit pas son défaut, ce qui est
   cohérent — le sien est un sens de parcours, pas une porte posée trop tôt (session ci-dessous).
 
-#### 🎉 Session du 2026-08-01 (suite) — LE 20 GAGNÉ À LA MAIN : le 13 est une SINGULARITÉ, et le détour non-monotone est CONFIRMÉ
+#### 🎉 Session du 2026-08-01 (4/7) — LE 20 GAGNÉ À LA MAIN : le 13 est une SINGULARITÉ, et le détour non-monotone est CONFIRMÉ
 
 **Le 20 est un second niveau à peigne** (constat utilisateur) : colonne x=17 pleine (y=4→13), colonne
 x=16 en alternance buts/murs (les dents), et la rangée du bas (14,13)…(17,13) pour entrée. 18 buts.
@@ -506,7 +537,7 @@ ne l'attaque, et le §6.1 a fermé les tie-breaks.
   question ouverte la plus nette de la campagne hybride, et elle est **négative** : elle dit ce que
   le verrou n'est pas.
 
-#### 🎉 Session du 2026-08-01 (soir) — SEPT NON-RÉSOLUS GAGNÉS À LA MAIN, et trois généralisations mortes
+#### 🎉 Session du 2026-08-01 (5/7) — SEPT NON-RÉSOLUS GAGNÉS À LA MAIN, et trois généralisations mortes
 
 **La campagne hybride a produit, en une journée, sept parties gagnantes sur des niveaux que le
 solveur ne finit pas** : 12, 13, 18, 19, 20, 22, 23. ⚠️ **Aucun n'est un score** —
@@ -657,7 +688,7 @@ tie-breaks.
 - **Les transits explosent avec la taille** : 119 sur le 22 (27 buts) pour 146 arrivées et 27 poses.
   La variante sèche de R1 est re-tuée une huitième fois.
 
-#### ✅ Session du 2026-08-01 (suite 3) — LE CORRECTIF MULTI-SALLES CODÉ ET PROMU : ×7,5 sur le 10
+#### ✅ Session du 2026-08-01 (6/7) — LE CORRECTIF MULTI-SALLES CODÉ ET PROMU : ×7,5 sur le 10
 
 **Ouvert depuis le 2026-07-17, déclassé le 2026-07-29, re-priorisé le 2026-08-01, fait.**
 
@@ -722,7 +753,7 @@ démêlage est un trou de GUIDAGE ») : un correctif d'ordre ne pouvait structur
   (regroupé en 7+2+2) ; les trois autres restent à vérifier. C'est là que le correctif peut encore
   rapporter, ou ne rien donner.
 
-#### ❌ Session du 2026-08-01 (suite 2) — LE 12 : c'est le SENS de parcours qui décide, pas le groupement
+#### ❌ Session du 2026-08-01 (7/7) — LE 12 : c'est le SENS de parcours qui décide, pas le groupement
 
 **Le 12 gagné à la main en hybride** — 234 poussées, 15/15, **10 macros** lancées, **1 % hors
 régime**, 37 transits. Troisième non-résolu joué, troisième fois que le solveur générerait les coups
@@ -890,15 +921,8 @@ ailleurs (`mou = 2 × reculs`, la caisse revenant sur la case libérée 9 fois s
 fermé doit être ajusté par celui qui joue, pas deviné** — les trois `GARER` du 4 sont à relire comme
 des `T`.
 
-**État du code de la journée du 2026-08-01** (non commité, branche `ordre-dynamique`) :
-- `game.cpp`/`game.h` — **`sallesDeButs()`** + préférence de salle dans le tri topologique (le
-  correctif multi-salles, **PROMU**, aucun interrupteur) ; **`diagnosticPas0()`** (outil de
-  diagnostic UI) ; **`cheminOrdreInjecte()`** + lecture du fichier d'ordre (chantier).
-- `mainwindow.cpp`/`.h` — rapport du clic droit éclaté en causes distinctes ; le journal hybride
-  annonce la SOURCE de l'ordre (`calcule` / `⚠ INJECTE depuis …`) ; **`rejoueJournal()`,
-  `prochainCoupChoisi()`, `noteIntention()`** + les touches `L`/`N`/`E`/`O`/`G`/`A`/`T`/`R`/`?` ;
-  **légende des touches** dans la barre d'état ; flèches et Retour arrière neutralisés en annotation.
-- `mesures/pas0.cpp` + `pas0.pro` — **neuf**, chantier.
+**État du code de la journée du 2026-08-01** — commité depuis, `git log` fait foi pour l'inventaire
+des fichiers. Ce qui doit survivre à `git log`, en revanche :
 - ⚠️ **À RETIRER avec la campagne** : l'injection par fichier, `pas0`, le rejeu de journal + les
   intentions + la légende, et `diagnosticPas0` si le clic droit ne sert plus. **À GARDER** :
   `sallesDeButs()` et le groupement, qui sont de la production.
@@ -1286,7 +1310,7 @@ sur 12/14/15/16 avec leur ordre humain injecté.
   exactement, testé reproductible sur 5 niveaux depuis `f3bf1fb`, ZÉRO ancre perdue. Non fait
   aujourd'hui, la session a bifurqué sur la critique du solveur.
 
-#### 🎯 Session du 2026-08-04 — LA LOI CODÉE ET JUGÉE, le GEL HORS TOUR, et une précédence d'espèce neuve
+#### 🎯 Session du 2026-08-04 (1/4) — LA LOI CODÉE ET JUGÉE, le GEL HORS TOUR, et une précédence d'espèce neuve
 
 **Trois choses, dans cet ordre : la loi du 2026-08-03 passe du dessin au code ; sa seconde moitié
 (le gel) apparaît en cours de route ; et la bisection d'une partie humaine du 16 produit une règle
@@ -1496,7 +1520,7 @@ en faire un test de mort).
 AU TRACÉ) + case à cocher. **Neufs** : `mesures/loi.cpp`/`.pro`, `mesures/porte.cpp`/`.pro`.
 Miroir de rejeu du journal : jetable, non versionné.
 
-#### ⏸️ Session du 2026-08-04 (suite) — LA CONTRAINTE DE PORTE GREFFÉE SUR `butActif()`
+#### ⏸️ Session du 2026-08-04 (2/4) — LA CONTRAINTE DE PORTE GREFFÉE SUR `butActif()`
 
 **C'est l'item que la session ci-dessus laissait en tête des ouverts** : la précédence
 caisse → but existait comme DÉTECTEUR (`mesures/porte`) mais le solveur n'avait aucun moyen d'y
@@ -1621,7 +1645,7 @@ RÉFUTÉ, pour qu'il ne soit pas reproposé.
   avec l'ordre dynamique, ou juger la loi sur les états réellement traversés. Non fait, et pas
   évident — l'ordre dynamique n'a pas de « rangs » stables à dessiner.
 
-#### 🎯 Session du 2026-08-04 (fin) — LE PLAN HUMAIN MESURÉ : ce qui sépare les résolus, et pourquoi le planificateur naïf est mort
+#### 🎯 Session du 2026-08-04 (3/4) — LE PLAN HUMAIN MESURÉ : ce qui sépare les résolus, et pourquoi le planificateur naïf est mort
 
 **Constat de l'utilisateur, qui ouvre la session** : *« essayer de trouver des règles à partir de
 différents cas marginaux, ça ne me paraît pas jouable […] le démêlage, le goal ordering, les portes,
@@ -1714,7 +1738,7 @@ dans la zone d'embut » que l'utilisateur a énoncé pour le 16.
 - [ ] ⚠️ **Ne pas relire les REPRISES comme un prédicteur** : elles se mesurent sur une partie humaine
   gagnante, donc a posteriori. Elles disent CE QUI est dur, pas qu'un plateau donné le sera.
 
-#### 📖 Session du 2026-08-04 (lecture) — LES GADGETS DE CULBERSON, et le vocabulaire qui manquait au verrou
+#### 📖 Session du 2026-08-04 (4/4, lecture) — LES GADGETS DE CULBERSON, et le vocabulaire qui manquait au verrou
 
 **Source** : Jonathan Laurent, *Complexité du jeu de Sokoban* (TIPE ENS, 18 juin 2012) — une
 démonstration originale du résultat de Culberson (1997), lu par l'utilisateur puis discuté et
@@ -2021,7 +2045,7 @@ posées à ne pas oublier en repartant :
   c'est un problème de « pourquoi » (dégager, ouvrir un passage), déjà rapproché du vocabulaire
   `E`/`O`/`G`/`A`/`T`/`R` de la campagne d'intentions.
 
-**Reste ouvert, hérité tel quel de la session du 2026-08-04 (fin), à attaquer en premier :**
+**Reste ouvert, hérité tel quel de la session du 2026-08-04 (3/4), à attaquer en premier :**
 - [ ] Refaire la mesure des destinations à une AUTRE maille (case où la caisse reste le plus
   longtemps, plutôt que celle où la manœuvre s'arrête) — pas cher, pourrait changer le verdict négatif.
 - [ ] Les trois niveaux à zone de dépôt repérée (16, 20, 25) : géométrie commune ?

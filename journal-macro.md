@@ -9,297 +9,40 @@
 > plus rien est pire que pas de renvoi. Les sessions restent dans l'ordre chronologique
 > où elles ont été écrites.
 
+
+
+
+
+
+<!-- INDEX DES SESSIONS -->
+
+**13 sessions.** Verdict en tête : ✅ acquis · ❌ réfuté · ⏸️ sans verdict ·
+🎯 résultat marquant · 🎉 niveau tombé · ⚠️ correction · 📖 lecture. Les titres sont
+exacts, une recherche sur la date ou sur un mot du sujet tombe dessus.
+
+| | date | sujet |
+|---|---|---|
+| ✅ | 2026-07-21 suite 2 | le COÛT PAR ÉTAT de la goal macro (outil `macro`) |
+| ⏸️ | 2026-07-23 | pourquoi la macro échoue si souvent : `echecBloque`, pas les forks |
+| ✅ | 2026-07-23 suite | LE 8 TOMBE, sans aucune modif de code |
+| 🎯 | 2026-07-24 | la macro PROMEUT-elle ses enfants ? (outil `deltaf`, à `6b0a024`) |
+| ⏸️ | 2026-07-24 suite | le régime « BUT DU COUPLAGE » codé, mesuré, EN ATTENTE du 12 |
+| 🎯 | 2026-07-28 1/4 | MESURE PRÉALABLE du PLONGEON (avant toute ligne de solveur) |
+| ✅ | 2026-07-28 2/4 | PLONGEON CODÉ et MESURÉ : la prédiction tombe juste |
+| ❌➡️✅ | 2026-07-28 3/4 | LE SEUIL EN % RÉFUTÉ, remplacé par un BUDGET RELATIF |
+|  |  | 🎉🎉 2026-07-28 (4/4) — **LE NIVEAU 11 EST RÉSOLU**, deux fois le même jour |
+| ✅ | 2026-07-29 1/4 | LE PLONGEON À L'ÉPREUVE DE DEUX NIVEAUX NEUFS (10, 21) |
+| ⚠️➡️❌ | 2026-07-29 2/4 | le log des plongeons N'EST PAS un détecteur de branche morte |
+| 🎯 | 2026-07-29 3/4 | le log des plongeons, ce qu'il dit vraiment |
+| ⏸️ | 2026-07-29 4/4 | LE 31 : 188 M états vus, arrêté sans verdict |
+
+<!-- FIN INDEX -->
+
 ### 6.3 La goal macro et le plongeon sur record
 
 > ⚠️ **Cette section n'avait AUCUN titre dans `plan.md`** — ses sessions vivaient sous le
 > §6.2, alors que le document la cite **38 fois**. C'est ce qui faisait paraître le §6.2
 > démesuré. Le titre est ajouté ici ; le contenu n'a pas bougé.
-
-#### 🎯 Session du 2026-07-28 — MESURE PRÉALABLE du PLONGEON (avant toute ligne de solveur)
-
-**L'outil : `bench <niv> <mode> record`** (neuf). Écrit en `.xsb` **chaque état qui bat le max de
-caisses posées**, au fil du solve, et le DATE en dépilements (la ligne `[record]` part sur stderr,
-donc elle s'entrelace avec la jauge — pas besoin de toucher à la signature du signal). Le chemin
-reconstruit est rejoué sur une copie du départ pour compter les poussées **et vérifier que ce
-chemin mène bien à cet état** (une fixture fausse ne se verrait pas autrement — c'est le bug
-big-endian de `mou`, §5). `bench` accepte désormais un **chemin `.xsb`** à la place d'un numéro, ce
-qui rend les fixtures produites directement re-solvables.
-
-**La question du chantier, et sa réponse chiffrée** : à quel moment apparaît un état complétable à
-bas coût, et que coûte-t-il de le finir ? Mesuré sur les 10 résolus (hors 8), `macro` depuis chaque
-record, budget 30 s :
-
-| niveau | solve complet | 1ᵉʳ record **vivant** | dépilements | états pour finir | poussées totales |
-|---|---|---|---|---|---|
-| 2 | 412 | 6/10 | < 1 000 | 38 | 133 (+2) |
-| 3 | 499 | **1/11** | < 1 000 | 442 | **134 = optimum** |
-| 4 | 67 224 | 8/20 | ~2 000 | 120 | 357 (+2) |
-| 6 | 570 | 7/10 | < 1 000 | 4 | **110 = optimum** |
-| 9 | 354 622 | 12/14 | ~85 000 | 8 | **237 = optimum** |
-| 5 | 9 123 | 9/12 | ~9 000 | 15 | 151 (+8) |
-| 7 | 24 376 | 6/11 | ~22 000 | 1 509 | 112 (+22) |
-| 17 | 24 786 | 5/6 | ~24 000 | 22 | **213 = optimum** |
-
-⚠️ **Ce tableau ne dit PAS le gain — il ignore ce que coûtent les plongeons RATÉS**, et c'est
-l'erreur qu'on a failli garder. Mesuré (états explorés avant « aucune solution » depuis chaque
-record mort) : de **1 à 59 771 états**, avec une queue lourde — 59 770 et 59 771 sur le 9, ~5 000
-sur le 7, ~4 280 sur le 5, ~810 sur le 2. **Un plongeon raté peut coûter plus cher que tout ce
-qu'on espérait gagner.** Bilan NET (dépilements + tous les ratés + le succès) :
-
-| niveau | défaut | **budget 100** | **budget 2000** |
-|---|---|---|---|
-| 4 | 67 224 | **2 670 → ×25** | 2 171 → ×31 |
-| 9 | 354 622 | **85 557 → ×4,1** | 95 057 → ×3,7 |
-| 5 | 9 123 | 9 398 → −3 % | 15 098 → **perte ×1,65** |
-| 7 | 24 376 | 24 315 → neutre | 27 519 → −13 % |
-| 2 | 412 | 768 → −87 % | 3 310 → **perte ×8** |
-| 3 | 499 | 723 → −45 % | 642 → −29 % |
-
-> **Un budget SERRÉ bat un budget large** — contre-intuitif, et la raison est dans les données :
-> **quand un record est cher à finir, le suivant est presque toujours bon marché.** Sur le 4, le
-> record 8 coûte 120 états, le 14 en coûte 19 et le 16 en coûte 13 — tous atteints au même moment
-> (~2 000 dépilements). S'acharner sur un record ne sert à rien : le suivant fait le travail pour
-> dix fois moins cher.
-
-**🎯 LE SEUIL DE REMPLISSAGE BAT LE BUDGET (idée utilisateur) — et c'est le réglage retenu.** Le
-budget décide *ce qu'on perd quand on se trompe* ; un **seuil en % de buts remplis** décide *quand
-on tente*. Comme les records morts sont **concentrés dans le bas du tableau**, le seuil les évite au
-lieu de les payer :
-
-| niveau | 4 | 7 | 2 | 3 | 6 | 5 | 17 | **9** |
-|---|---|---|---|---|---|---|---|---|
-| morts jusqu'à | 35 % | 45 % | 50 % | 55 % | 60 % | 67 % | 67 % | **79 %** |
-| 1ᵉʳ vivant | 40 % | 55 % | 60 % | 64 % | 70 % | 75 % | 83 % | 86 % |
-
-À **seuil 80 %** : **zéro plongeon raté sur les huit niveaux**, aucune perte nulle part, et
-**7 niveaux sur 8 rendent l'OPTIMUM EXACT** (le 4 est à +2) :
-
-| niveau | 4 | 9 | 5 | 7 | 17 | 2 | 3 | 6 |
-|---|---|---|---|---|---|---|---|---|
-| défaut | 67 224 | 354 622 | 9 123 | 24 376 | 24 786 | 412 | 499 | 570 |
-| seuil 80 % | **~2 013** | **85 008** | 9 003 | ~24 003 | ~24 022 | ~314 | ~303 | ~303 |
-| | **×33** | **×4,2** | = | = | = | = | = | = |
-
-Deux raisons, toutes deux lisibles dans les données : plus il y a de caisses posées, **moins il
-reste à faire** (les plongeons gagnants coûtent 3 à 22 états), **et** les branches condamnées se
-révèlent surtout tôt.
-
-- ⚠️ **Le seuil ne GARANTIT rien** : sur le 9, un record est encore mort à **11/14 = 79 %**, juste
-  sous la barre. Rien ne dit qu'un autre niveau n'aura pas un mort à 85 ou 90 % — c'est même
-  l'attendu sur les gros non résolus, où le démêlage se joue tard. **Résonance directe avec le 11**,
-  dont le record est justement **11/14 = 79 %** (§6.3, 2026-07-24) : la mesure du 9 prouve qu'un
-  11/14 peut parfaitement être MORT.
-- **D'où le réglage retenu : seuil pour décider QUAND plonger, budget pour borner ce qu'on perd
-  quand le seuil s'est laissé avoir.** Le seuil fait le gros du travail, le budget est le garde-fou.
-- ⚠️ Réserve §11.4 : ces 80 % sont calés sur **8 niveaux**, dont plusieurs triviaux. Défaut
-  raisonnable, pas une loi — à revérifier dès qu'un non-résolu tombe.
-
-#### ✅ Session du 2026-07-28 (suite) — PLONGEON CODÉ et MESURÉ : la prédiction tombe juste
-
-**Le code** : `Solveur::AstarMacroPlongeon` (« A\* macro — plongeon sur record (essai) »), régime
-**SÉPARÉ** comme le couplage — `AstarMacro` reste le défaut, aucune variable d'environnement (§7).
-`SolveurAStar::plonge()` : best-first sur **h SEUL** (à h égal, le plus profond d'abord), goal macro
-et les deux corrals actifs, cache d'enclos **partagé avec la recherche principale** (un enclos déjà
-jugé ne se rejuge pas). Déclenché au point exact où le record est battu, si `rangees ≥ 80 %` des
-buts. Un échec rend `noeuds` à sa taille d'avant : **un plongeon raté ne laisse aucune trace**. Les
-états du plongeon sont **comptés dans le compteur** — sinon les chiffres ne seraient pas comparables
-au défaut. CLI : `bench <niv> plongeon`.
-
-| niveau | macro | **plongeon** | | poussées |
-|---|---|---|---|---|
-| **4** | 67 224 | **2 061** | **×32,6** | 359 (+4) |
-| **9** | 354 622 | **85 729** | **×4,1** | **237 = optimum** |
-| 0 | 4 | 5 | −1 état | 4 = |
-| 1 | 14 | 15 | −1 état | 97 = |
-| 2 | 412 | 417 | −5 états | 131 = |
-| 3 | 499 | 500 | −1 état | 134 = |
-| 5 | 9 123 | 9 124 | −1 état | 143 = |
-| 6 | 570 | 571 | −1 état | 110 = |
-| 7 | 24 376 | 24 377 | −1 état | 90 = |
-| 17 | 24 786 | 24 788 | −2 états | 213 = |
-
-**Deux gains massifs, et une NEUTRALITÉ parfaite ailleurs** (+1 à +5 états, poussées identiques au
-canari sur 9 niveaux sur 10). Le seuil tient sa promesse : **un seul plongeon tenté par niveau, et
-il réussit du premier coup** — jamais un raté à payer.
-
-**La mesure préalable avait prédit le comportement à l'état près** — c'est la validation de la
-méthode « mesurer avant de coder », pas seulement du chantier :
-
-| niveau | déclenché à | états de plongeon | prédit par les fixtures |
-|---|---|---|---|
-| 3 | 9/11 = 82 % | 3 | r9, 3 états ✓ |
-| 5 | 10/12 = 83 % | 3 | r10, 3 états ✓ |
-| 17 | 5/6 = 83 % | 23 | r5, 22 états ✓ |
-| 9 | 12/14 = 86 % | 9 | r12, 8 états ✓ |
-| 4 | 16/20 = 80 % | — | ×33 prédit, ×32,6 obtenu ✓ |
-
-- **Seul écart** : le 4 rend **359 poussées, pas les 357** annoncés. Normal et attendu — la mesure
-  préalable lançait un A\* **macro** depuis le record, le solveur lance un **greedy** ; les deux ne
-  prennent pas le même chemin. L'ordre de grandeur du gain, lui, est exact.
-- **Le canari n'est pas concerné** : régime séparé, `AstarMacro` inchangé. Les poussées du plongeon
-  sont d'ailleurs identiques au canari partout sauf sur le 4.
-
-#### ❌➡️✅ Session du 2026-07-28 (fin) — LE SEUIL EN % RÉFUTÉ, remplacé par un BUDGET RELATIF
-
-**Le 8 a tout fait basculer.** Il ne gagnait RIEN à seuil 80 % (4 376 071 états, +1). Cause :
-son record plafonne à **12/18 = 67 %**, sous la barre — le plongeon ne se déclenchait qu'une fois la
-partie déjà jouée. À seuil 66 % il passe à **1 171 492 (×3,7)**, à 238 poussées, le plongeon
-réussissant depuis 12/18 en **23 états**. (C'est l'observation utilisateur « à 1 million d'états
-dépilés, on arrive sur un motif solvable » — vérifiée, à 1,17 M.)
-
-**Mais baisser le seuil ne marche pas non plus** : à 66 %, le 3 gagne (×2,51) alors que le **2 perd
-2 poussées et le 5 en perd 8** — on plonge depuis un chemin qui a déjà dévié. **Aucune valeur ne
-convient : 80 % est bon pour 4/9, 66 % est bon pour 8/3 et mauvais pour 2/5.**
-
-**La carte des records du 8 dit pourquoi, et donne la bonne variable.** Les records n'arrivent pas
-régulièrement, ils tombent **par PAQUETS séparés de longs plateaux de stagnation** :
-
-| records | atteints à | stagnation qui suit |
-|---|---|---|
-| 1-2 | ~0 | 22 000 |
-| 3 | 22 000 | 136 000 |
-| **4-10** | **158 000** | **1 013 000** (à 10/18) |
-| **11-12** | **1 171 000** | **3 205 000** (à 12/18) |
-| 13-18 | 4 376 000 | fin |
-
-Et surtout : le record **5/18 — 28 % du plateau** — est **complétable en 1 133 états**. Au même
-pourcentage, le **9** a des records **MORTS qui coûtent 59 771 états** à réfuter. **Le pourcentage de
-remplissage ne distingue pas les deux cas : ce n'est structurellement pas la bonne variable.**
-
-> **CE QUI LES DISTINGUE, c'est le TRAVAIL DÉJÀ CONSENTI.** Le 8 atteint son 5/18 après 158 000
-> dépilements ; le 9 atteint ses records morts après ~1 000. D'où la règle retenue, qui remplace À
-> LA FOIS le seuil et le budget fixe :
->
-> **budget du plongeon = (états déjà développés) / 100**, et on plonge à CHAQUE record.
->
-> *Plus on a ramé, plus il est rationnel de parier.* Le 2 (412 états au total) n'accorde jamais assez
-> de budget pour qu'un plongeon aboutisse → il ne plonge jamais et garde son optimum **par
-> construction, pas par réglage**. Les plongeons ruineux du 9 sont étouffés (budget ~10 à ce stade).
-> Le 8 à 158 000 dépilements dispose de 1 591.
-
-**Mesuré (`bench <niv> plongeon`, contre `macro`) :**
-
-| niveau | macro | **plongeon** | | poussées |
-|---|---|---|---|---|
-| **4** | 67 224 | **2 238** | **×30,0** | 359 (+4) |
-| **8** | 4 376 070 | **159 484** | **×27,4** | 240 (+2) |
-| **9** | 354 622 | **85 797** | **×4,13** | **237 = optimum** |
-| 2 | 412 | 431 | −5 % | **131 = optimum** |
-| 3 | 499 | 502 | = | **134 = optimum** |
-| 5 | 9 123 | 9 120 | = | **151 (+8)** ⚠️ |
-| 0 / 1 / 6 / 7 / 17 | — | ±2 % | = | **identiques** |
-
-**Les trois plus gros solves gagnent ×4 à ×30 pour 0 à 4 poussées de plus.** Sur le 8, le plongeon
-gagnant part de **4/18 = 22 %** en 340 états — le greedy fait mieux que l'A\* macro de la mesure
-préalable (1 133 états depuis 5/18), il fonce vraiment.
-
-- ⚠️ **Le 5 est le cas défavorable** : +8 poussées pour un gain d'états nul. Son record à 75 % est
-  complétable en 15 états alors que le budget en autorise déjà 90 — le plongeon part, alors
-  qu'attendre le record suivant donnait l'optimum. **Aucun budget ne corrige ça** : l'information
-  manquante est « combien de temps me reste-t-il ? », que le solveur ne connaît pas. C'est la
-  frontière habituelle du projet — on sait mesurer ce qui s'est passé, pas prédire ce qui reste.
-  Et c'est un argument de plus pour le vrai levier : une `h` plus serrée, elle, SAIT ce qui reste.
-- ⚠️ **Ce qui est gagné et ce qui ne l'est pas.** Le paramètre ne porte plus sur une **propriété du
-  plateau** (« à partir de quel remplissage un état devient sûr » — faux en général : complétable à
-  28 % sur le 8, mort à 79 % sur le 9) mais sur le **comportement observé du solveur**. Il a donc une
-  chance de tenir sur un niveau jamais vu. Mais **1/100 reste un nombre choisi** : à 1/1000 le 8
-  raterait ses 1 133 états, à 1/10 le 5 se dégraderait davantage. On a déplacé l'arbitraire, pas
-  supprimé.
-**✅ LE DIVISEUR BALAYÉ puis FIGÉ à 1/50 (fin de session).** Le 1/100 initial venait de projections,
-jamais d'un balayage — exactement le reproche fait aux constantes empiriques. Mesuré sur les 12
-résolus :
-
-| diviseur | ce qui casse |
-|---|---|
-| 1/10 | **le 2 dérive à 139 poussées** (+8) : on plonge trop tôt, depuis un chemin déjà dévié |
-| 1/15 | le 2 dérive encore (133) |
-| **1/20 à 1/100** | **plage SÛRE** — poussées correctes partout |
-| 1/500 | **le 4 REPERD tout** (67 159 états au lieu de 2 115), le 8 retombe à 1 174 706 |
-
-**Les deux bords ont un mécanisme identifié** : en haut un budget trop généreux fait plonger depuis
-un record trop précoce (qualité perdue) ; en bas un budget trop maigre ne paie plus le plongeon
-gagnant — le 4 a besoin de 35 états à ~2 100 dépilements (donc diviseur ≤ 60), le 8 de 340 états à
-158 000 (donc ≤ 464). **1/50 est au centre** : ×2,5 de marge en haut, ×10 en bas.
-
-**Le 1/100 coûtait ×6,9 sur le 8** (159 484 contre 22 991) sans qu'on le sache. Chiffres complets :
-[scores.md](scores.md). ⚠️ **La fenêtre est ÉTROITE (facteur 5)** et le 4 la ferme de justesse : son
-plongeon gagnant réussit **en 35 états pour un budget de 41**, soit 17 % de marge. Un niveau dont le
-premier record complétable demanderait 50 états au même stade échapperait au plongeon. C'est la
-fragilité connue du réglage.
-
-- **Le log par TENTATIVE** (`[plongeon n] record r/N a X depiles | budget B -> REUSSI/echec en E
-  etats | cumul ...`) est ajouté après coup : sur le 11, 14 minutes se sont écoulées sans qu'on
-  puisse savoir si le solveur avait seulement tenté quelque chose, et un run arrêté à la main
-  n'imprime jamais son bilan de fin. Il montre le mécanisme en clair — sur le 4, les 7 records morts
-  sont réfutés pour **51 états au total**, puis le 8ᵉ aboutit ; cumul 4 % du travail.
-- **Propriété qui n'était pas dans l'intention de départ, et qui rend le régime SÛR : le surcoût est
-  borné a priori.** Chaque record coûte au plus 1 % du travail fait à cet instant, et il y a au plus
-  un record par but — le plongeon ne peut donc jamais faire dérailler un solve, au pire l'alourdir de
-  quelques pour cent. Observé : +4,6 % (2), +1,4 % (7), +0,1 % (17). Aucun budget FIXE ne pouvait
-  offrir cette garantie.
-
-**✅ DÉCISION : le plongeon reste un SOLVEUR À PART ENTIÈRE, PAS le défaut** (2026-07-28). Ce n'est
-pas de la prudence de façade, c'est le canari qui l'impose :
-- Le canari est **le juge de toute modif** du projet (§0) — une `h` qui surestime ou un élagage faux
-  positif « fait manquer l'optimum **sans aucun signal** ». Avec le plongeon en défaut, les poussées
-  de référence deviendraient 359 / 151 / 240 / 243 au lieu de 355 / 143 / 238 / 241, et surtout
-  elles deviendraient **INSTABLES** : toute modif décalant le compteur d'états décale le moment du
-  plongeon, donc le record d'où il part, donc le nombre de poussées. **On perdrait l'invariant qui
-  détecte les régressions silencieuses.**
-- La promotion n'apporterait rien de fonctionnel : le régime est déjà dans le menu de l'app et en
-  CLI (`bench <niv> plongeon` / `coupl-plongeon`). C'est **le régime à utiliser sur un niveau NON
-  RÉSOLU** — c'est ainsi que le 11 est tombé.
-- Argument renforcé par le balayage : un réglage qui gouverne la QUALITÉ de la solution et dont la
-  fenêtre utile fait un facteur 5 n'a pas sa place dans le défaut.
-
-#### 🎉🎉 2026-07-28 — **LE NIVEAU 11 EST RÉSOLU**, deux fois le même jour
-
-**La cible historique du projet tombe.** Jamais finie jusque-là (meilleur résultat antérieur :
-11/14 caisses posées, arrêt manuel à 57,7 M dépilements le 2026-07-24 ; et avant cela 8/14 à
-12,4 M). **12 niveaux résolus sur 33** — la carte du §0 est à jour.
-
-| régime | états | poussées | commit |
-|---|---|---|---|
-| `couplage` + corral-N (run utilisateur, mené au bout sans budget) | **87 085 967** | **241** | `cb4780c` |
-| **`couplage` + corral-N + PLONGEON** | **13 918 468** | 243 (+2) | (ce diff) |
-
-- **×6,3 pour +2 poussées.** Le plongeon gagnant part de **10/14 caisses posées** et coûte
-  **11 états**, sur un budget de 139 184 dont il n'utilise donc que 0,008 %. **10 plongeons tentés**
-  sur tout le run. C'est le résultat le plus net du régime : il n'accélère pas seulement des niveaux
-  déjà résolus, **il rend abordable le plus dur**.
-- **Ce qui a rendu ça possible, dans l'ordre** : le corral-N (élague le bois mort — 24 088 361
-  enfilages prunés sur 349 M, amortissement de cache ×208 pour 670 738 configurations distinctes
-  jugées), le régime `couplage` (seul à amener le 11 à 11/14), et le plongeon (fonce dans le vivant).
-  **Aucun des trois seul n'y arrivait.**
-- ⚠️ **Le mur mémoire du §6.5 est confirmé et dépassé** : 123,98 M clés en arène, file à 41,5 M,
-  `noeuds` à 142,5 M → de l'ordre de **8 Go** sur le run brut. Le plongeon, en divisant les états par
-  6,3, divise aussi la mémoire d'autant — **c'est le premier levier qui repousse le mur mémoire**,
-  alors qu'il n'a pas été conçu pour ça.
-- **241 poussées est sans référence** (premier solve du 11, régime macro donc pas un optimum prouvé).
-  Pour borner l'écart : `passages 11` donne les trajets solos (§3).
-
-**Quatre conclusions, toutes mesurées :**
-1. **Le levier est RÉEL mais INÉGAL.** Gros gains sur 2/3/4/6/9, **zéro** sur 5/7/17 — là, le
-   premier record vivant n'apparaît qu'à ~97 % du solve, il n'y a plus rien à gagner. Comme toute
-   technique de ce projet, il mord sur une famille, pas partout (§2.2).
-2. **La dégradation est minime, et souvent NULLE.** Sur 3/6/9/17, plonger rend **exactement
-   l'optimum du niveau**. Ailleurs +2 poussées (2, 4) ; seuls le 5 (+8) et le 7 (+22) paient
-   vraiment. C'était l'inconnue principale du chantier — elle est levée dans le bon sens.
-3. **Les records MORTS dominent la phase initiale, partout** : 11 d'affilée sur le 9, 8 sur le 5,
-   6 sur le 3 et le 6. Un plongeon sur chaque record plongerait donc des dizaines de fois dans le
-   vide avant son premier succès → **budget serré obligatoire** (les échecs, eux, tombent en < 1 s).
-4. ⚠️ **« Meilleur record » n'est PAS « meilleur état » — le niveau 3 le prouve.** Son record
-   **1/11 est vivant et se complète à l'optimum**, puis les records 2 à 6 sont **morts**, puis ça
-   redevient vivant. Le solveur bat donc son record en s'enfonçant dans des branches condamnées
-   alors qu'il avait déjà eu un état parfaitement complétable en main. Un plongeon qui ne se
-   déclenche que sur un record **strictement supérieur** rate ce cas.
-
-⚠️ **Réserve de méthode** : « MORT » signifie ici « A\* **macro** épuise l'espace depuis cet état »,
-ce qui n'est **pas** une preuve d'insolubilité (le régime d'engagement est incomplet — il ne génère
-que les macros vers le but actif). Vérification faite en **A\* pur** (complet) sur deux fixtures du
-niveau 4 : r04 et r07 sont **réellement morts**, et identiques avec `CORRAL=0` (donc pas un faux
-positif du corral). Pour le design, c'est de toute façon la bonne mesure : si le plongeon utilise la
-macro, il échouera exactement là où ces solves échouent.
 
 #### ✅ Session du 2026-07-21 (suite 2) — le COÛT PAR ÉTAT de la goal macro (outil `macro`)
 
@@ -680,7 +423,293 @@ w1 | 57673000 depiles | file 30837887 (+277 MONTE) | vus 85790194 | f 233 h(rest
   (`caisseAssignee`). Invisible sur les gains ci-dessus, mais à regarder si un niveau ralentit sans
   que ses états baissent.
 
-#### ✅ Session du 2026-07-29 — LE PLONGEON À L'ÉPREUVE DE DEUX NIVEAUX NEUFS (10, 21)
+#### 🎯 Session du 2026-07-28 (1/4) — MESURE PRÉALABLE du PLONGEON (avant toute ligne de solveur)
+
+**L'outil : `bench <niv> <mode> record`** (neuf). Écrit en `.xsb` **chaque état qui bat le max de
+caisses posées**, au fil du solve, et le DATE en dépilements (la ligne `[record]` part sur stderr,
+donc elle s'entrelace avec la jauge — pas besoin de toucher à la signature du signal). Le chemin
+reconstruit est rejoué sur une copie du départ pour compter les poussées **et vérifier que ce
+chemin mène bien à cet état** (une fixture fausse ne se verrait pas autrement — c'est le bug
+big-endian de `mou`, §5). `bench` accepte désormais un **chemin `.xsb`** à la place d'un numéro, ce
+qui rend les fixtures produites directement re-solvables.
+
+**La question du chantier, et sa réponse chiffrée** : à quel moment apparaît un état complétable à
+bas coût, et que coûte-t-il de le finir ? Mesuré sur les 10 résolus (hors 8), `macro` depuis chaque
+record, budget 30 s :
+
+| niveau | solve complet | 1ᵉʳ record **vivant** | dépilements | états pour finir | poussées totales |
+|---|---|---|---|---|---|
+| 2 | 412 | 6/10 | < 1 000 | 38 | 133 (+2) |
+| 3 | 499 | **1/11** | < 1 000 | 442 | **134 = optimum** |
+| 4 | 67 224 | 8/20 | ~2 000 | 120 | 357 (+2) |
+| 6 | 570 | 7/10 | < 1 000 | 4 | **110 = optimum** |
+| 9 | 354 622 | 12/14 | ~85 000 | 8 | **237 = optimum** |
+| 5 | 9 123 | 9/12 | ~9 000 | 15 | 151 (+8) |
+| 7 | 24 376 | 6/11 | ~22 000 | 1 509 | 112 (+22) |
+| 17 | 24 786 | 5/6 | ~24 000 | 22 | **213 = optimum** |
+
+⚠️ **Ce tableau ne dit PAS le gain — il ignore ce que coûtent les plongeons RATÉS**, et c'est
+l'erreur qu'on a failli garder. Mesuré (états explorés avant « aucune solution » depuis chaque
+record mort) : de **1 à 59 771 états**, avec une queue lourde — 59 770 et 59 771 sur le 9, ~5 000
+sur le 7, ~4 280 sur le 5, ~810 sur le 2. **Un plongeon raté peut coûter plus cher que tout ce
+qu'on espérait gagner.** Bilan NET (dépilements + tous les ratés + le succès) :
+
+| niveau | défaut | **budget 100** | **budget 2000** |
+|---|---|---|---|
+| 4 | 67 224 | **2 670 → ×25** | 2 171 → ×31 |
+| 9 | 354 622 | **85 557 → ×4,1** | 95 057 → ×3,7 |
+| 5 | 9 123 | 9 398 → −3 % | 15 098 → **perte ×1,65** |
+| 7 | 24 376 | 24 315 → neutre | 27 519 → −13 % |
+| 2 | 412 | 768 → −87 % | 3 310 → **perte ×8** |
+| 3 | 499 | 723 → −45 % | 642 → −29 % |
+
+> **Un budget SERRÉ bat un budget large** — contre-intuitif, et la raison est dans les données :
+> **quand un record est cher à finir, le suivant est presque toujours bon marché.** Sur le 4, le
+> record 8 coûte 120 états, le 14 en coûte 19 et le 16 en coûte 13 — tous atteints au même moment
+> (~2 000 dépilements). S'acharner sur un record ne sert à rien : le suivant fait le travail pour
+> dix fois moins cher.
+
+**🎯 LE SEUIL DE REMPLISSAGE BAT LE BUDGET (idée utilisateur) — et c'est le réglage retenu.** Le
+budget décide *ce qu'on perd quand on se trompe* ; un **seuil en % de buts remplis** décide *quand
+on tente*. Comme les records morts sont **concentrés dans le bas du tableau**, le seuil les évite au
+lieu de les payer :
+
+| niveau | 4 | 7 | 2 | 3 | 6 | 5 | 17 | **9** |
+|---|---|---|---|---|---|---|---|---|
+| morts jusqu'à | 35 % | 45 % | 50 % | 55 % | 60 % | 67 % | 67 % | **79 %** |
+| 1ᵉʳ vivant | 40 % | 55 % | 60 % | 64 % | 70 % | 75 % | 83 % | 86 % |
+
+À **seuil 80 %** : **zéro plongeon raté sur les huit niveaux**, aucune perte nulle part, et
+**7 niveaux sur 8 rendent l'OPTIMUM EXACT** (le 4 est à +2) :
+
+| niveau | 4 | 9 | 5 | 7 | 17 | 2 | 3 | 6 |
+|---|---|---|---|---|---|---|---|---|
+| défaut | 67 224 | 354 622 | 9 123 | 24 376 | 24 786 | 412 | 499 | 570 |
+| seuil 80 % | **~2 013** | **85 008** | 9 003 | ~24 003 | ~24 022 | ~314 | ~303 | ~303 |
+| | **×33** | **×4,2** | = | = | = | = | = | = |
+
+Deux raisons, toutes deux lisibles dans les données : plus il y a de caisses posées, **moins il
+reste à faire** (les plongeons gagnants coûtent 3 à 22 états), **et** les branches condamnées se
+révèlent surtout tôt.
+
+- ⚠️ **Le seuil ne GARANTIT rien** : sur le 9, un record est encore mort à **11/14 = 79 %**, juste
+  sous la barre. Rien ne dit qu'un autre niveau n'aura pas un mort à 85 ou 90 % — c'est même
+  l'attendu sur les gros non résolus, où le démêlage se joue tard. **Résonance directe avec le 11**,
+  dont le record est justement **11/14 = 79 %** (§6.3, 2026-07-24) : la mesure du 9 prouve qu'un
+  11/14 peut parfaitement être MORT.
+- **D'où le réglage retenu : seuil pour décider QUAND plonger, budget pour borner ce qu'on perd
+  quand le seuil s'est laissé avoir.** Le seuil fait le gros du travail, le budget est le garde-fou.
+- ⚠️ Réserve §11.4 : ces 80 % sont calés sur **8 niveaux**, dont plusieurs triviaux. Défaut
+  raisonnable, pas une loi — à revérifier dès qu'un non-résolu tombe.
+
+#### ✅ Session du 2026-07-28 (2/4) — PLONGEON CODÉ et MESURÉ : la prédiction tombe juste
+
+**Le code** : `Solveur::AstarMacroPlongeon` (« A\* macro — plongeon sur record (essai) »), régime
+**SÉPARÉ** comme le couplage — `AstarMacro` reste le défaut, aucune variable d'environnement (§7).
+`SolveurAStar::plonge()` : best-first sur **h SEUL** (à h égal, le plus profond d'abord), goal macro
+et les deux corrals actifs, cache d'enclos **partagé avec la recherche principale** (un enclos déjà
+jugé ne se rejuge pas). Déclenché au point exact où le record est battu, si `rangees ≥ 80 %` des
+buts. Un échec rend `noeuds` à sa taille d'avant : **un plongeon raté ne laisse aucune trace**. Les
+états du plongeon sont **comptés dans le compteur** — sinon les chiffres ne seraient pas comparables
+au défaut. CLI : `bench <niv> plongeon`.
+
+| niveau | macro | **plongeon** | | poussées |
+|---|---|---|---|---|
+| **4** | 67 224 | **2 061** | **×32,6** | 359 (+4) |
+| **9** | 354 622 | **85 729** | **×4,1** | **237 = optimum** |
+| 0 | 4 | 5 | −1 état | 4 = |
+| 1 | 14 | 15 | −1 état | 97 = |
+| 2 | 412 | 417 | −5 états | 131 = |
+| 3 | 499 | 500 | −1 état | 134 = |
+| 5 | 9 123 | 9 124 | −1 état | 143 = |
+| 6 | 570 | 571 | −1 état | 110 = |
+| 7 | 24 376 | 24 377 | −1 état | 90 = |
+| 17 | 24 786 | 24 788 | −2 états | 213 = |
+
+**Deux gains massifs, et une NEUTRALITÉ parfaite ailleurs** (+1 à +5 états, poussées identiques au
+canari sur 9 niveaux sur 10). Le seuil tient sa promesse : **un seul plongeon tenté par niveau, et
+il réussit du premier coup** — jamais un raté à payer.
+
+**La mesure préalable avait prédit le comportement à l'état près** — c'est la validation de la
+méthode « mesurer avant de coder », pas seulement du chantier :
+
+| niveau | déclenché à | états de plongeon | prédit par les fixtures |
+|---|---|---|---|
+| 3 | 9/11 = 82 % | 3 | r9, 3 états ✓ |
+| 5 | 10/12 = 83 % | 3 | r10, 3 états ✓ |
+| 17 | 5/6 = 83 % | 23 | r5, 22 états ✓ |
+| 9 | 12/14 = 86 % | 9 | r12, 8 états ✓ |
+| 4 | 16/20 = 80 % | — | ×33 prédit, ×32,6 obtenu ✓ |
+
+- **Seul écart** : le 4 rend **359 poussées, pas les 357** annoncés. Normal et attendu — la mesure
+  préalable lançait un A\* **macro** depuis le record, le solveur lance un **greedy** ; les deux ne
+  prennent pas le même chemin. L'ordre de grandeur du gain, lui, est exact.
+- **Le canari n'est pas concerné** : régime séparé, `AstarMacro` inchangé. Les poussées du plongeon
+  sont d'ailleurs identiques au canari partout sauf sur le 4.
+
+#### ❌➡️✅ Session du 2026-07-28 (3/4) — LE SEUIL EN % RÉFUTÉ, remplacé par un BUDGET RELATIF
+
+**Le 8 a tout fait basculer.** Il ne gagnait RIEN à seuil 80 % (4 376 071 états, +1). Cause :
+son record plafonne à **12/18 = 67 %**, sous la barre — le plongeon ne se déclenchait qu'une fois la
+partie déjà jouée. À seuil 66 % il passe à **1 171 492 (×3,7)**, à 238 poussées, le plongeon
+réussissant depuis 12/18 en **23 états**. (C'est l'observation utilisateur « à 1 million d'états
+dépilés, on arrive sur un motif solvable » — vérifiée, à 1,17 M.)
+
+**Mais baisser le seuil ne marche pas non plus** : à 66 %, le 3 gagne (×2,51) alors que le **2 perd
+2 poussées et le 5 en perd 8** — on plonge depuis un chemin qui a déjà dévié. **Aucune valeur ne
+convient : 80 % est bon pour 4/9, 66 % est bon pour 8/3 et mauvais pour 2/5.**
+
+**La carte des records du 8 dit pourquoi, et donne la bonne variable.** Les records n'arrivent pas
+régulièrement, ils tombent **par PAQUETS séparés de longs plateaux de stagnation** :
+
+| records | atteints à | stagnation qui suit |
+|---|---|---|
+| 1-2 | ~0 | 22 000 |
+| 3 | 22 000 | 136 000 |
+| **4-10** | **158 000** | **1 013 000** (à 10/18) |
+| **11-12** | **1 171 000** | **3 205 000** (à 12/18) |
+| 13-18 | 4 376 000 | fin |
+
+Et surtout : le record **5/18 — 28 % du plateau** — est **complétable en 1 133 états**. Au même
+pourcentage, le **9** a des records **MORTS qui coûtent 59 771 états** à réfuter. **Le pourcentage de
+remplissage ne distingue pas les deux cas : ce n'est structurellement pas la bonne variable.**
+
+> **CE QUI LES DISTINGUE, c'est le TRAVAIL DÉJÀ CONSENTI.** Le 8 atteint son 5/18 après 158 000
+> dépilements ; le 9 atteint ses records morts après ~1 000. D'où la règle retenue, qui remplace À
+> LA FOIS le seuil et le budget fixe :
+>
+> **budget du plongeon = (états déjà développés) / 100**, et on plonge à CHAQUE record.
+>
+> *Plus on a ramé, plus il est rationnel de parier.* Le 2 (412 états au total) n'accorde jamais assez
+> de budget pour qu'un plongeon aboutisse → il ne plonge jamais et garde son optimum **par
+> construction, pas par réglage**. Les plongeons ruineux du 9 sont étouffés (budget ~10 à ce stade).
+> Le 8 à 158 000 dépilements dispose de 1 591.
+
+**Mesuré (`bench <niv> plongeon`, contre `macro`) :**
+
+| niveau | macro | **plongeon** | | poussées |
+|---|---|---|---|---|
+| **4** | 67 224 | **2 238** | **×30,0** | 359 (+4) |
+| **8** | 4 376 070 | **159 484** | **×27,4** | 240 (+2) |
+| **9** | 354 622 | **85 797** | **×4,13** | **237 = optimum** |
+| 2 | 412 | 431 | −5 % | **131 = optimum** |
+| 3 | 499 | 502 | = | **134 = optimum** |
+| 5 | 9 123 | 9 120 | = | **151 (+8)** ⚠️ |
+| 0 / 1 / 6 / 7 / 17 | — | ±2 % | = | **identiques** |
+
+**Les trois plus gros solves gagnent ×4 à ×30 pour 0 à 4 poussées de plus.** Sur le 8, le plongeon
+gagnant part de **4/18 = 22 %** en 340 états — le greedy fait mieux que l'A\* macro de la mesure
+préalable (1 133 états depuis 5/18), il fonce vraiment.
+
+- ⚠️ **Le 5 est le cas défavorable** : +8 poussées pour un gain d'états nul. Son record à 75 % est
+  complétable en 15 états alors que le budget en autorise déjà 90 — le plongeon part, alors
+  qu'attendre le record suivant donnait l'optimum. **Aucun budget ne corrige ça** : l'information
+  manquante est « combien de temps me reste-t-il ? », que le solveur ne connaît pas. C'est la
+  frontière habituelle du projet — on sait mesurer ce qui s'est passé, pas prédire ce qui reste.
+  Et c'est un argument de plus pour le vrai levier : une `h` plus serrée, elle, SAIT ce qui reste.
+- ⚠️ **Ce qui est gagné et ce qui ne l'est pas.** Le paramètre ne porte plus sur une **propriété du
+  plateau** (« à partir de quel remplissage un état devient sûr » — faux en général : complétable à
+  28 % sur le 8, mort à 79 % sur le 9) mais sur le **comportement observé du solveur**. Il a donc une
+  chance de tenir sur un niveau jamais vu. Mais **1/100 reste un nombre choisi** : à 1/1000 le 8
+  raterait ses 1 133 états, à 1/10 le 5 se dégraderait davantage. On a déplacé l'arbitraire, pas
+  supprimé.
+**✅ LE DIVISEUR BALAYÉ puis FIGÉ à 1/50 (fin de session).** Le 1/100 initial venait de projections,
+jamais d'un balayage — exactement le reproche fait aux constantes empiriques. Mesuré sur les 12
+résolus :
+
+| diviseur | ce qui casse |
+|---|---|
+| 1/10 | **le 2 dérive à 139 poussées** (+8) : on plonge trop tôt, depuis un chemin déjà dévié |
+| 1/15 | le 2 dérive encore (133) |
+| **1/20 à 1/100** | **plage SÛRE** — poussées correctes partout |
+| 1/500 | **le 4 REPERD tout** (67 159 états au lieu de 2 115), le 8 retombe à 1 174 706 |
+
+**Les deux bords ont un mécanisme identifié** : en haut un budget trop généreux fait plonger depuis
+un record trop précoce (qualité perdue) ; en bas un budget trop maigre ne paie plus le plongeon
+gagnant — le 4 a besoin de 35 états à ~2 100 dépilements (donc diviseur ≤ 60), le 8 de 340 états à
+158 000 (donc ≤ 464). **1/50 est au centre** : ×2,5 de marge en haut, ×10 en bas.
+
+**Le 1/100 coûtait ×6,9 sur le 8** (159 484 contre 22 991) sans qu'on le sache. Chiffres complets :
+[scores.md](scores.md). ⚠️ **La fenêtre est ÉTROITE (facteur 5)** et le 4 la ferme de justesse : son
+plongeon gagnant réussit **en 35 états pour un budget de 41**, soit 17 % de marge. Un niveau dont le
+premier record complétable demanderait 50 états au même stade échapperait au plongeon. C'est la
+fragilité connue du réglage.
+
+- **Le log par TENTATIVE** (`[plongeon n] record r/N a X depiles | budget B -> REUSSI/echec en E
+  etats | cumul ...`) est ajouté après coup : sur le 11, 14 minutes se sont écoulées sans qu'on
+  puisse savoir si le solveur avait seulement tenté quelque chose, et un run arrêté à la main
+  n'imprime jamais son bilan de fin. Il montre le mécanisme en clair — sur le 4, les 7 records morts
+  sont réfutés pour **51 états au total**, puis le 8ᵉ aboutit ; cumul 4 % du travail.
+- **Propriété qui n'était pas dans l'intention de départ, et qui rend le régime SÛR : le surcoût est
+  borné a priori.** Chaque record coûte au plus 1 % du travail fait à cet instant, et il y a au plus
+  un record par but — le plongeon ne peut donc jamais faire dérailler un solve, au pire l'alourdir de
+  quelques pour cent. Observé : +4,6 % (2), +1,4 % (7), +0,1 % (17). Aucun budget FIXE ne pouvait
+  offrir cette garantie.
+
+**✅ DÉCISION : le plongeon reste un SOLVEUR À PART ENTIÈRE, PAS le défaut** (2026-07-28). Ce n'est
+pas de la prudence de façade, c'est le canari qui l'impose :
+- Le canari est **le juge de toute modif** du projet (§0) — une `h` qui surestime ou un élagage faux
+  positif « fait manquer l'optimum **sans aucun signal** ». Avec le plongeon en défaut, les poussées
+  de référence deviendraient 359 / 151 / 240 / 243 au lieu de 355 / 143 / 238 / 241, et surtout
+  elles deviendraient **INSTABLES** : toute modif décalant le compteur d'états décale le moment du
+  plongeon, donc le record d'où il part, donc le nombre de poussées. **On perdrait l'invariant qui
+  détecte les régressions silencieuses.**
+- La promotion n'apporterait rien de fonctionnel : le régime est déjà dans le menu de l'app et en
+  CLI (`bench <niv> plongeon` / `coupl-plongeon`). C'est **le régime à utiliser sur un niveau NON
+  RÉSOLU** — c'est ainsi que le 11 est tombé.
+- Argument renforcé par le balayage : un réglage qui gouverne la QUALITÉ de la solution et dont la
+  fenêtre utile fait un facteur 5 n'a pas sa place dans le défaut.
+
+#### 🎉🎉 2026-07-28 (4/4) — **LE NIVEAU 11 EST RÉSOLU**, deux fois le même jour
+
+**La cible historique du projet tombe.** Jamais finie jusque-là (meilleur résultat antérieur :
+11/14 caisses posées, arrêt manuel à 57,7 M dépilements le 2026-07-24 ; et avant cela 8/14 à
+12,4 M). **12 niveaux résolus sur 33** — la carte du §0 est à jour.
+
+| régime | états | poussées | commit |
+|---|---|---|---|
+| `couplage` + corral-N (run utilisateur, mené au bout sans budget) | **87 085 967** | **241** | `cb4780c` |
+| **`couplage` + corral-N + PLONGEON** | **13 918 468** | 243 (+2) | (ce diff) |
+
+- **×6,3 pour +2 poussées.** Le plongeon gagnant part de **10/14 caisses posées** et coûte
+  **11 états**, sur un budget de 139 184 dont il n'utilise donc que 0,008 %. **10 plongeons tentés**
+  sur tout le run. C'est le résultat le plus net du régime : il n'accélère pas seulement des niveaux
+  déjà résolus, **il rend abordable le plus dur**.
+- **Ce qui a rendu ça possible, dans l'ordre** : le corral-N (élague le bois mort — 24 088 361
+  enfilages prunés sur 349 M, amortissement de cache ×208 pour 670 738 configurations distinctes
+  jugées), le régime `couplage` (seul à amener le 11 à 11/14), et le plongeon (fonce dans le vivant).
+  **Aucun des trois seul n'y arrivait.**
+- ⚠️ **Le mur mémoire du §6.5 est confirmé et dépassé** : 123,98 M clés en arène, file à 41,5 M,
+  `noeuds` à 142,5 M → de l'ordre de **8 Go** sur le run brut. Le plongeon, en divisant les états par
+  6,3, divise aussi la mémoire d'autant — **c'est le premier levier qui repousse le mur mémoire**,
+  alors qu'il n'a pas été conçu pour ça.
+- **241 poussées est sans référence** (premier solve du 11, régime macro donc pas un optimum prouvé).
+  Pour borner l'écart : `passages 11` donne les trajets solos (§3).
+
+**Quatre conclusions, toutes mesurées :**
+1. **Le levier est RÉEL mais INÉGAL.** Gros gains sur 2/3/4/6/9, **zéro** sur 5/7/17 — là, le
+   premier record vivant n'apparaît qu'à ~97 % du solve, il n'y a plus rien à gagner. Comme toute
+   technique de ce projet, il mord sur une famille, pas partout (§2.2).
+2. **La dégradation est minime, et souvent NULLE.** Sur 3/6/9/17, plonger rend **exactement
+   l'optimum du niveau**. Ailleurs +2 poussées (2, 4) ; seuls le 5 (+8) et le 7 (+22) paient
+   vraiment. C'était l'inconnue principale du chantier — elle est levée dans le bon sens.
+3. **Les records MORTS dominent la phase initiale, partout** : 11 d'affilée sur le 9, 8 sur le 5,
+   6 sur le 3 et le 6. Un plongeon sur chaque record plongerait donc des dizaines de fois dans le
+   vide avant son premier succès → **budget serré obligatoire** (les échecs, eux, tombent en < 1 s).
+4. ⚠️ **« Meilleur record » n'est PAS « meilleur état » — le niveau 3 le prouve.** Son record
+   **1/11 est vivant et se complète à l'optimum**, puis les records 2 à 6 sont **morts**, puis ça
+   redevient vivant. Le solveur bat donc son record en s'enfonçant dans des branches condamnées
+   alors qu'il avait déjà eu un état parfaitement complétable en main. Un plongeon qui ne se
+   déclenche que sur un record **strictement supérieur** rate ce cas.
+
+⚠️ **Réserve de méthode** : « MORT » signifie ici « A\* **macro** épuise l'espace depuis cet état »,
+ce qui n'est **pas** une preuve d'insolubilité (le régime d'engagement est incomplet — il ne génère
+que les macros vers le but actif). Vérification faite en **A\* pur** (complet) sur deux fixtures du
+niveau 4 : r04 et r07 sont **réellement morts**, et identiques avec `CORRAL=0` (donc pas un faux
+positif du corral). Pour le design, c'est de toute façon la bonne mesure : si le plongeon utilise la
+macro, il échouera exactement là où ces solves échouent.
+
+#### ✅ Session du 2026-07-29 (1/4) — LE PLONGEON À L'ÉPREUVE DE DEUX NIVEAUX NEUFS (10, 21)
 
 **Deux niveaux tombent le même jour, sans une ligne de code** : le **21** (2 923 006 états, 165
 poussées) et le **10** (2 175 724, 544). Détails et réserves : [scores.md](scores.md).
@@ -719,7 +748,7 @@ décaler le compteur d'états décale le moment du plongeon, donc le record d'o�
 plongeon, les poussées ne sont donc PAS un canari, même approximatif** — et le meilleur résultat
 connu sur le 21 est 147, pas 165.
 
-#### ⚠️➡️❌ Session du 2026-07-29 — le log des plongeons N'EST PAS un détecteur de branche morte
+#### ⚠️➡️❌ Session du 2026-07-29 (2/4) — le log des plongeons N'EST PAS un détecteur de branche morte
 
 > **RÉFUTÉ le jour même, par le profilage à témoins (§6.6).** Ce qui suit reste vrai *techniquement*
 > — `E ≪ B` signifie bien « espace épuisé » — mais la conclusion qu'on en tirait (« le 12 s'enfonce
@@ -741,7 +770,7 @@ connu sur le 21 est 147, pas 165.
 > Ce qui distingue réellement les résolus n'est pas l'absence de records morts, c'est que **le
 > plongeon finit par réussir** — un constat *a posteriori*, donc pas un prédicteur.
 
-#### 🎯 Session du 2026-07-29 — le log des plongeons, ce qu'il dit vraiment
+#### 🎯 Session du 2026-07-29 (3/4) — le log des plongeons, ce qu'il dit vraiment
 
 **La lecture, et elle est gratuite** (le log existe depuis le 2026-07-28) :
 
@@ -782,7 +811,7 @@ au §6.2 : l'ordre de remplissage a condamné la partie au rang 16.
   **lent**. Le plafond réel sur cette machine est vers 15-16 Go, soit de l'ordre de **150 M états
   vus** (extrapolation du §6.5).
 
-#### ⏸️ Session du 2026-07-29 (fin) — LE 31 : 188 M états vus, arrêté sans verdict
+#### ⏸️ Session du 2026-07-29 (4/4) — LE 31 : 188 M états vus, arrêté sans verdict
 
 Premier des deux candidats désignés par le profilage (§6.6) — retenu pour ses **0 record mort** et
 une dizaine de plongeons échouant *uniquement* par budget. Lancé sans budget, **arrêté à 45 min sans
