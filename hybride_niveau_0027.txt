@@ -3105,3 +3105,7 @@
 [mouv] joueur (8,2)->(7,2) POUSSE caisse ->(6,2) [POSE]
 [hybride] aucun but actif (etat gagne)
 [macro] TERMINEE
+
+=== niveau 27 — partie du 2026-08-07 11:10:11 ===
+[hybride] ordre de remplissage ⚠ INJECTE depuis ordre_niveau_0027.txt : 0:(6,4) 1:(5,4) 2:(4,4) 3:(1,4) 4:(3,4) 5:(2,4) 6:(1,3) 7:(2,3) 8:(3,3) 9:(4,3) 10:(2,1) 11:(3,1) 12:(4,1) 13:(2,2) 14:(3,2) 15:(4,2) 16:(6,3) 17:(5,3) 18:(5,2) 19:(6,2)
+[hybride] posees 0/20 | but actif (6,4) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES

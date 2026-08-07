@@ -16,7 +16,7 @@
 
 <!-- INDEX DES SESSIONS -->
 
-**13 sessions.** Verdict en tête : ✅ acquis · ❌ réfuté · ⏸️ sans verdict ·
+**15 sessions.** Verdict en tête : ✅ acquis · ❌ réfuté · ⏸️ sans verdict ·
 🎯 résultat marquant · 🎉 niveau tombé · ⚠️ correction · 📖 lecture. Les titres sont
 exacts, une recherche sur la date ou sur un mot du sujet tombe dessus.
 
@@ -35,6 +35,8 @@ exacts, une recherche sur la date ou sur un mot du sujet tombe dessus.
 | ⚠️➡️❌ | 2026-07-29 2/4 | le log des plongeons N'EST PAS un détecteur de branche morte |
 | 🎯 | 2026-07-29 3/4 | le log des plongeons, ce qu'il dit vraiment |
 | ⏸️ | 2026-07-29 4/4 | LE 31 : 188 M états vus, arrêté sans verdict |
+| 🎯 | 2026-08-07 1/2 | LE JOUEUR PRIS POUR UN OBSTACLE : la macro ne savait jouer aucun DEMI-TOUR |
+| ❌ | 2026-08-07 2/2 | LA TOLÉRANCE AU DÉTOUR mesurée puis RÉFUTÉE — 5 macros sur 205 |
 
 <!-- FIN INDEX -->
 
@@ -840,3 +842,231 @@ conclusion**. À retenir avant de le reprendre :
   deux minutes, 0 record mort, 10 plongeons par budget. À lancer en premier à la reprise.
 - [ ] Si le 31 est repris : prévoir **des heures**, pas des minutes, et surveiller la file plutôt que
   la RSS.
+
+#### 🎯 Session du 2026-08-07 (1/2) — LE JOUEUR PRIS POUR UN OBSTACLE : la macro ne savait jouer aucun DEMI-TOUR
+
+**Point de départ, constat utilisateur sur un plateau exporté du niveau 2** (une seule caisse restante
+en (11,7), un seul but vide en (2,1)) : *« la caisse en (11,7) ne déclenche pas de macro. Le chemin
+précalculé passe par la ligne 7, colonne 11 ⇒ 5. Pourquoi la macro ne passe pas par la colonne 11 ? »*
+
+**La colonne 11 n'était pas le sujet — et le précalcul avait raison.** `distanceParBut` pour le but
+(2,1) rend `(11,7)=17`, `(10,7)=16`, `(11,6)=**18**` : monter coûte **+1**. La ligne 7 est bien la
+route la plus courte. Le défaut était en aval, à la sixième poussée.
+
+**🔴 LE BUG, une ligne, dans le contrat de descente `avanceVersBut` (`game.cpp:2736`) :**
+
+```cpp
+if (!isLibre(devant)) return -1;         // arrivée occupée (mur / autre caisse)
+```
+
+`isLibre` ne rend vrai que pour `tcNone` et `tcGoal` (`game.cpp:642`). La case où se tient le **joueur**
+est `tcPlayer`/`tcGoalPlayer` — donc **fausse**. Or le joueur n'est jamais un obstacle pour une
+poussée : `pousse()` le téléporte sur la case d'appui avant que la caisse n'avance.
+
+**Et l'autre exemplaire de la règle l'avait, en le commentant** (`getCaissesDeplacable`, `game.cpp:661`) :
+
+```cpp
+// Le joueur libère sa propre case en marchant vers le point de
+// poussée avant de pousser : elle compte comme libre même si
+// elle est actuellement occupée par lui.
+if(isLibre(idxDestination) || idxDestination == idxPlayer) {
+```
+
+**Deux exemplaires de la même règle, un seul l'appliquait.** Les poussées simples savaient, la macro
+non. C'est le motif du §7 (« énumérer TOUTES les entrées qui atteignent le compteur »), sous une
+cinquième forme : une exemption écrite à un endroit et pas à l'autre.
+
+> **CE QUE ÇA COÛTAIT EXACTEMENT, ET C'EST STRUCTUREL.** Après une poussée, le joueur est **par
+> construction** sur la case d'où la caisse vient. Toute poussée qui ramène la caisse en arrière a donc
+> pour destination la case du joueur — **le test refusait tout DEMI-TOUR, sans exception**. Or le
+> demi-tour est le **RECUL** du §3 : les 0,8 à 2,8 % de poussées qui portent la **totalité du mou**, et
+> dont `moureel` a mesuré que la caisse revient sur la case libérée **9 fois sur 10**. La macro ne
+> pouvait en jouer aucun.
+
+Sur le plateau d'origine, la trace le montre au pas 6 — le test de monotonie PASSAIT :
+
+```
+pas 6 : caisse (5,7)  reste 11  joueur (6,7)
+        Droite -> (6,7) : libre=0  ❌   (rApres=3, dpb=11, attendu 11)
+```
+
+**Le correctif**, aligné sur l'exemplaire qui avait la règle :
+
+```cpp
+const int idxPlayer = playerPoint.x() + playerPoint.y() * largeur;
+if (!isLibre(devant) && devant != idxPlayer) return -1;
+```
+
+C'est un **RELÂCHEMENT** : plus de macros disponibles, jamais moins. Il ne peut pas produire de fausse
+solution (`pousse()` valide le coup, `zone[appui]` valide l'appui), mais il change l'arbre partout où
+la macro tourne — d'où le canari, obligatoire.
+
+**✅ CANARI INTACT ET GAIN NET** (macro, binaire contre binaire, ancien reconstruit depuis `1308642`
+par `git worktree`, macOS arm64) :
+
+| niv | états REF | états NEW | | coups REF → NEW |
+|---|---|---|---|---|
+| **17** | 24 786 | **18 636** | **÷1,33** | 569 → **561** |
+| **2** | 412 | **364** | ÷1,13 | 541 → **523** |
+| **9** | 354 623 | **325 250** | ÷1,09 | 678 = |
+| **4** | 55 560 | **55 095** | −0,8 % | 945 → **943** |
+| 0, 1, 3, 5, 6, 7, 190, 191 | — | identiques | — | = |
+
+**Poussées identiques sur les douze** : 4/97/131/134/355/143/110/90/237/213, 190=220, 191=250.
+**Aucun niveau dégradé.** Les **coups** baissent à poussées égales : même solution, moins de marche —
+c'est le demi-tour joué en macro au lieu d'être reconstruit en poussées simples.
+
+---
+
+**⚠️ LE SECOND PLATEAU N'EST PAS LE MÊME PROBLÈME — et il ne faut pas le corriger.** L'utilisateur a
+ensuite exporté le même niveau 2 avec **toutes les caisses restantes** (6 hors but). Là, aucune macro,
+pour aucune caisse. Ce n'est pas un bug : mesuré par retrait progressif des caisses, but actif (1,1).
+
+| plateau | macro | où (11,7) s'arrête |
+|---|---|---|
+| toutes les caisses | **NON** | (10,7) — (9,7) et (10,6) sont des caisses |
+| sans (9,7) | **NON** | plus loin, sur (7,7) |
+| sans (9,7), (7,7) | **NON** | (5,7) — `appui (4,7) HORS ZONE` |
+| sans (9,7), (7,7), (4,7) | **OUI** | **ARRIVÉE au but** |
+
+- **La troisième caisse ne bloque pas sur le trajet.** (4,7) n'est jamais traversée : c'est la case où
+  le joueur doit se tenir pour faire le **demi-tour** en (5,7). Une caisse garée **à côté** du chemin
+  suffit à tuer la macro, et rien dans le trajet ne le laisse voir.
+- **Contrat réel de la macro, à écrire noir sur blanc** : elle exige que **tout le trajet solo soit
+  libre, PLUS les appuis de ses demi-tours**. Elle ne sait pas contourner d'une case.
+- La table dit vrai jusqu'au bout, vérifié à la main sur ce plateau : colonne 11 = 4+5+2+3+3+2 = **19** ;
+  ligne 7 = 16 de trajet **+ 2 pour le demi-tour en (5,7)** = **18**. `distanceParBut` **encode le
+  demi-tour** — c'est bien la descente, et elle seule, qui ne savait pas l'exécuter.
+
+> 🎯 **LA FORMULATION QUI MANQUAIT AU PLAN : `h` ET L'ITINÉRAIRE DE LA MACRO PARTAGENT UNE TABLE, ALORS
+> QU'ILS N'ONT PAS LA MÊME CONTRAINTE.** `h` doit ignorer les autres caisses sous peine d'être
+> inadmissible — c'est « caisses = murs », réfuté au §4 **comme borne**. La macro, elle, n'est qu'un
+> **GUIDE** : elle a le droit de les voir. Un itinéraire faux ne produit jamais de fausse solution, il
+> fait échouer la macro **visiblement** — exactement la propriété LOUD que la session du 2026-08-06
+> cherchait pour le report de macro. **Rien n'est codé, rien n'est mesuré** : le coût (un champ de
+> distance par état) est le vrai sujet, et il n'a pas été estimé.
+
+---
+
+**📖 LEÇON DE MÉTHODE — c'est la RÉPLIQUE du contrat qui a localisé le bug, pas sa lecture.** Le
+raisonnement au crayon sur `avanceVersBut` a conclu **trois fois** que la poussée devait passer (région
+correcte, zone correcte, monotonie correcte). Ce qui a tranché : réécrire la descente dans `pas0` avec
+l'**API publique seule**, puis la confronter à la vraie fonction sur le même couple. La réplique
+arrivait au but, l'originale non — **l'écart entre deux implémentations de la même règle est un
+localisateur, là où relire une fonction ne l'est pas.**
+
+⚠️ **Un piège de lecture au passage** : `macroVersButBacktrack` rend `poussees.size() == 0` sur TOUT
+échec (le vecteur n'est affecté qu'en cas de succès). J'y ai lu « il échoue avant d'avoir joué » alors
+qu'il échouait au sixième pas. **La taille du chemin rendu ne dit rien du point d'échec** ; seul
+`essais` (nombre de branches) est informatif.
+
+**État du code** (non commité, sur `ordre-dynamique`, base `1308642`) :
+- `game.cpp` / `game.h` — le correctif d'`avanceVersBut` ; **`Game::champDistanceBrut(indexBut)`**,
+  accesseur const sur `distanceParBut` vu de la région du joueur courant. Même motif que
+  `getOrdreButs()` : un accesseur de mesure plutôt qu'un `qgetenv` de debug dans le chemin chaud (§7).
+- `mesures/pas0.cpp` — accepte un **chemin `.xsb`** (comme `bench`/`loi`/`ordre`), plus deux modes.
+  `champ` imprime **les deux champs côte à côte** — le BRUT (ce que la macro croit devoir suivre) et le
+  JOUABLE (ce que la descente accepte) : les lire ensemble est le seul moyen de séparer « la table se
+  trompe » de « la table a raison mais la descente ne sait pas l'exécuter ». `trace` rejoue la descente
+  pas à pas en donnant, pour chaque direction, la raison du refus (`MUR` / `caisse` / `appui HORS ZONE`
+  / `NON MONOTONE`), et se confronte à la vraie fonction en fin de sortie.
+  ⚠️ Charger une fixture de milieu de partie **recalcule `ordreButs`** (piège §7) — vérifié ici que le
+  but actif est le même que dans l'app (rang 4 de l'ordre du niveau 2, `(1,1)`) avant de conclure.
+
+**Reste ouvert :**
+- [ ] **Relancer les non-résolus.** Le §0 le dit : la frontière bouge quand les leviers changent, et
+  le 10 et le 21 sont tombés sans une ligne de code neuve. Ce correctif rend disponibles des macros
+  qui ne l'étaient nulle part — c'est exactement le cas de figure.
+- [ ] **L'itinéraire de la macro séparé de la table de `h`** (encadré ci-dessus). À discuter avant de
+  coder ; chiffrer d'abord le coût d'un champ de distance par état.
+- [ ] **Chercher les autres exemplaires de la règle du joueur-obstacle.** Les deux trouvés sont
+  `avanceVersBut` et `getCaissesDeplacable` ; rien ne garantit qu'il n'y en ait pas un troisième
+  (`diagnosticPas0` et `macroPeutDemarrer` délèguent, donc sont couverts).
+
+#### ❌ Session du 2026-08-07 (2/2) — LA TOLÉRANCE AU DÉTOUR : mesurée, puis RÉFUTÉE le jour même
+
+**Point de départ, constat utilisateur sur un plateau exporté du niveau 3** (5 caisses en colonne 10,
+5 buts vides, but actif `(2,8)` — rang 6 de l'ordre du 3, identique dans la fixture et dans l'app) :
+*« les caisses en (10,3), (10,5) et (10,6) devraient déclencher une macro, mais effectivement un poil
+plus longue que l'optimum ».*
+
+**L'intuition était juste sur ce plateau.** Le trajet solo descend la **colonne 10**, bouchée par les
+quatre autres caisses ; la seule issue est la **colonne 11**, refusée par la descente monotone. Mesuré
+par recherche bornée où seule la caisse suivie bouge (mode `detour`, ci-dessous) :
+
+| caisse | trajet solo | réel | écart |
+|---|---|---|---|
+| (10,3) | 13 | 17 | **+4** |
+| (10,5) | 11 | 13 | **+2** |
+| (10,6) | 10 | 12 | **+2** |
+
+(10,2) et (10,4) sont absentes : elles ne sont poussables dans **aucune** direction (masque
+`getCaissesDeplacable` à 0), coincées entre leurs voisines.
+
+**⚠️ L'ÉCART EST TOUJOURS PAIR, et c'est le §3 qui le dit.** `Δh` ne vaut jamais que −1 ou +1 le long
+d'un chemin ; un trajet de longueur `L` partant de `d₀` et finissant à 0 vérifie donc
+`L ≡ d₀ (mod 2)`. Les paliers de détour sont **2, 4, 6** — il n'y a pas de réglage fin à chercher. Et
+la conversion est directe (`mou = 2 × reculs`) : **un détour à +2 est exactement UN recul**. Ce que la
+macro ne sait pas jouer ici, ce n'est pas une bizarrerie de son contrat, c'est **la congestion
+elle-même, dans l'unité où le §3 la mesure**.
+
+**❌ LE BALAYAGE SUR LES 25 FIXTURES DISPONIBLES RÉFUTE LA GÉNÉRALISATION** (190-199, les neuf records
+du 13, plateau02, plateau02_2, plateau03, plateau16, plateau16_2, stock16 ; budget +8) :
+
+| | caisses poussables |
+|---|---|
+| examinées | **205** |
+| atteignent le but actif à **+0** — la macro les a déjà | 22 |
+| atteignent à **+2** | **5** |
+| atteignent à +4 | 1 |
+| atteignent à +6 | 1 |
+| **n'atteignent pas, même à +8** | **176 (86 %)** |
+
+> **Un budget de détour ajouterait 5 macros sur 205. Et les 7 gains sont TOUS sur les trois plateaux
+> exportés ce jour-là** — sur les 22 fixtures antérieures, il en ajoute **exactement zéro**. Le coût,
+> lui, serait une recherche bornée par caisse et par état, alors que le §6.3 a optimisé dans l'autre
+> sens (pré-test avant copie, 48,5 % des tentatives mortes au pas 0 sur le 11). **Piste fermée.**
+
+**🎯 CE QUE LE 86 % APPREND, ET C'EST LE VRAI RÉSULTAT DE LA SESSION.** Ces 176 caisses ne sont pas
+bloquées par un chemin trop long : elles **n'atteignent pas le but du tout** tant que les autres
+caisses ne bougent pas. Le mode d'échec dominant de la macro n'est donc **pas** « l'itinéraire est un
+peu plus long », c'est **« il faut d'abord dégager quelqu'un d'autre »** — et aucun budget de détour ne
+corrige ça, par construction : la macro déplace UNE caisse. C'est le démêlage, c'est-à-dire le mur
+PSPACE du §4. Premier chiffre mis sur ce mode d'échec.
+
+**Deux réserves, à garder avec le chiffre :**
+- **Les autres caisses sont traitées en MURS** dans cette recherche. Légitime pour un *itinéraire*
+  (« cette caisse peut-elle y aller sans qu'on touche aux autres ? »), mais ça SURESTIME la
+  difficulté — c'est le piège « caisses = murs » du §4, ici assumé et borné à sa seule lecture valide.
+  Le 86 % est donc un majorant du « il faut dégager quelqu'un », pas une mesure exacte.
+- **L'échantillon est biaisé DANS LE SENS QUI AURAIT DÛ FAVORISER L'IDÉE** : les trois plateaux du
+  jour ont été exportés *parce que* la macro y échouait. Que le gain soit nul sur les 22 autres n'en
+  est que plus net.
+
+**⚠️ PIÈGE DE DÉPOUILLEMENT — la première agrégation était FAUSSE et parfaitement plausible.** Elle
+annonçait **98,2 % à +0 et 1,3 % à +2**, ce qui se lisait comme « la macro fait déjà presque tout ».
+Cause : le parseur retenait les lignes commençant par `( x, y)`, or **le tableau des buts en fin de
+sortie commence pareil** — 11 lignes de buts par fixture comptées comme des caisses à écart 0.
+**Ce qui l'a démasquée, c'est une colonne CONSTANTE** : « 15, 15, 15, 15, 14… » sur les level019x,
+soit le nombre de BUTS et non de caisses, sur des plateaux dont le nombre de caisses varie. Même
+leçon que le §7 (« vérifier la cohérence interne d'un relevé avant de raisonner dessus ») : ici
+l'incohérence était lisible sans rien relancer.
+
+**État du code** : `mesures/pas0.cpp` seulement — deux modes neufs, rien dans le solveur.
+- `multi [x,y]` — combien de macros DISTINCTES une caisse peut-elle produire ? Énumère toutes les
+  descentes monotones et compte les **états** distincts. Mesuré : jusqu'à **4 chemins**, **toujours
+  1 seul état**. Structurel : toutes les descentes monotones ont la MÊME longueur (chaque pas retire
+  exactement 1), la configuration de caisses finale est identique, et la clé ne retient que la **ZONE**
+  du joueur — deux chemins ne divergent que si leurs dernières poussées viennent de côtés
+  **déconnectés une fois la caisse posée**. Jamais observé sur 17 fixtures. **Enfiler les forks ne
+  produirait donc que des doublons** que la dédup rejetterait.
+- `detour [tout|x,y] [budget]` — l'écart au trajet solo, par recherche bornée à une seule caisse
+  mobile. ⚠️ **Ce n'est PAS une borne pour `h`** (caisses en murs = surestimation) : c'est un
+  itinéraire. La distinction est celle de la session 1/2.
+
+**Reste ouvert :**
+- [ ] **Le vrai levier reste « dire *plus tard* sur une CAISSE »** (journal-hybride, 2026-08-06) :
+  refuser une macro laisse `macrosOk` à 0 et enclenche le repli tout seul. Le trou est le PRÉDICAT,
+  pas le câblage — et le 86 % ci-dessus dit que c'est bien là que ça se joue, pas dans l'itinéraire.
+- [ ] La macro **PARTIELLE** (s'arrêter en route au lieu de tout jeter) n'a pas été mesurée. Sur le
+  plateau du 2, la caisse (11,7) avance de deux poussées puis se mure, et cette avance est perdue.

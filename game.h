@@ -301,6 +301,15 @@ public:
     // humain (getZoneJoueur() + un balayage de 'size' cases), jamais dans le
     // solveur.
     QVector<int> champDistanceButActif() const;
+    // Champ de distance BRUT vers 'indexBut' : distanceParBut[but][case][région
+    // du joueur COURANT vis-à-vis de cette case], sur TOUTES les cases non-mur.
+    // C'est la table précalculée telle quelle, sans le filtre de jouabilité de
+    // champDistanceButActif() ci-dessus — donc le trajet que la macro CROIT
+    // devoir suivre, y compris là où aucun coup légal ne l'y mène.
+    // Lire les deux ensemble est le seul moyen de séparer « la table se trompe »
+    // de « la table a raison mais la descente monotone ne sait pas l'exécuter ».
+    // Accesseur de mesure, comme getOrdreButs() : jamais appelé par le solveur.
+    QVector<int> champDistanceBrut(int indexBut) const;
     // Trajet COMPLET de la goal macro pour la caisse 'idxCaisse' vers le but
     // actif : rejoue macroVersBut sur une COPIE (ne modifie pas *this) et
     // rend un champ sparse, une valeur (distance restante) sur CHAQUE case

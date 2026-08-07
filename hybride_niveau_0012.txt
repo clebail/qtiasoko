@@ -1962,3 +1962,7 @@
 === niveau 12 — partie du 2026-08-06 12:44:25 ===
 [hybride] ordre de remplissage calcule : 0:(13,5) 1:(13,6) 2:(13,7) 3:(15,5) 4:(15,6) 5:(15,7) 6:(15,8) 7:(13,8) 8:(15,9) 9:(13,9) 10:(14,9) 11:(14,8) 12:(14,7) 13:(14,6) 14:(14,5)
 [hybride] posees 0/15 | but actif (13,5) rang 0/15 | 0 macro jouable -> POUSSEES SIMPLES
+
+=== niveau 12 — partie du 2026-08-07 11:10:06 ===
+[hybride] ordre de remplissage ⚠ INJECTE depuis ordre_niveau_0012.txt : 0:(15,9) 1:(15,8) 2:(15,7) 3:(15,6) 4:(15,5) 5:(13,5) 6:(13,6) 7:(13,7) 8:(13,8) 9:(13,9) 10:(14,9) 11:(14,8) 12:(14,7) 13:(14,6) 14:(14,5)
+[hybride] posees 0/15 | but actif (15,9) rang 0/15 | 0 macro jouable -> POUSSEES SIMPLES

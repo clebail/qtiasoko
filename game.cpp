@@ -2733,7 +2733,14 @@ int Game::avanceVersBut(int c, int d, int dCur, const int* dpb,
     if (appx < 0 || appx >= largeur || appy < 0 || appy >= hauteur) return -1;
     const int devant = devx + devy * largeur;
     const int appui  = appx + appy * largeur;
-    if (!isLibre(devant)) return -1;         // arrivée occupée (mur / autre caisse)
+    // ⚠️ Le JOUEUR n'est pas un obstacle : il libère sa propre case en marchant
+    // vers l'appui avant que la caisse n'avance (pousse() le téléporte). Même
+    // exemption que getCaissesDeplacable (game.cpp:664), qui l'avait déjà et
+    // dont c'est la seule différence avec ce test — sans elle, la descente
+    // refusait TOUTE poussée qui ramène la caisse sur la case d'où on vient de
+    // la pousser, c'est-à-dire tout DEMI-TOUR : le joueur s'y tient forcément.
+    const int idxPlayer = playerPoint.x() + playerPoint.y() * largeur;
+    if (!isLibre(devant) && devant != idxPlayer) return -1;   // mur / autre caisse
     if (!zone[appui]) return -1;             // joueur ne peut pas se placer derrière
     const int rApres = regions[c * size + devant];
     if (rApres < 0) return -1;
@@ -2767,6 +2774,25 @@ QVector<int> Game::champDistanceButActif() const {
             const int devant = avanceVersBut(cell, d, dCur, dpb, zone);
             if (devant >= 0) champ[devant] = dCur - 1;
         }
+    }
+    return champ;
+}
+
+QVector<int> Game::champDistanceBrut(int indexBut) const {
+    if (indexBut < 0 || indexBut >= nbButs) return {};
+
+    QVector<int> champ(size, -1);
+    const int joueurIdx = playerPoint.x() + playerPoint.y() * largeur;
+    const int* dpb = distanceParBut.constData() + (qsizetype)indexBut * size * maxRegions;
+
+    for (int cell = 0; cell < size; cell++) {
+        if (cases[cell] == Level::tcMur) continue;
+        // La région se lit avec le joueur RÉEL : c'est ce que fait le solveur
+        // (getHeuristique, avanceVersBut), et c'est là qu'est tout l'intérêt —
+        // une même case n'a pas la même distance selon le côté où est le joueur.
+        const int r = regions[joueurIdx * size + cell];
+        if (r < 0) continue;
+        champ[cell] = dpb[cell * maxRegions + r];
     }
     return champ;
 }
