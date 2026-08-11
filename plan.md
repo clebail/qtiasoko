@@ -21,12 +21,17 @@ en silence pendant que le code bouge (c'est exactement ce qui a fait passer inap
 régression du niveau 9, cf. §6.3 — corrigé par la règle du §1).
 
 - ⚠️ **UN NIVEAU EST « RÉSOLU » SI ET SEULEMENT S'IL A UNE LIGNE DANS [scores.md](scores.md)**
-  (solve mené au bout, états/poussées/commit relevés). À ce jour : **15 résolus sur les 33**
-  (0-11, 17, 21 et 32 — le 11 le 2026-07-28, le **10, le 21 et le 32 le 2026-07-29**, cf. §6.0).
-  **Les 18 autres — 12, 13 à 16, 18 à 20, 22 à 31 — ne sont PAS résolus**, y compris
-  ceux dont ce document parle beaucoup (18, 24, 25, 26 au §6.2 ; 13-16 dans les tableaux de
+  (solve mené au bout, états/poussées/commit relevés). À ce jour : **18 résolus sur les 33**
+  (0-12, 17, 21, 26, 27 et 32 — le 11 le 2026-07-28, le 10/21/32 le 2026-07-29, et le **12, le 26 et
+  le 27 les 2026-08-09/11**, tous trois par le régime `ordre-look`, cf. §6.2 et
+  [journal-macro.md](journal-macro.md)).
+  **Les 15 autres — 13 à 16, 18 à 20, 22 à 25, 28 à 31 — ne sont PAS résolus**, y compris
+  ceux dont ce document parle beaucoup (18, 24, 25 au §6.2 ; 13-16 dans les tableaux de
   diagnostic du §6.3). Apparaître dans un tableau de mesure ne veut PAS dire résolu : `mort`,
   `macro` et la jauge `rangees` tournent justement sur des niveaux qu'on ne sait pas finir.
+  ⚠️ **Le 26 et le 27 sont résolus par un RÉGIME SÉPARÉ** (`ordre-look`), jamais par le défaut —
+  même statut que le 10, le 21 et le 32 avec le plongeon. Et `ordre-look` **casse le 32** : aucun
+  régime ne résout aujourd'hui les 18 d'un seul tenant.
   Hors carte : 190 et 191 sont des **bancs d'essai** (endgame du 11 isolé), résolus mais ils ne
   comptent pas dans les 33.
 - ⚠️ **CORRIGÉ le 2026-07-29 — « les non-résolus n'ont, pour la plupart, jamais été attaqués »
@@ -47,8 +52,11 @@ régression du niveau 9, cf. §6.3 — corrigé par la règle du §1).
 - **Le mur mémoire n'existe plus** : pic 599 Mo sur tout le tour (contre 20,7 Go qui tuaient
   le 2 avant la macro). **Ce qui reste est un mur de TEMPS.** Tous les chantiers mémoire
   (hachage 128 bits, blocs pour `noeuds`/file) sont **sans objet**.
-- Deux modes d'échec (jauge `rangees`) : **Groupe A** ne démarre pas (la macro ne s'engage
-  jamais) ; **Groupe B** plafonne à mi-chemin (l'ordre de remplissage se mure tout seul).
+- ~~Deux modes d'échec (jauge `rangees`) : **Groupe A** ne démarre pas ; **Groupe B** plafonne à
+  mi-chemin.~~ ❌ **PARTITION TOMBÉE le 2026-08-11** : le **12** était Groupe A et il est résolu, le
+  **26** était Groupe B et il est résolu. Elle était « ce qui SURVIT » du profilage du §6.6 ; il n'en
+  reste rien. Le mode d'échec réellement dominant aujourd'hui est **la MÉMOIRE** — trois des cinq
+  niveaux de la série `ordre-look` y sont morts (§6.5).
 
 ---
 
@@ -82,7 +90,7 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `gabarit.py <niv>` | **(neuf, 2026-08-03, scratchpad)** un plateau ASCII par but ACTIF (buts déjà remplis affichés comme posés, rien pré-rempli) — support pour DESSINER une règle de cases mortes à la main sans que l'instrument ne suggère le vocabulaire (cf. §6.2) |
 | `juge_loi.py` | **(neuf, 2026-08-03, scratchpad)** juge une loi de cases mortes contre TOUTES les parties humaines gagnantes d'un coup (murs seuls, ordre injectable) : toute caisse sur une case déclarée morte est un faux positif PROUVÉ. A validé la loi du §6.2 sur 21/24 parties, et localisé les 3 exceptions à des ordres faux. ⚠️ **PERDU avec le scratchpad de sa session** — les scratchpads sont éphémères, tout outil qui doit resservir se rapatrie dans `mesures/` le jour même |
 | `loi <niv> [gabarit.txt]` | **(neuf, 2026-08-04)** LE JUGE DE LA LOI DE L'ORDRE (§6.2). Sans argument : la table des cases mortes but par but. Avec un gabarit : compare la table CALCULÉE au dessin FAIT À LA MAIN, case par case, et sort non nul au moindre écart — la loi n'étant dérivée d'aucun théorème, ce dessin est sa seule vérité de référence, et le canari ne verrait jamais un écart (un élagage trop mordant ne casse que des niveaux qu'on ne finit pas). Compare le **SURPLUS** (loi moins table ordinaire). Accepte aussi un `.xsb` : verdict `geleHorsTour` + cases mortes sur un plateau isolé |
-| `porte <niv>` | **(neuf, 2026-08-04) LA PRÉCÉDENCE CAISSE → BUT** — d'espèce neuve, toutes les autres sont but → but. *Si remplir G prive le joueur de TOUS les appuis d'une caisse C, alors C doit avoir bougé avant G.* Statique, O(caisses × buts × plateau), relaxation optimiste (une contrainte est une preuve, un silence ne promet rien). ⚠️ Une poussée dont la destination est une case MORTE ne compte pas comme une issue — sans ce test l'outil est muet. Rend **0 sur les 15 résolus**, et 2 sur 18 non résolus : le 16 (avant le rang 0) et le 30 |
+| `porte <niv>` | **(neuf, 2026-08-04) LA PRÉCÉDENCE CAISSE → BUT** — d'espèce neuve, toutes les autres sont but → but. *Si remplir G prive le joueur de TOUS les appuis d'une caisse C, alors C doit avoir bougé avant G.* Statique, O(caisses × buts × plateau), relaxation optimiste (une contrainte est une preuve, un silence ne promet rien). ⚠️ Une poussée dont la destination est une case MORTE ne compte pas comme une issue — sans ce test l'outil est muet. Rend **0 sur les 15 résolus**, et 2 sur 18 non résolus : le 16 (avant le rang 0) et le 30 — *comptes du 2026-08-04, quand la carte était à 15/33* |
 
 **Règles de mesure, non négociables :**
 - **Comparer un binaire à un AUTRE binaire** (ancien reconstruit depuis `HEAD` via
@@ -370,6 +378,14 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 
 ### 6.0 Feuille de route — ordre de reprise (décidé le 2026-07-17)
 
+> ⚠️ **CETTE FEUILLE DE ROUTE EST HISTORIQUE — relire d'abord ce qui suit** (2026-08-11). Le plongeon
+> ci-dessous a été codé, promu, et a fait tomber 10/11/21/32 ; l'ordre a fait tomber 12/26/27 par le
+> régime `ordre-look`. **Le prochain chantier n'est plus ici** : c'est la **MÉMOIRE** (§6.5), devenue
+> le mode d'échec dominant — trois des cinq derniers niveaux relancés y sont morts, dont un à 213,7 M
+> états pour 14 Go. L'arène est le premier poste nommé par le §6.5, et il n'a jamais été attaqué.
+> Le second est le **STOCK** (journal-hybride, 2026-08-09) : deux notions distinctes et chiffrées —
+> « garder pour plus tard » et le stockage — qu'aucune ligne du solveur n'exprime.
+
 > 🎯 **PROCHAIN CHANTIER (2026-07-28) — LE PLONGEON-SUR-RECORD** (idée utilisateur).
 > Le corral-N (§6.1 suite 3) a fait sa part : il élague le **bois mort**. Ce qui bloque
 > le 11 (et vraisemblablement les 22 non-résolus) est le **DÉMÊLAGE** pur — le mur PSPACE
@@ -547,6 +563,7 @@ PRÉDIT ce gain :
 | plongeon sur record | ×33 | record vivant précoce | **date du 1ᵉʳ record ≥ 80 %** |
 | pondéré | ×34 | petits niveaux | **PIRE** sur les gros |
 | **loi de l'ordre** (2026-08-07) | **÷2,98** (12) | **inconnue** | ⚠️ **AUCUN — seule ligne vide du tableau** |
+| **`ordre-look`** (2026-08-09) | **3 niveaux gagnés** (12, 26, 27) | **inconnue** | ⚠️ **AUCUN** — il GAGNE 12/26/27, est **NEUTRE** sur le 31 (ordre différent, trajectoire identique au dépilement près) et **CASSE** le 32. Change l'ordre de 9 niveaux sur 35 ; les 26 autres sont bit-à-bit identiques |
 
 **Aucun levier n'est universel sauf le couplage.** Le §6.1 l'écrit déjà noir sur blanc pour le
 corral (« la fréquence prédit le gain, exactement ») ; ce tableau ne fait que constater que c'est
@@ -589,7 +606,7 @@ vrai partout.
 > chaque indicateur statique corrèle vraiment avec le gain — sur 11 niveaux résolus, c'est le piège
 > du §11.4 en plein. Les indicateurs statiques s'ajouteront à (b) à mesure qu'ils font leurs preuves.
 
-**Ce que ça débloquerait concrètement** : un profilage dirait lesquels des 19 non résolus sont
+**Ce que ça débloquerait concrètement** : un profilage dirait lesquels des non résolus sont
 multi-salles (donc bloqués sur l'ordering), lesquels sont riches en corrals (donc déjà bien servis),
 lesquels sont du pur démêlage — au lieu de lancer un solve de plusieurs heures au hasard.
 
@@ -780,6 +797,19 @@ plateau × leviers disponibles.**
   `distanceParBut`, mais sa *faisabilité* dépend de l'état, donc elle est rejouée à chaque état.
 - **`solveurastar.cpp`** — A\* (`poids`, `macro`). `SElement` (clé seule), `TableG`/`Arene`,
   régime d'engagement de la macro, re-développement en optimal / fermeture en pondéré.
+- **Le régime `ordre-look`** (`AstarMacroCouplagePlongeonLook`, 2026-08-08, `5aeae01`) — a fait tomber
+  le **12, le 26 et le 27**. Trois pièces : `Game::ordreLookahead` (drapeau, copié dans les ctors de
+  copie ET de déplacement comme `ordreDynamique`), `Game::setOrdreLookahead()` qui **recalcule
+  `ordreButs` sur place** (donc à poser sur l'état de DÉPART, avant la recherche), et
+  `Game::installeOrdreParPrecedence()` — exemplaire unique de l'installation, extrait exprès de
+  `calculDistancePoussee` pour que le recalcul rejoue le même repli rebours.
+  La règle elle-même est **au rang 0 seulement**, **après** les clés de contiguïté, et **confinée à la
+  salle de tête** ; chacune des trois restrictions a été payée par une régression mesurée (190, 10, 32
+  — cf. [journal-ordre.md](journal-ordre.md), 2026-08-08). ⚠️ C'est un **re-tri d'un sous-ensemble
+  APRÈS le tri**, pas une clé du comparateur : une clé qui ne s'applique qu'entre certains couples
+  n'est pas un ordre strict faible et `std::sort` partirait en comportement indéfini.
+  ⚠️ `setOrdreLookahead` **refuse de recalculer si un ordre est injecté** (fichier ou `ORDRE_HUMAIN`)
+  et le dit sur stderr — sans ce garde, le régime écrasait l'injection en silence (§7).
 - **`cle.h`** — `Arene` (blocs), `Cle` (offset 4 o), `TableG` (adressage ouvert).
 - **`solveur.*`** — socle `QThread`, fabrique (`types()`/`creer()`), `reconstruire()`.
 - **`mesures/`** — harnais externes ; `mort.cpp` (neuf) et `mou.cpp` (corrigé) pour le taux de
