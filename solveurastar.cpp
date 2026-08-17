@@ -1,4 +1,5 @@
 #include <QtDebug>
+#include <QVarLengthArray>
 #include <QSet>
 #include <cstdio>
 #include <algorithm>
@@ -16,6 +17,72 @@
 // À f égal, on préfère le g le plus GRAND : l'état le plus profond est le plus
 // proche du but, ce qui fait plonger A* vers la solution au lieu de balayer tout
 // un palier.
+#ifdef INSTRUM_SONDE
+StatsSonde& statsSonde() { static StatsSonde s; return s; }
+#endif
+
+// ── MUR MÉMOIRE (§6.5, chantier 2026-08-11) ───────────────────────────────────
+// Les QUATRE postes, chiffrés au même instant. Raison d'être : la décomposition du
+// §6.5 date du niveau 8 (17,7 M états, juillet) et elle était CALCULÉE, pas mesurée ;
+// on tourne aujourd'hui à 100-213 M états, et `noeuds` fait 1,36 entrée par état vu
+// à cause de la macro — une part qui dépend de la longueur des chaînes, donc du
+// régime. Rien ne garantit que l'arène domine encore.
+//
+// ⚠️ On mesure la CAPACITÉ, pas l'occupation : un vecteur à moitié plein coûte son
+// tableau entier, et l'arène alloue des blocs entiers dont le dernier est partiel.
+// Compter les entrées utiles sous-estimerait, et c'est le coût réel qui arrête le
+// solveur.
+//
+// ⚠️ Imprimé sur stderr AVEC LA JAUGE, pas seulement en fin de run : les trois
+// niveaux qui ont touché le mur (25, 29, 31) ont tous été TUÉS, donc aucune sortie
+// de fin. C'est la leçon du §6.6 — seul ce qui part en continu se relève.
+static void imprimeMemoire(const char* quand, const Arene& arene, const TableG& meilleurG,
+                           size_t noeudsOctets, size_t fileCap, size_t etatsVus) {
+    const double MO = 1024.0 * 1024.0;
+    const size_t oArene   = arene.octets();
+    const size_t oTable   = meilleurG.capacite() * TableG::octetsParCellule();
+    const size_t oNoeuds  = noeudsOctets;   // calculé par l'appelant : Noeud est protégé
+    const size_t oFile    = fileCap * sizeof(SolveurAStar::SElement);
+    const size_t total    = oArene + oTable + oNoeuds + oFile;
+    if (total == 0) return;
+    fprintf(stderr,
+            "[MEM %s] total %.0f Mo | arene %.0f (%.0f%%) | tableG %.0f (%.0f%%) | "
+            "noeuds %.0f (%.0f%%) | file %.0f (%.0f%%) | %.1f o/etat vu | %zu cles de %d shorts\n",
+            quand, total / MO,
+            oArene / MO, 100.0 * oArene / total,
+            oTable / MO, 100.0 * oTable / total,
+            oNoeuds / MO, 100.0 * oNoeuds / total,
+            oFile / MO, 100.0 * oFile / total,
+            etatsVus ? (double)total / etatsVus : 0.0,
+            arene.nbCles(), arene.getTaille());
+    // La CHARGE de TableG : c'est elle qui décide du gaspillage. Elle oscille entre
+    // 35 % (juste après un doublement) et 70 % (le seuil), donc la moitié de la table
+    // est vide en moyenne — 2 662 Mo au mur sur le 29.
+    fprintf(stderr, "[MEM %s] tableG charge %.1f %% (%zu entrees / %zu cellules, %.0f Mo vides)\n",
+            quand, meilleurG.capacite() ? 100.0 * meilleurG.size() / meilleurG.capacite() : 0.0,
+            meilleurG.size(), meilleurG.capacite(),
+            (meilleurG.capacite() - meilleurG.size()) * TableG::octetsParCellule() / MO);
+#ifdef INSTRUM_SONDE
+    // ⚠️ DELTA depuis le point précédent, pas le cumul. Le cumul moyenne toutes les
+    // charges traversées depuis le début et noie précisément ce qu'on veut voir : le
+    // coût d'une sonde À CETTE charge-là. C'est le couple (charge, sondes) qui décide
+    // entre serrer la table et garder le chemin chaud rapide.
+    {
+        static unsigned long long cA = 0, cS = 0, iA = 0, iS = 0;
+        const StatsSonde& st = statsSonde();
+        const unsigned long long dcA = st.chercheAppels - cA, dcS = st.chercheSondes - cS;
+        const unsigned long long diA = st.insereAppels  - iA, diS = st.insereSondes  - iS;
+        cA = st.chercheAppels; cS = st.chercheSondes; iA = st.insereAppels; iS = st.insereSondes;
+        fprintf(stderr, "[SONDE %s] charge %.1f %% -> cherche %.2f sondes (%llu) | insere %.2f (%llu)\n",
+                quand,
+                meilleurG.capacite() ? 100.0 * meilleurG.size() / meilleurG.capacite() : 0.0,
+                dcA ? (double)dcS / dcA : 0.0, dcA,
+                diA ? (double)diS / diA : 0.0, diA);
+    }
+#endif
+    fflush(stderr);
+}
+
 static bool compare(const SolveurAStar::SElement& a, const SolveurAStar::SElement& b) {
     if (a.f != b.f) return a.f > b.f;
     if (a.g != b.g) return a.g < b.g;
@@ -408,7 +475,7 @@ int SolveurAStar::plonge(const Game& etatDepart, int gDepart, int idxNoeudDepart
     // Un échec ne doit RIEN laisser derrière lui : on rend 'noeuds' à sa taille
     // d'avant. Sans ça, chaque plongeon raté enflerait définitivement l'arbre de
     // reconstruction de la recherche principale.
-    const int noeudsAvant = noeuds.size();
+    const size_t noeudsAvant = noeuds.size();
 
     // Les états vivent dans un vecteur qui ne fait que croître ; le tas ne porte
     // que (h, index), donc aucun Game n'est recopié pendant les push_heap.
@@ -480,8 +547,7 @@ int SolveurAStar::plonge(const Game& etatDepart, int gDepart, int idxNoeudDepart
 
         int p = parent;
         for (const auto& q : chaine) {
-            noeuds.append(Noeud{p, (quint16)q.first, (quint8)q.second});
-            p = noeuds.size() - 1;
+            p = (int)noeuds.ajoute((quint32)p, q.first, q.second);
         }
         etats.push_back(c);
         gs.push_back(gC);
@@ -554,7 +620,9 @@ void SolveurAStar::run() {
     // std::unordered_map : la map chaînée payait ~40 o d'infrastructure par
     // entrée (noeud alloué un par un + seau) pour 8 o utiles, ce qui en faisait
     // le premier poste mémoire du solveur — ~800 Mo sur le niveau 3.
-    Arene arene(depart.tailleCle());
+    // ⚠️ L'arène est EMPAQUETÉE (§6.5, 2026-08-13) : elle a besoin de la taille du
+    // plateau pour savoir sur combien de bits tient un indice de case.
+    Arene arene(depart.tailleCle(), depart.getLargeur() * depart.getHauteur());
     TableG meilleurG(&arene);
 
     // Ensemble des états DÉJÀ DÉVELOPPÉS. Uniquement en mode pondéré.
@@ -583,9 +651,9 @@ void SolveurAStar::run() {
     // l'autre : sans ce reset, la racine ne serait pas à l'indice 0 et le premier
     // enfant deviendrait son propre parent — reconstruire() boucherait à l'infini.
     noeuds.clear();
-    noeuds.append(Noeud{-1, 0, 0});   // racine : aucune poussée ne la précède (idxCaisse/dir jamais lus)
+    noeuds.ajoute(ArbreNoeuds::RACINE, 0, 0);   // racine : aucune poussée ne la précède (idxCaisse/dir jamais lus)
 
-    depart.getEtat(arene.reserve());
+    { QVarLengthArray<quint16, 40> t(depart.tailleCle()); depart.getEtat(t.data()); arene.ecrit(t.data()); }
     const Cle cleDepart{arene.dernier()};
     meilleurG.insere(cleDepart, 0);
 
@@ -657,8 +725,8 @@ void SolveurAStar::run() {
 
         // Entrée périmée : un meilleur chemin vers ce même état a été trouvé
         // APRÈS qu'on ait enfilé celle-ci. On la jette sans la compter.
-        const TableG::Slot* slotCur = meilleurG.cherche(cur.cle);
-        if(slotCur && cur.g > slotCur->g) continue;
+        const size_t iCur = meilleurG.cherche(cur.cle);
+        if (iCur != TableG::ABSENT && cur.g > meilleurG.g(iCur)) continue;
 
         if (interditRedeveloppement) {
             if (ferme.count(cur.cle)) continue;
@@ -683,7 +751,9 @@ void SolveurAStar::run() {
 
         // Le Game n'était pas dans la file : on le reconstruit depuis la clé.
         // appliqueEtat renvoie gratuitement le nombre de caisses déjà rangées.
-        const int rangees = etat.appliqueEtat(arene.lit(cur.cle.offset));
+        QVarLengthArray<quint16, 40> tLu(arene.getTaille());
+        arene.depaquete(cur.cle.offset, tLu.data());
+        const int rangees = etat.appliqueEtat(tLu.data());
         if (rangees > maxRangees) {
             maxRangees = rangees;
             // Copie figée pour l'UI (§10) + le chemin qui y mène, pour le rejeu pas
@@ -730,6 +800,7 @@ void SolveurAStar::run() {
                              << plongeons << "plongeons au total).";
                     qDebug() << "SolveurAStar: solution trouvee apres" << compteur
                              << "etats explores.";
+                    imprimeMemoire("fin-plongeon", arene, meilleurG, noeuds.octets(), file.capacity(), meilleurG.size());
                     imprimeStatsCorral();
                     emit solutionTrouvee(reconstruire(idxGagnant), compteur);
                     return;
@@ -754,6 +825,7 @@ void SolveurAStar::run() {
             // de run() : un run tué (c'est le cas de tous les non-résolus, donc de
             // toutes les cibles) n'en rendait aucune. Même trou que [CORRAL-N] et que
             // le profilage du §6.6 — seul ce qui part en continu se relève.
+            imprimeMemoire("jauge", arene, meilleurG, noeuds.octets(), file.capacity(), meilleurG.size());
             if (loiOrdre) {
                 const StatsLoi& l = statsLoi();
                 fprintf(stderr, "[LOI] enfilages=%lld PRUNES=%lld (%.2f%%)"
@@ -802,6 +874,7 @@ void SolveurAStar::run() {
             qDebug() << "  arene =" << arene.nbCles() << "cles,  meilleurG =" << meilleurG.size()
                      << ",  noeuds =" << noeuds.size() << ",  file =" << file.size()
                      << ",  capacite file =" << file.capacity();
+            imprimeMemoire("fin-principale", arene, meilleurG, noeuds.octets(), file.capacity(), meilleurG.size());
 #ifdef INSTRUM_F
             imprimeHistoF(histoF, cur.g, compteur);
 #endif
@@ -931,22 +1004,23 @@ void SolveurAStar::run() {
                     if (v == -1) sp.inconnus++; else sp.vivants++;
                 }
             }
-            e.getEtat(arene.reserve(), zoneEnfant);
+            QVarLengthArray<quint16, 40> tCle(e.tailleCle());
+            e.getEtat(tCle.data(), zoneEnfant);
+            arene.ecrit(tCle.data());
             Cle cle{arene.dernier()};
             if (interditRedeveloppement && ferme.count(cle)) { arene.annule(); return; }
-            TableG::Slot* slot = meilleurG.cherche(cle);
-            if (slot) {
-                if (gE >= slot->g) { arene.annule(); return; }
-                slot->g = gE;
-                cle = slot->cle;
+            const size_t iSlot = meilleurG.cherche(cle);
+            if (iSlot != TableG::ABSENT) {
+                if (gE >= meilleurG.g(iSlot)) { arene.annule(); return; }
+                meilleurG.setG(iSlot, gE);
+                cle = meilleurG.cle(iSlot);
                 arene.annule();
             } else {
                 meilleurG.insere(cle, gE);
             }
             int parent = cur.idxNoeud;
             for (const auto& p : chaine) {
-                noeuds.append(Noeud{parent, (quint16)p.first, (quint8)p.second});
-                parent = noeuds.size() - 1;
+                parent = (int)noeuds.ajoute((quint32)parent, p.first, p.second);
             }
             qint64 score;
             const int hE = e.getHeuristique(&score);
@@ -997,6 +1071,27 @@ void SolveurAStar::run() {
                 }
             }
 #endif
+            // ⚠️ DIAGNOSTIC (§6.5, 2026-08-13) : le 29 meurt sur std::bad_alloc et le
+            // repli de TableG ne se déclenche PAS — donc ce n'est pas elle. Les quatre
+            // conteneurs grossissent par doublement ; celui-ci et `noeuds` sont les
+            // deux autres candidats. On nomme le coupable au lieu de le supposer.
+            // ⚠️ CROISSANCE DOUCE (×1,25), pas un doublement (§6.5, chantier file).
+            // La file est le plus gros des deux vecteurs du solveur — 3 072 Mo sur le
+            // 29 — et à cet instant-là elle ne portait que 78,5 M éléments sur 134,2 M
+            // de capacité : 1 264 Mo alloués, jamais écrits. Le facteur est expliqué
+            // sur reserveDouce (solveur.h) ; il ne change NI l'ordre de dépilement NI
+            // les états, seulement la place réservée.
+            if (file.size() == file.capacity()) {
+                const size_t vise = file.capacity() + file.capacity() / 4 + 16;
+                try { file.reserve(vise); }
+                catch (const std::bad_alloc&) {
+                    fprintf(stderr, "[BADALLOC] FILE : %zu -> %zu elements (%.0f -> %.0f Mo) REFUSE\n",
+                            file.capacity(), vise,
+                            file.capacity() * sizeof(SElement) / 1048576.0,
+                            vise * sizeof(SElement) / 1048576.0);
+                    fflush(stderr); throw;
+                }
+            }
             file.push_back({fE, gE, parent, cle, score});
             std::push_heap(file.begin(), file.end(), compare);
         };
@@ -1073,6 +1168,7 @@ void SolveurAStar::run() {
     }
 
     qDebug() << "SolveurAStar: aucune solution," << compteur << "etats explores.";
+    imprimeMemoire("fin-echec", arene, meilleurG, noeuds.octets(), file.capacity(), meilleurG.size());
     imprimeStatsCorral();
     emit aucuneSolution();
 }

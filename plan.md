@@ -82,6 +82,8 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `pas0 <niv>` | **(neuf, 2026-08-01) POURQUOI AUCUNE MACRO N'EST DISPONIBLE**, sur le plateau de DÉPART. Pour chaque couple (caisse, but), rejoue le contrat EXACT de l'UI — `macroPeutDemarrer`, descente `macroVersButBacktrack` menée au bout, `!isPerdu` — et classe les échecs : *amorce puis bloque en (x,y)*, *détour non-monotone requis*, *joueur du mauvais côté*. Répond en une seconde à « le premier but choisi change-t-il quelque chose au démarrage ? » (sur le 12 : non, aucun des 15 n'est atteignable). ⚠️ **Le premier jet ne testait que `macroPeutDemarrer` et annonçait l'inverse** — amorcer n'est PAS aboutir. Outil de chantier<br>**(2026-08-07)** accepte un **chemin `.xsb`** (comme `bench`/`loi`/`ordre`) et deux modes. `champ` imprime **les deux champs de distance côte à côte** — le **BRUT** (`Game::champDistanceBrut`, la table précalculée telle quelle = ce que la macro croit devoir suivre) et le **JOUABLE** (ce que la descente monotone accepte) : les lire ensemble est le seul moyen de séparer « la table se trompe » de « la table a raison mais la descente ne sait pas l'exécuter ». `trace` rejoue la descente pas à pas avec, pour CHAQUE direction, la raison du refus (`MUR` / `caisse` / `appui HORS ZONE` / `NON MONOTONE`), puis se confronte à la vraie fonction. C'est ce couple qui a trouvé le bug du demi-tour (§6.3, 2026-08-07). Deux autres modes : `multi` (combien de macros DISTINCTES une caisse peut produire — mesuré : jusqu'à 4 chemins, **toujours 1 seul état**) et `detour` (l'écart au trajet solo, par recherche bornée à une seule caisse mobile ; ⚠️ **itinéraire, PAS une borne** — les autres caisses y sont des murs, donc surestimation, §4) |
 | **injection d'ordre par FICHIER** | **(neuf, 2026-08-01)** `ordre_niveau_XXXX.txt` dans le répertoire courant écrase l'ordre calculé de ce niveau. Complète `ORDRE_HUMAIN`, qui est une variable d'environnement et **n'atteint donc pas l'app** lancée par un launcher (§7) : c'est le seul moyen de JOUER un ordre à la main en mode hybride et de voir où il coince. Même parseur, exemplaire unique. **Bruyant des deux côtés** (`[ORDRE_FICHIER]` sur stderr, et le journal hybride écrit `ordre de remplissage ⚠ INJECTE depuis …` au lieu de `calcule`) — un fichier oublié changerait sinon le comportement en silence, le pire cas du §7. Absent = rien ne change |
 | **rejeu de journal + INTENTIONS** (dans l'app) | **(neuf, 2026-08-01) CAPTURER LE PLAN, PAS LE COUP.** Touche `L` : relit `hybride_niveau_XXXX.txt`, en extrait la **dernière partie GAGNÉE** (les `[undo]` retirent le dernier coup) et l'installe dans le rejeu pas à pas existant — aucune mécanique de navigation en double. `N` saute à la prochaine **poussée choisie** (macros et marche franchies d'un coup). Six touches d'intention en vocabulaire **FERMÉ** : `E` écarter du chemin d'une autre caisse · `O` ouvrir un passage joueur · `G` garer pour plus tard · `A` préparer un appui · `T` **sortir pour reprendre dans l'autre sens** (= le RECUL du §3) · `R` rapprocher · `?` je ne sais pas. **Une frappe par PLAN**, valable jusqu'à la suivante — c'est l'objet même : le rang d'un coup isolé ne peut pas voir un plan sur plusieurs coups. Sortie : `hybride_niveau_XXXX_intentions.txt`, avec le **numéro de coup** (sans lui les annotations seraient orphelines). ⚠️ Flèches et Retour arrière **neutralisés** pendant une session : ils modifient le plateau sans toucher à `posPas`, et le numéro de coup écrit devient faux |
+| `image <niv|fichier.xsb> [sortie.png] [taille]` | **(neuf, 2026-08-14, idée utilisateur)** UN PLATEAU EN PNG, AVEC LES SPRITES DE L'UI. ⚠️ Réutilise les classes de l'APPLICATION (`Sprite`, `Sol`/`SolHors`, `Mur`, `Caisse`, `GoalCaisse`, `Goal`, `Player`) et **le même empilement de couches que `WGame::paintEvent`**, flood-fill dedans/dehors compris — redessiner à côté produirait une image qui RESSEMBLE au jeu sans en être, et c'est justement quand les deux divergent qu'on regarde une image. Raison d'être : on lit des `.xsb` en ASCII en permanence, et **la géométrie du 12 a été mal lue trois fois de suite, dans les deux sens**, alors que la réponse était dans le dessin. Seul harnais de `mesures/` qui tire des sources de l'application et exige `QT += gui` (`QT_QPA_PLATFORM=offscreen` sans écran) |
+| `paquetcle` | **(neuf, 2026-08-13)** LE CODEC DE CLÉS EST-IL UNE BIJECTION ? Empaquetage/dépaquetage sur les dix tailles réelles de plateau — bords, valeurs identiques, cases croissantes, 200 k tirages aléatoires par taille — plus la **canonicité** (les bits de rab à zéro, sans quoi `memcmp` ment). 2 000 040 cas. ⚠️ À passer AVANT tout câblage : le canari ne verrait pas une clé subtilement fausse, il verrait un niveau non résolu ou rien du tout |
 | `attente.py <niv>` | **(neuf, 2026-08-09) LES CAISSES QU'IL NE FAUT PAS TRAITER COMME LES AUTRES.** Plus longue immobilité d'une caisse **sur une case qui n'est PAS un but**, en % de la partie gagnée — puis un seul critère de partage : attend-elle **là où elle a commencé** (on n'y a pas touché : *« ne gêne en rien, je la garde pour plus tard »*) ou **là où on l'a mise** (**stockage**, détour payé) ? ⚠️ Le filtre « pas un but » est indispensable : sans lui une caisse LIVRÉE tôt sort en tête (le 32, « immobile 96 % » = posée au coup 22 et finie). Les deux niveaux de référence sortent aux extrêmes sans réglage : le **14** n'a que du « sur place » (97/94/87/80 %), le **16** que du « déplacé » (90/89/87/81 %) |
 | `diverge`, `paires`, `trace`, `passages`, `congestion` | mou de `h`, interactions de paires, solution pas à pas, cartes de trajets |
 | **historique des RECORDS + critique du solveur `C`** (dans l'app) | **(neuf, 2026-08-03) LE MIROIR DE L'ANNOTATION D'INTENTIONS, mais sur ce que le SOLVEUR fait.** Le solveur a DEUX points d'enfilage (recherche principale + `plonge()`) et `nouveauMaxCaisses` écrasait le chemin visionné à CHAQUE record — un sélecteur conserve tous les chemins d'un run, voir le record 7 ET le record 8 ne demande plus qu'un seul run. Touche `C` : boîte de texte LIBRE (pas de vocabulaire fermé — celui des intentions a mis deux sessions à se stabiliser, on ne le refait pas sans savoir ce qu'on y met), journal `solveur_niveau_XXXX_critique.txt`, plateau `.xsb` joint à chaque entrée pour que `mort`/A\* puisse juger l'état après coup. `C` inerte pendant une session d'intentions (deux journaux distincts, ne pas mélanger) |
@@ -503,6 +505,220 @@ deux seulement** :
 
 ### 6.5 ⚠️ ROUVERT le 2026-07-24 — le mur mémoire est de retour sur le 11
 
+> ✅ **DÉCOMPOSITION MESURÉE le 2026-08-11 — le tableau ci-dessous était CALCULÉ, il ne l'est plus.**
+> Instrumentation `[MEM]` posée dans `solveurastar.cpp` (fonction unique, appelée aux trois sorties
+> **et avec la jauge** — les trois niveaux morts de mémoire ont tous été TUÉS, donc aucune sortie de
+> fin ne les aurait décrits). Relevé sur le **29** à **212,5 M états vus**, six fois plus gros que le
+> niveau 8 qui avait servi au calcul de juillet :
+>
+> | poste | §6.5 calculé (niv. 8, 17,7 M) | **mesuré** (niv. 29, 212,5 M) | |
+> |---|---|---|---|
+> | **arène** | 45 % | **43 %** | 6 891 Mo |
+> | `meilleurG` / `TableG` | 18 % | **26 %** | 4 096 Mo |
+> | file | 27 % | **19 %** | 3 072 Mo |
+> | `noeuds` | 13 % | **11 %** | 1 792 Mo |
+> | **total** | — | **15 851 Mo** | **78,2 o/état vu** |
+>
+> **Le modèle tenait.** L'arène domine, et « premier poste à attaquer » reste juste. Deux choses que le
+> calcul de juillet ne disait pas :
+> - **`TableG` pèse plus que prévu** — 4 096 Mo, une puissance de deux EXACTE : la table vient de
+>   doubler et la moitié de ses cellules n'a jamais servi. C'est ce qui explique l'écart entre les
+>   **15,8 Go comptabilisés et les 14 Go résidents** (`footprint`) : de la capacité allouée jamais
+>   touchée, donc jamais paginée. ⚠️ **Un doublement de `TableG` réserve 2 Go d'un coup** — sur une
+>   machine de 18 Go, cette allocation décide seule du moment où le mur tombe.
+> - **L'arène est pleine à ~100 %** : 212 486 340 clés de 17 shorts = 7,2 Go utiles pour 6 891 Mo
+>   alloués. **Elle ne peut donc pas être optimisée, seulement ÉVITÉE** — réduire ce poste veut dire
+>   ne plus garder la clé complète de chaque état vu, c'est-à-dire le hachage 128 bits mis en réserve
+>   par ce même paragraphe.
+>
+> ✅ **PREMIER GAIN, le 2026-08-11 : `TableG` en DEUX TABLEAUX PARALLÈLES, −25 %.**
+> `Slot{Cle; qint32 g}` faisait 8 octets. `g` est un nombre de POUSSÉES — 639 au maximum jamais
+> observé — donc un `quint16` suffit ; mais un `struct{quint32;quint16}` est **repadé à 8** par
+> l'alignement, la structure annulait le gain. Séparés en `vector<quint32> offsets` +
+> `vector<quint16> gs` : **6 octets par cellule**.
+> Bénéfice second, qui vaut peut-être autant : **la boucle de sondage ne compare QUE l'offset**, donc
+> elle ne touche que le tableau de 4 octets — **16 cellules par ligne de cache au lieu de 8**.
+>
+> | | mesuré |
+> |---|---|
+> | `tableG` sur le niveau 9 | 8 Mo → **6 Mo** |
+> | total par état vu | 94,3 → **90,9 o** |
+> | extrapolé au run du 29 | 4 096 → **~3 072 Mo**, **1 024 Mo rendus** |
+> | temps (USok, binaire contre binaire depuis `68b7991`) | **×1,00** sur 2 astar, 9/4/17 macro |
+> | canari | **les douze identiques à l'état près** |
+>
+> Deux gardes `Q_ASSERT_X` sur `g` (dans `setG` et `insere`) : le §7 collectionne les troncatures
+> muettes, et celle-ci ne planterait pas — elle **mentirait**. Un `g` tronqué rend un chemin plus
+> court que le réel, donc une solution qui n'existe pas, et le canari n'y verrait rien.
+>
+> ⚠️ **LA POINTE DE RÉHACHAGE : mesurée, mais son caractère fatal N'EST PAS démontré.** `rehache()`
+> alloue la nouvelle table avant de libérer l'ancienne : la pointe vaut **exactement 1,50 fois la
+> cible**, tracé sur les six doublements du niveau 9. Sur le 29 (avant les 6 octets), le passage de
+> 2 048 à 4 096 Mo demandait **6 144 Mo en un instant** ; après, 4 608.
+> **J'ai d'abord écrit que c'était « probablement ce qui tue les runs » — la mesure ne le soutient
+> pas** : `footprint` rendait **14 Go résidents pour 15 Go de pic** sur le 29, trop peu pour une
+> pointe à 1,5×. Le bond est réel, sa létalité est une hypothèse.
+>
+> ❌ **LE DIMENSIONNEMENT UNIQUE, codé puis RETIRÉ le 2026-08-11.** Dimensionner la table une fois
+> sur un budget dérivé de la RAM supprime la pointe *et* le coût CPU du réhachage. Retiré pour deux
+> raisons :
+> 1. **Il PARIE** — rien ne distingue « ce run sera énorme » de « ce run vient de dépasser le seuil ».
+>    Un niveau terminant naturellement à 384 Mo de table sautait à 1 536 Mo, quatre fois trop.
+>    ⚠️ Premier jet encore pire : il réservait **1 536 Mo pour les 22 clés du niveau 1** — le commentaire
+>    annonçait un seuil que le code n'avait pas. *Un commentaire qui décrit une garde absente est pire
+>    qu'aucun commentaire.*
+> 2. **On paierait un sur-dimensionnement CERTAIN contre un bénéfice HYPOTHÉTIQUE** (cf. ci-dessus).
+>
+> **Ne pas le reproposer sans avoir d'abord montré qu'une pointe de réhachage TUE réellement un run.**
+> ⚠️ Et noter que le facteur de croissance ne peut pas résoudre ça : avec un facteur `k`, la pointe
+> vaut `(1+1/k)` fois la cible et la charge retombe à `70 %/k`. `k=2` → 1,50× et 35 % ; `k=8` → 1,12×
+> et 8,8 %. **Grandir plus réduit la pointe et aggrave le gaspillage permanent — aucun `k` ne gagne
+> sur les deux.**
+>
+> ✅ **VALIDÉ À L'ÉCHELLE ET CHIFFRÉ EN PORTÉE, le 2026-08-12/13.**
+> - **Canari à 103 M états** : le **26** rend `etats=103640691 poussees=197 coups=639`, **identique au
+>   dernier état**. C'était la vérification qui manquait — les douze niveaux du canari plafonnent à
+>   325 k états, et une table de hachage peut se comporter jusqu'à 6 Mo puis diverger à 1,5 Go.
+> - **Portée : +24 % sur le 29** — 213,7 M → **265,7 M états vus**, et un record de plus (`max` 10/16
+>   → **11/16**). Coût par état : **78,2 → 66,3 o**.
+>   ⚠️ **J'avais prédit +7 %.** L'erreur : la comparaison était faite à un instant où `tableG` venait
+>   de doubler, donc à sa charge la plus défavorable (35 %) et à son gaspillage maximum. **Comparer
+>   deux runs à un instant pris au hasard dans un cycle de doublement ne mesure rien** — il faut ou
+>   bien le point d'arrêt, ou bien une moyenne sur le cycle.
+> - ⚠️ **Sur le 26, le gain ne se voit PAS en mémoire finale** : `tableG` rend bien ses 512 Mo, mais le
+>   total reste à ~7 Go, la recherche ayant réinvesti la place dans l'arène avant de plonger. Le gain
+>   se lit en **portée**, pas en pic — sur un niveau qui termine, il n'y a rien à voir.
+> - **Non mesuré : le TEMPS à grande échelle.** Les USok (×1,00) portaient sur des runs où la table
+>   tient en cache. À 1,5 Go chaque sonde est un défaut de cache, et c'est là que la séparation
+>   devait payer. Le chiffrer coûte trois heures (référence à reconstruire + deux runs du 26).
+>
+> ✅ **SECOND GAIN, le 2026-08-13 : L'ARÈNE EMPAQUETÉE, −46 %.** Une clé est une suite d'indices de
+> CASE rangés sur 16 bits, alors que `ceil(log2(taille du plateau))` vaut **6 à 9 bits** sur les 35
+> niveaux. Empaquetés à cette largeur : **46 % de l'arène**, prédiction confirmée à 46 % mesurés.
+>
+> **Pourquoi le bit-packing et pas un delta+varint**, qui gagnerait autant : le packing garde une
+> longueur **FIXE**. L'arène conserve son pas fixe, `CleEq` reste un memcmp — sur **17 octets au lieu
+> de 34**, donc plus rapide — et le codage est canonique, donc deux états égaux ont les mêmes octets.
+> Un varint cassait les trois.
+>
+> | mesuré sur le 26, au même point (103,6 M états) | avant | après |
+> |---|---|---|
+> | **total** | 7 081 Mo | **5 576 Mo** (−21 %) |
+> | **arène** | 3 241 Mo (46 %) | **1 736 Mo (31 %)** (−46 %) |
+> | octets par état | 61,2 | **48,2** |
+> | temps (USok, 5 mesures) | — | **×1,00** (0,98 à 1,02) |
+> | canari | — | **les douze + le BFS + le 26 à 103,6 M états, identiques** |
+>
+> Le décodage ne coûte rien parce qu'il est payé par la comparaison : `CleEq`/`CleHash` parcourent
+> moitié moins d'octets, et ils tournent une à quatre fois par sonde.
+>
+> ⚠️ **Test de BIJECTION avant tout câblage** (`mesures/paquetcle`) : 2 000 040 cas sur les dix tailles
+> réelles, bords compris, plus la vérification que les bits de rab sont à zéro — sans quoi deux clés
+> égales pourraient différer et le memcmp mentirait. **Le canari n'aurait pas vu une clé subtilement
+> fausse** : il aurait vu un niveau non résolu, ou rien. C'est la leçon du §7 sur `decodeCle`, dont le
+> bug a faussé `mou` pendant des semaines sans qu'aucune mesure ne le signale.
+>
+> 🎯 **BILAN DES DEUX CHANTIERS : 78,2 → 66,3 → 48,2 octets par état, soit −38 %.**
+> **Et il n'y a PLUS de poste dominant** : sur le 26, arène 31 %, `TableG` 28 %, `noeuds` 28 %.
+> La logique « premier poste à attaquer » de ce paragraphe s'arrête donc ici, faute de premier poste.
+> ⚠️ Ce classement vaut pour **13 buts** ; sur le 29 (16 buts) l'arène pesait 51 % et `noeuds` 12 % —
+> la répartition suit la longueur de clé, donc le nombre de caisses. À relire là-bas.
+
+> ✅ **TROISIÈME GAIN, le 2026-08-17 : `noeuds` EN DEUX TABLEAUX + CROISSANCE DOUCE, −15 % au total.**
+> Même diagnostic que `TableG` en août : `Solveur::Noeud` était `{qint32 parent; quint16 idxCaisse;
+> quint8 dir}`, 7 octets utiles **repadés à 8** par l'alignement du `qint32`. Séparé en
+> `ArbreNoeuds` — `std::vector<quint32> parents` + `std::vector<quint16> caisseDir` (case et
+> direction tassées dans un seul champ, `case << 2 | dir`) — soit **6 octets, −25 %**. Bénéfice
+> second, comme pour `TableG` : `reconstruire()` ne lit QUE `parents` en remontant la chaîne, donc
+> 16 parents par ligne de cache au lieu de 8 noeuds entiers.
+>
+> **Deuxième pièce, plus grosse que prévu : la CROISSANCE DOUCE (×1,25 au lieu de ×2) sur `noeuds`
+> ET la file d'A\*.** Un doublement laisse en moyenne 33 % de capacité vide (pointe à 50 % juste
+> après le doublement) ; à ×1,25 c'est ~11 %. Mesuré en direct sur le 29 au moment du chantier : la
+> file portait 78,5 M éléments dans 134,2 M de capacité, soit **1 264 Mo alloués et jamais écrits**
+> rien que sur ce conteneur. La fonction `reserveDouce` (`solveur.h`) porte le facteur, appliquée
+> aux deux vecteurs de `ArbreNoeuds` et à la file de `solveurastar.cpp`.
+> ⚠️ **Ce levier est d'une nature différente des précédents** : il ne touche NI la structure d'une
+> clé NI aucune décision du solveur, seulement la capacité réservée. Contrairement à un tie-break ou
+> à un élagage, **le canari ne peut PAS bouger** — s'il bouge, c'est un bug, pas un arbitrage. Il
+> réduit aussi la POINTE de réallocation (le mécanisme qui avait fait ajouter la garde
+> `std::bad_alloc` sur `TableG`) : à ×1,25 la coexistence ancien+nouveau vaut 1,45x la cible contre
+> 1,50x à ×2 sur `TableG`, et *bien davantage* sur `noeuds`/la file où l'ancien ET le nouveau
+> vecteur sont désormais deux fois plus petits qu'avec le `Noeud` à 8 octets.
+>
+> | mesuré sur le 29, au même point (236 M clés, binaire contre binaire) | avant (`5e740dd`) | après |
+> |---|---|---|
+> | **total** | 12 239 Mo | **10 387 Mo** (**−15,1 %**) |
+> | octets par état vu | 54,4 | **46,2** |
+> | `noeuds` (capacité) | 2 048 Mo | **1 406 Mo** (−31,3 %) |
+> | file (capacité) | 3 072 Mo | **1 863 Mo** (−39,4 %) |
+> | temps CPU (`bench 4 macro`, 4 mesures entrelacées, `/usr/bin/time -f %U`) | 8,10 s (moy.) | **8,01 s** — ×1,00, dans le bruit |
+> | canari | **29 mesures** (0-9, 17, 190, 191 × macro/couplage + 0-2 astar), **bit-à-bit identiques** |
+>
+> Le gain sur `noeuds` (−31,3 %) dépasse les −25 % mécaniques de la structure : le reste vient de la
+> capacité moins gaspillée. Sur la file, dont la structure `SElement` n'a pas changé, **la totalité
+> du −39,4 % vient de la seule croissance douce** — c'est la preuve séparée que les deux effets sont
+> distincts et s'additionnent.
+> ⚠️ **Comparaison faite au DERNIER point commun** (236 M clés = le plafond de la référence avant
+> qu'elle ne soit arrêtée manuellement) plutôt qu'à un instant choisi au hasard dans un cycle de
+> croissance — la leçon du run à +7 %/+24 % du 2026-08-12/13 juste au-dessus.
+> ⚠️ **Chronométrer le CPU pas le mural, deux fois plus qu'ailleurs ici** : les premières mesures de
+> temps ont été prises pendant qu'un run de 200+ M états tournait en fond sur la même machine (12
+> coeurs, donc pas de contention de scheduler, mais assez de trafic mémoire/cache pour faire
+> ressortir un point à 14,88 s contre 8,1 s ailleurs) — écarté par les mesures entrelacées une fois
+> le run de fond arrêté.
+> **Pas encore commité** — la garde d'assertion de `ArbreNoeuds::ajoute` (14 bits pour l'index de
+> case, 2 pour la direction) suit la même règle que `TableG::setG` (§7) : un débordement mentirait
+> plutôt que de planter.
+
+> 🎯 **LE VRAI MUR N'ÉTAIT PAS LA MÉMOIRE : `QVector` PLAFONNE À 2 Go** (2026-08-13).
+> Le 29 mourait sur `std::bad_alloc` **trois runs de suite, au même dépilement** (180 338 000) —
+> signature d'une cause déterministe, pas d'une pression système. Diagnostic par conteneur :
+> `[BADALLOC] NOEUDS : 167 772 160 -> 335 544 320 entrées (1 280 -> 2 560 Mo) REFUSE`, alors que le
+> total n'était que de **7 212 Mo sur 18 Go**.
+> Test en isolation : **`QVector` échoue à 2 048 Mo là où `std::vector` passe**, et à 4 096 aussi —
+> limite des tailles en `int` de Qt 5, indépendante de la mémoire libre. Le solveur mourait avec
+> **11 Go disponibles**. Corrigé en passant `Solveur::noeuds` en `std::vector`.
+> ⚠️ **Ce plafond empêchait les deux gains mémoire de servir à quoi que ce soit.**
+>
+> ⚠️ **TROIS HYPOTHÈSES FAUSSES AVANT LA BONNE, et leur point commun.**
+> 1. *« La pointe de réhachage tue les runs »* — l'arithmétique tombait juste (18 898 Mo sur 18 Go),
+>    mais le repli posé sur `TableG` **n'a jamais imprimé sa ligne**. **Un calcul cohérent n'est pas
+>    une preuve d'identité** : les quatre conteneurs ont des tailles voisines et doublent tous, donc
+>    n'importe lequel produit à peu près la même arithmétique.
+> 2. *« `footprint` ne voit pas de pic, donc il n'y en a pas »* — l'allocation ÉCHOUE, donc les pages
+>    ne deviennent jamais résidentes. **L'instrument ne pouvait pas voir ce qu'on lui demandait.**
+> 3. *« Un seuil haut réduira la pointe »* — sauter à la moitié du budget donne **exactement** la
+>    pointe du doublement. Codé avant que le calcul ne le montre.
+> Ce qui a tranché à chaque fois : aller **nommer** le fait (diagnostic par conteneur, puis test de
+> `QVector` en isolation) au lieu de le déduire.
+>
+> 🎯 **BILAN DE PORTÉE : +77 %, ET ZÉRO NIVEAU.** 78,2 → **45,4 octets par état** (−42 %, `TableG` et
+> arène cumulés) ; portée 265,7 → **470,3 M états vus**. De très loin le plus gros run du projet — le
+> précédent record était le 26 à 103,6 M. **Et il n'apporte rien** : records du 29 à 9/16 (6,1 M
+> dépilements), 10/16 (35,9 M), 11/16 (167,9 M), puis **RIEN entre 167,9 M et 331,5 M**. 163 millions
+> de dépilements sans un seul nouveau record. Les trois plongeons échouent **par espace épuisé** (12,
+> 15 et 40 états sur des budgets de 121 k, 719 k et 3,3 M) : ce sont des **branches mortes**, comme
+> les neuf records du 12 en juillet.
+> **La mémoire était un PLAFOND, pas le problème.** Cohérent avec le §3 (le mou est un résidu
+> d'ordonnancement) et le §4 (le démêlage est le mur PSPACE) : on a acheté de l'espace d'exploration,
+> pas des idées.
+
+> ❌ **DEUX AUTRES LEVIERS ÉVALUÉS, dont un réfuté.** Le coût du sondage linéaire a été mesuré en
+> fonction de la charge (`INSTRUM_SONDE`, 1,5 M appels) : **1,89 sonde à 35 %, 4,40 à 70 %** — la
+> courbe théorique `(1+1/(1-α)²)/2` s'y cale. Conséquences :
+> - **Monter le seuil de 70 % à 85 % est RÉFUTÉ** : la formule donne **22,7 sondes**, soit ×5 sur la
+>   boucle la plus chaude après le flood-fill. On échangerait 2 Go contre un solveur cinq fois plus
+>   lent à cet endroit.
+> - **Croissance ×1,5 au lieu de ×2** : garderait la charge entre 47 et 70 % au lieu de 35-70 %,
+>   ~1 Go au mur pour ~+17 % de sondes. Défendable, non fait — exige un modulo au lieu du masque.
+
+> ⚠️ **ET UN PIÈGE DE MESURE À NE PAS REFAIRE** : la même instrumentation sur le **niveau 9**
+> (325 k états) donne `noeuds` à **29 %** et l'arène à 34 % — j'ai failli réorienter le chantier vers
+> les chaînes de macro sur cette base. À 212 M états c'est 11 % et 43 %. **Un petit run ne dit RIEN de
+> la décomposition** : la granularité des blocs (65 536 clés) y écrase tout. Mesurer à l'échelle où le
+> mur tombe, jamais ailleurs.
+
 > 🎯 **CONFIRMÉ ET DEVENU DOMINANT le 2026-08-11.** Sur la série des cinq niveaux relancés en
 > `ordre-look`, **trois sont morts de la MÉMOIRE et non du temps** (25, 29, 31). Le modèle de ce
 > paragraphe, marqué « calculés, pas mesurés », est validé sur **quatre tailles** — 61 Mo par million
@@ -511,6 +727,9 @@ deux seulement** :
 > pour 14 Go** (pic 15 Go sur 18 Go), contre ~150 M supposés — parce que le coût par état BAISSE en
 > cours de run (les arènes allouent par blocs : 131 Mo/M à 9,9 M états, 88 à 34,6 M sur le même run).
 > ⚠️ Toute extrapolation mémoire faite tôt dans un run **surestime d'un facteur deux**.
+> 🎯 **ET PLUS ON REPOUSSE LE MUR, PLUS L'ARÈNE DOMINE** : 43 % à 212 M états, **51 % à 265 M** sur le
+> 29 (46 % sur le 26). Elle croît linéairement avec les états vus, là où `TableG` et la file avancent
+> par paliers. C'est donc la cible suivante, et la seule qui reste à cette taille.
 > Conséquence : « l'arène est le premier poste à attaquer si le mur redevient bloquant » n'est plus
 > une éventualité. Détail en [journal-macro.md](journal-macro.md), 2026-08-09/11.
 

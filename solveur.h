@@ -4,7 +4,40 @@
 #include <QAtomicInt>
 #include <QThread>
 #include <QVector>
+#include <vector>
+#include <new>
+#include <cstdio>
 #include "game.h"
+
+// ── CROISSANCE DOUCE DES GROS VECTEURS (§6.5, chantier noeuds/file) ──────────
+// `std::vector` double sa capacité. Pour les deux vecteurs qui pèsent en gigaoctets
+// — `noeuds` et la file d'A* — ce facteur 2 coûte DEUX fois, et les deux ont été
+// mesurés sur le 29 à 235,7 M états vus :
+//   1. LE VIDE PERMANENT. La file portait 78,5 M éléments dans une capacité de
+//      134,2 M : **1 264 Mo alloués et jamais écrits**, soit 10 % du solveur. Sur un
+//      cycle de doublement la capacité vaut en moyenne 1,5x le contenu — 33 % de
+//      vide. À 1,25 elle vaut 1,125x, soit 11 %.
+//   2. LA POINTE. Une réallocation détient l'ancien tableau ET le nouveau : 3 + 6 =
+//      9 Go le temps d'un doublement de la file, contre 3 + 3,75 = 6,75 à 1,25.
+//      C'est exactement la pointe qui a tué des runs sur `TableG` (§6.5).
+//
+// Ce qu'on paie : le trafic total de recopie vaut N/(k-1) éléments, donc 4N à 1,25
+// contre N à 2. Sur une file de 1,9 Go utile cela fait ~7,5 Go de memcpy sur TOUT le
+// run — de l'ordre de la seconde, contre des heures de recherche. Le compte est sans
+// appel dans ce sens-là.
+//
+// ⚠️ Et surtout : **ça ne change RIEN à la trajectoire**. Ni l'ordre de dépilement, ni
+// les états, ni les poussées — seule la capacité allouée bouge. Contrairement à un
+// tie-break ou à un élagage, le canari ne peut PAS bouger ; s'il bouge, c'est un bug,
+// pas un arbitrage.
+// ⚠️ `reserve` d'une valeur explicite est honorée à l'octet par libstdc++, là où
+// `push_back` seul re-double. Il faut donc appeler reserve AVANT chaque push qui
+// remplirait la capacité, pas se reposer sur la croissance implicite.
+template <typename V>
+inline void reserveDouce(V& v) {
+    if (v.size() == v.capacity())
+        v.reserve(v.capacity() + v.capacity() / 4 + 16);
+}
 
 // Base abstraite des solveurs. Tourne dans son propre thread : une résolution
 // explore potentiellement un très grand nombre d'états, hors de question de
@@ -157,23 +190,91 @@ protected:
     // le sont. Ce trajet ne sert qu'à l'affichage, jamais à l'identité d'un
     // état : reconstruire() le recalcule donc une seule fois, le long de la
     // solution, en rejouant les poussées depuis 'depart'.
-    // 8 octets, pas 12 : il y a un Noeud par état DÉCOUVERT, et le niveau 3 en
-    // découvre 21,5 M — chaque octet s'y paie en centaines de mégaoctets.
-    //
     // ⚠️ 'idxCaisse' est un index de CASE sur la grille (reconstruire() en tire
     // x = idx % largeur, y = idx / largeur), PAS le rang de la caisse parmi les
     // N. Les grilles vont jusqu'à 20x16 = 320 cases : un quint8 y déborderait en
     // silence (la case 300 deviendrait la 44) et corromprait le rejeu sans que
-    // le nombre d'états ni le nombre de poussées ne bougent d'un chiffre. D'où
-    // le quint16 — qui, avec le padding, tient dans les mêmes 8 octets.
-    struct Noeud {
-        qint32 parent;
-        quint16 idxCaisse;
-        quint8 dir;
+    // le nombre d'états ni le nombre de poussées ne bougent d'un chiffre.
+    //
+    // ── DEUX TABLEAUX PARALLÈLES, 6 OCTETS (§6.5, chantier noeuds) ────────────
+    // C'était `struct Noeud { qint32 parent; quint16 idxCaisse; quint8 dir; }`,
+    // soit 7 octets utiles repadés à 8 par l'alignement du qint32. Même forme et
+    // même remède que TableG le 2026-08-11 : séparer les champs supprime le
+    // padding, parce qu'un tableau de quint16 n'a pas à s'aligner sur 4.
+    //   parent (4 o) + (case << 2 | dir) (2 o) = **6 octets au lieu de 8, −25 %**.
+    // `noeuds` pèse 28 % du solveur sur le 26 et 1,36 entrée par état vu (la goal
+    // macro pose un noeud PAR POUSSÉE de sa chaîne, pour que reconstruire() la
+    // rejoue) : c'est donc ~7 % du total.
+    //
+    // Bénéfice second, comme pour TableG : la remontée de reconstruire() ne lit
+    // QUE 'parents', donc 16 parents par ligne de cache au lieu de 8 noeuds.
+    // Et la POINTE de réallocation baisse : deux vecteurs de 4 et 2 octets qui
+    // doublent chacun de leur côté demandent au pire 1,5x4 + 2 = 8 n octets, là
+    // où un seul vecteur de 8 en demandait 12 n.
+    //
+    // ⚠️ `dir` ne prend que 2 bits (NB_DIRECTION = 4) et `idxCaisse` 9 (320 cases
+    // au plus), soit 11 bits sur les 16 : la garde ci-dessous est là parce que le
+    // §7 collectionne les troncatures muettes — un débordement ne planterait pas,
+    // il rejouerait la mauvaise case et le nombre d'états ne bougerait pas d'un
+    // chiffre.
+    // ⚠️ La racine n'a pas de parent. Le sentinelle est RACINE et non -1 : les
+    // index sont désormais non signés (un qint32 plafonnerait à 2,1 G noeuds, et
+    // le plus gros run du projet en a déjà vu 640 M).
+    class ArbreNoeuds {
+    public:
+        static const quint32 RACINE = 0xFFFFFFFFu;
+
+        void clear() { parents.clear(); caisseDir.clear(); }
+        size_t size() const { return parents.size(); }
+        // Octets RÉELLEMENT alloués : c'est la CAPACITÉ qui pèse, pas l'occupation
+        // (un vecteur à moitié plein coûte son tableau entier). Utilisé par le
+        // relevé [MEM] de solveurastar.cpp.
+        size_t octets() const {
+            return parents.capacity() * sizeof(quint32) + caisseDir.capacity() * sizeof(quint16);
+        }
+        void resize(size_t n) { parents.resize(n); caisseDir.resize(n); }
+
+        // Ajoute un noeud et rend son index. 'parent' = RACINE pour la racine.
+        quint32 ajoute(quint32 parent, int idxCaisse, int dir) {
+            Q_ASSERT_X(idxCaisse >= 0 && idxCaisse < 16384, "ArbreNoeuds::ajoute",
+                       "idxCaisse deborde les 14 bits (§6.5)");
+            Q_ASSERT_X(dir >= 0 && dir < 4, "ArbreNoeuds::ajoute",
+                       "dir deborde les 2 bits (§6.5)");
+            try {
+                reserveDouce(parents);
+                reserveDouce(caisseDir);
+                parents.push_back(parent);
+                caisseDir.push_back((quint16)((idxCaisse << 2) | dir));
+            } catch (const std::bad_alloc&) {
+                // Même diagnostic que l'arène : nommer le conteneur qui refuse.
+                // Trois hypothèses fausses ont précédé la bonne le 2026-08-13
+                // faute de cette ligne (§6.5).
+                fprintf(stderr, "[BADALLOC] NOEUDS : %zu entrees (%.0f Mo) REFUSE\n",
+                        parents.size(), octets() / 1048576.0);
+                fflush(stderr);
+                throw;
+            }
+            return (quint32)(parents.size() - 1);
+        }
+
+        quint32 parent(quint32 i) const   { return parents[i]; }
+        quint16 idxCaisse(quint32 i) const { return (quint16)(caisseDir[i] >> 2); }
+        quint8  dir(quint32 i) const       { return (quint8)(caisseDir[i] & 3); }
+
+    private:
+        // ⚠️ std::vector et NON QVector (§6.5, 2026-08-13). QVector plafonne à 2 Go —
+        // limite des tailles en `int` de Qt 5 — et refuse au-delà QUELLE QUE SOIT la
+        // mémoire libre. Mesuré en isolation : à 2 048 Mo QVector échoue là où
+        // std::vector passe, et à 4 096 Mo aussi.
+        // C'est ce plafond, et non la RAM ni une pointe de réhachage, qui tuait le
+        // niveau 29 sur `std::bad_alloc` avec 11 Go encore libres — trois runs de
+        // suite, au même dépilement puisque la recherche est déterministe.
+        std::vector<quint32> parents;
+        std::vector<quint16> caisseDir;   // idxCaisse << 2 | dir
     };
 
     Game depart;
-    QVector<Noeud> noeuds;
+    ArbreNoeuds noeuds;
 
     QList<Game::EDirection> reconstruire(int idx);
 

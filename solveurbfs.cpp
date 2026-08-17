@@ -1,5 +1,6 @@
 #include <QQueue>
 #include <QtDebug>
+#include <QVarLengthArray>
 #include <unordered_set>
 #include <utility>
 #include "cle.h"
@@ -15,14 +16,16 @@ void SolveurBFS::run() {
     // Clés rangées bout à bout dans l'arène, l'ensemble des vus n'en portant que
     // des références de 4 octets (cf. cle.h). C'était son poste mémoire : un
     // malloc et un en-tête QArrayData par QByteArray, pour 22 o utiles.
-    Arene arene(depart.tailleCle());
+    // ⚠️ L'arène est EMPAQUETÉE (§6.5, 2026-08-13) : elle a besoin de la taille du
+    // plateau pour savoir sur combien de bits tient un indice de case.
+    Arene arene(depart.tailleCle(), depart.getLargeur() * depart.getHauteur());
     std::unordered_set<Cle,CleHash,CleEq> vus(1024, CleHash{&arene}, CleEq{&arene});
 
     noeuds.clear();
-    noeuds.append(Noeud{-1, 0, 0});   // racine : aucune poussée ne la précède (idxCaisse/dir jamais lus)
+    noeuds.ajoute(ArbreNoeuds::RACINE, 0, 0);   // racine : aucune poussée ne la précède (idxCaisse/dir jamais lus)
 
     file.enqueue({depart, 0});
-    depart.getEtat(arene.reserve());
+    { QVarLengthArray<quint16, 40> t(depart.tailleCle()); depart.getEtat(t.data()); arene.ecrit(t.data()); }
     vus.insert(Cle{arene.dernier()});
 
     int maxRangees = 0;
@@ -70,11 +73,10 @@ void SolveurBFS::run() {
                         // Clé écrite directement en fin d'arène. insert() dit s'il
                         // s'agit d'un nouvel état ; si non, on reprend la clé —
                         // elle est déjà dans l'arène, sous son offset d'origine.
-                        e.getEtat(arene.reserve());
+                        { QVarLengthArray<quint16, 40> t(e.tailleCle()); e.getEtat(t.data()); arene.ecrit(t.data()); }
 
                         if (vus.insert(Cle{arene.dernier()}).second) {
-                            noeuds.append(Noeud{idx, (quint16)i, (quint8)d});
-                            file.enqueue({std::move(e), noeuds.size() - 1});
+                            file.enqueue({std::move(e), (int)noeuds.ajoute((quint32)idx, i, d)});
                         } else {
                             arene.annule();
                         }

@@ -88,26 +88,28 @@ Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
 // chaque poussée n'est jouable qu'à sa place dans la séquence, et le trajet de
 // marche qui y mène dépend de la position des caisses à cet instant précis.
 QList<Game::EDirection> Solveur::reconstruire(int idx) {
-    QList<int> chaine;
-    for (int i = idx; i != -1; i = noeuds[i].parent) {
+    QList<quint32> chaine;
+    // ⚠️ Le sentinelle de racine est ArbreNoeuds::RACINE, plus -1 : les index de
+    // noeuds sont non signés depuis le passage en tableaux parallèles (§6.5).
+    for (quint32 i = (quint32)idx; i != ArbreNoeuds::RACINE; i = noeuds.parent(i)) {
         chaine.prepend(i);
     }
 
     QList<Game::EDirection> chemin;
     Game g(depart);
 
-    for (int i : chaine) {
-        const Noeud& n = noeuds[i];
-        if (n.parent == -1) continue;   // la racine n'est précédée d'aucune poussée
+    for (quint32 i : chaine) {
+        if (noeuds.parent(i) == ArbreNoeuds::RACINE) continue;   // la racine n'est précédée d'aucune poussée
 
-        const Game::EDirection dir = (Game::EDirection)n.dir;
+        const Game::EDirection dir = (Game::EDirection)noeuds.dir(i);
+        const quint16 idxCaisse = noeuds.idxCaisse(i);
 
-        const QPoint appui(n.idxCaisse % g.getLargeur() + appuis[dir].dx,
-                           n.idxCaisse / g.getLargeur() + appuis[dir].dy);
+        const QPoint appui(idxCaisse % g.getLargeur() + appuis[dir].dx,
+                           idxCaisse / g.getLargeur() + appuis[dir].dy);
 
         chemin += AStar(&g).getChemin(g.getPlayerPoint(), appui);
 
-        g.pousse(n.idxCaisse, dir);
+        g.pousse(idxCaisse, dir);
         chemin.append(dir);
     }
 

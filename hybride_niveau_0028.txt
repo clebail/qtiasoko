@@ -1,0 +1,189 @@
+
+=== niveau 28 — partie du 2026-08-06 12:21:06 ===
+[hybride] ordre de remplissage calcule : 0:(13,8) 1:(12,7) 2:(13,7) 3:(14,4) 4:(13,5) 5:(14,5) 6:(12,6) 7:(13,6) 8:(14,6) 9:(14,7) 10:(14,8) 11:(15,3) 12:(15,4) 13:(15,8) 14:(14,9) 15:(15,9) 16:(15,10) 17:(15,11) 18:(14,10) 19:(13,10)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+
+=== niveau 28 — partie du 2026-08-06 12:37:37 ===
+[hybride] ordre de remplissage calcule : 0:(13,8) 1:(12,7) 2:(13,7) 3:(14,4) 4:(13,5) 5:(14,5) 6:(12,6) 7:(13,6) 8:(14,6) 9:(14,7) 10:(14,8) 11:(15,3) 12:(15,4) 13:(15,8) 14:(14,9) 15:(15,9) 16:(15,10) 17:(15,11) 18:(14,10) 19:(13,10)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+
+=== niveau 28 — partie du 2026-08-07 18:43:03 ===
+[hybride] ordre de remplissage calcule : 0:(13,8) 1:(12,7) 2:(13,7) 3:(14,4) 4:(13,5) 5:(14,5) 6:(12,6) 7:(13,6) 8:(14,6) 9:(14,7) 10:(14,8) 11:(15,3) 12:(15,4) 13:(15,8) 14:(14,9) 15:(15,9) 16:(15,10) 17:(15,11) 18:(14,10) 19:(13,10)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+
+=== niveau 28 — partie du 2026-08-09 12:40:48 ===
+[hybride] ordre de remplissage calcule : 0:(13,8) 1:(12,7) 2:(13,7) 3:(14,4) 4:(13,5) 5:(14,5) 6:(12,6) 7:(13,6) 8:(14,6) 9:(14,7) 10:(14,8) 11:(15,3) 12:(15,4) 13:(15,8) 14:(14,9) 15:(15,9) 16:(15,10) 17:(15,11) 18:(14,10) 19:(13,10)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (1,8)->(2,8)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (2,8)->(2,7) POUSSE caisse ->(2,6)
+[rang] (2,7) Haut | rang 2/2 | h 291 f 292 | meilleur (2,7) Droite h 283 f 284 | df +8
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (2,7)->(3,7)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (3,7)->(4,7)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (4,7)->(5,7)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (5,7)->(5,8)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (5,8)->(5,9)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (5,9)->(5,10)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (5,10)->(6,10)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (6,10)->(7,10) POUSSE caisse ->(8,10)
+[rang] (7,10) Droite | ⚠ ECARTE par le solveur : perdu (checkDefaite) | 6 autres enfants enfiles
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[mouv] joueur (6,10)->(5,10)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (5,10)->(5,11)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (5,11)->(5,12)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (5,12)->(6,12)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (6,12)->(7,12)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (7,12)->(8,12) POUSSE caisse ->(9,12)
+[rang] (8,12) Droite | rang 1/6 (4 ex aequo) | h 290 f 292 | meilleur (2,6) Haut h 290 f 292 | df +0
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,12)->(8,11)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,11)->(8,10)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,10)->(8,9) POUSSE caisse ->(8,8)
+[rang] (8,9) Haut | rang 7/9 (2 ex aequo) | h 291 f 294 | meilleur (2,6) Haut h 289 f 292 | df +2
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,9)->(8,8) POUSSE caisse ->(8,7)
+[rang] (8,8) Haut | rang 8/12 (4 ex aequo) | h 292 f 296 | meilleur (2,6) Haut h 290 f 294 | df +2
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,8)->(8,7) POUSSE caisse ->(8,6)
+[rang] (8,7) Haut | rang 12/12 | h 295 f 300 | meilleur (2,6) Haut h 291 f 296 | df +4
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,7)->(9,7)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,7)->(10,7)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[mouv] joueur (1,8)->(1,7)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (1,7)->(2,7) POUSSE caisse ->(3,7)
+[rang] (2,7) Droite | rang 1/2 | h 283 f 284 | meilleur (2,7) Droite h 283 f 284 | df +0
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (2,7)->(2,6)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (2,6)->(2,5)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (2,5)->(2,4)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (2,4)->(3,4)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (3,4)->(4,4)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (4,4)->(5,4)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (5,4)->(6,4)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (6,4)->(7,4)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (7,4)->(7,3)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (7,3)->(8,3)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,3)->(8,2)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,2)->(9,2)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,2)->(10,2) POUSSE caisse ->(11,2)
+[rang] (10,2) Droite | rang 3/4 (1 ex aequo) | h 284 f 286 | meilleur (6,3) Droite h 282 f 284 | df +2
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,2)->(10,3)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (10,3)->(9,3) POUSSE caisse ->(8,3)
+[rang] (9,3) Gauche | rang 5/6 (1 ex aequo) | h 285 f 288 | meilleur (11,2) Gauche h 283 f 286 | df +2
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,3)->(9,4) POUSSE caisse ->(9,5)
+[rang] (9,4) Bas | rang 1/4 (2 ex aequo) | h 284 f 288 | meilleur (11,2) Gauche h 284 f 288 | df +0
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,4)->(9,5) POUSSE caisse ->(9,6)
+[rang] (9,5) Bas | rang 1/5 (2 ex aequo) | h 283 f 288 | meilleur (11,2) Gauche h 283 f 288 | df +0
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,5)->(9,6) POUSSE caisse ->(9,7)
+[rang] (9,6) Bas | rang 1/5 (2 ex aequo) | h 282 f 288 | meilleur (11,2) Gauche h 282 f 288 | df +0
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,6)->(8,6)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,6)->(7,6)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (7,6)->(8,6)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,6)->(8,7)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,7)->(8,8)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,8)->(8,9) POUSSE caisse ->(8,10)
+[rang] (8,9) Bas | rang 1/6 (3 ex aequo) | h 281 f 288 | meilleur (11,2) Gauche h 281 f 288 | df +0
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,9)->(9,9) POUSSE caisse ->(10,9)
+[rang] (9,9) Droite | rang 4/8 (4 ex aequo) | h 282 f 290 | meilleur (11,2) Gauche h 280 f 288 | df +2
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (9,9)->(9,10) POUSSE caisse ->(9,11)
+[rang] (9,10) Bas | rang 4/8 (4 ex aequo) | h 283 f 292 | meilleur (11,2) Gauche h 281 f 290 | df +2
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 1 macro jouable : caisse (12,10) en 5 poussees (1 branche)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[undo] retour arriere
+[mouv] joueur (9,9)->(8,9)
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,9)->(8,10) POUSSE caisse ->(8,11)
+[rang] (8,10) Bas | rang 4/8 (4 ex aequo) | h 283 f 292 | meilleur (11,2) Gauche h 281 f 290 | df +2
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES
+[mouv] joueur (8,10)->(7,10) POUSSE caisse ->(6,10)
+[rang] (7,10) Gauche | rang 5/9 (4 ex aequo) | h 284 f 294 | meilleur (11,2) Gauche h 282 f 292 | df +2
+[hybride] posees 0/20 | but actif (13,8) rang 0/20 | 0 macro jouable -> POUSSEES SIMPLES

@@ -16,7 +16,7 @@
 
 <!-- INDEX DES SESSIONS -->
 
-**16 sessions.** Verdict en tête : ✅ acquis · ❌ réfuté · ⏸️ sans verdict ·
+**17 sessions.** Verdict en tête : ✅ acquis · ❌ réfuté · ⏸️ sans verdict ·
 🎯 résultat marquant · 🎉 niveau tombé · ⚠️ correction · 📖 lecture. Les titres sont
 exacts, une recherche sur la date ou sur un mot du sujet tombe dessus.
 
@@ -38,6 +38,7 @@ exacts, une recherche sur la date ou sur un mot du sujet tombe dessus.
 | 🎯 | 2026-08-07 1/2 | LE JOUEUR PRIS POUR UN OBSTACLE : la macro ne savait jouer aucun DEMI-TOUR |
 | ❌ | 2026-08-07 2/2 | LA TOLÉRANCE AU DÉTOUR mesurée puis RÉFUTÉE — 5 macros sur 205 |
 | 🎉 | 2026-08-09/11 | LA SÉRIE `ordre-look` : le 26 tombe, et TROIS MURS MÉMOIRE mesurés |
+| 🎯 | 2026-08-14 | LE RECORD 11/16 DU 29 DISSÉQUÉ : trois caisses condamnent les DEUX extrémités |
 
 <!-- FIN INDEX -->
 
@@ -1182,3 +1183,59 @@ processus déjà lancé : **`ps -o time=`, jamais `-o etime=`**.
   **Il ne l'est plus.**
 - [ ] **Le plongeon est inactif sur le 29** (0,0013 % du travail). Son seuil de déclenchement n'a
   jamais été mesuré sur un niveau où il ne se déclenche PAS — c'est un angle mort du §6.0.
+
+#### 🎯 Session du 2026-08-14 — LE RECORD 11/16 DU 29 DISSÉQUÉ : trois caisses condamnent les DEUX extrémités
+
+**Contexte.** Le chantier mémoire a porté la portée du 29 de 265,7 à 470,3 M états (+77 %, cf. §6.5)
+**sans lui faire gagner une seule caisse** : ses records sont 9/16, 10/16 et 11/16, puis plus rien
+pendant 163 M dépilements. Les trois plongeons échouent **par espace épuisé** — 12, 15 et 40 états sur
+des budgets de 121 k, 719 k et 3,3 M — donc ce sont des **branches mortes**. D'où la question : qu'est-ce
+qui condamne un état à 11 caisses posées sur 16 ?
+
+**Le plateau, exporté par `bench 29 ordre-look record` puis rendu par le nouvel outil `image` :**
+
+```
+salle : 2 x 8 buts, lignes 7 et 8, x = 6..13
+ligne 8 : ********   (PLEINE)
+ligne 7 : ..***...   (3 caisses au milieu, 5 buts vides : 6, 7 et 11, 12, 13)
+joueur  : (13,9), sous la salle
+```
+
+**Le joueur est enfermé** : flood-fill à **27 cases**, et **aucun des cinq buts vides n'est adjacent à
+sa zone**. La salle entière lui est fermée. A\* pur réfute la position en **40 états**, avec ou sans
+corral — c'est donc la géométrie seule qui la condamne, pas un élagage.
+
+> 🎯 **LE MÉCANISME, et il est plus fin que « la rangée du bas est pleine ».** Énumération des accès
+> aux deux buts vides de GAUCHE, sur les murs et les caisses :
+>
+> | but | seule entrée réelle | l'autre voie, et pourquoi elle est morte |
+> |---|---|---|
+> | **(6,7)** | par le HAUT — caisse en (6,6), joueur en (6,5) | depuis (7,7) vers la gauche : exige le joueur en **(8,7)**, occupé |
+> | **(7,7)** | par la GAUCHE — caisse en (6,7), joueur en (5,7) | depuis (8,7) vers la droite : exige le joueur en **(9,7)**, occupé |
+>
+> **Les trois caisses du MILIEU de la ligne 7 — (8,7), (9,7), (10,7) — ne bouchent pas seulement les
+> buts de DROITE : elles suppriment les APPUIS dont les buts de GAUCHE avaient besoin.** Une caisse
+> posée « au bon endroit » condamne des buts situés de l'autre côté de la salle.
+
+**Troisième spécimen de la même espèce**, après le 12 (*la colonne 15 ne se sert qu'avec le joueur en
+colonne 13*) et le 13. Mais en pire : ici c'est le **milieu** qui condamne **les deux extrémités**, et
+**aucun but pris isolément ne l'explique** — c'est le groupe de trois. C'est exactement l'angle mort de
+`precedenceGlobale`, qui ne teste **qu'un seul bloqueur à la fois**. Le journal du 2026-07-30 l'avait
+déjà rencontré sur le 13 et conclu que la précédence par paires est **fausse comme test de mort mais
+valide comme ORDONNANCEMENT** ; rien n'en a jamais été tiré côté ordre.
+
+**⚠️ ET C'EST L'IMAGE QUI L'A RENDU ÉVIDENT.** Le flood-fill donnait déjà « 27 cases, aucun but
+atteignable », mais c'est le rendu PNG qui a fait voir d'un coup la rangée pleine, le bloc de trois au
+milieu et le perso seul en dessous. L'outil `image` est né de ce besoin — et de l'aveu que la géométrie
+du 12 avait été **mal lue trois fois de suite, dans les deux sens**, alors que la réponse était dans le
+dessin. Un `.xsb` en ASCII est une source d'erreur, pas une lecture.
+
+**État du code** : `mesures/image.cpp` + `image.pro` (neufs). Rien dans le solveur.
+
+**Reste ouvert :**
+- [ ] **La précédence à N bloqueurs, comme ORDRE et non comme élagage.** Trois spécimens désormais
+  (12, 13, 29), le code existe (`mesures/precedencepaires.h`, marqué réfuté *comme test de mort*), et
+  `ordreParPrecedence` ne l'utilise pas. C'est la piste que le 29 désigne.
+- [ ] **Le 29 n'a pas de partie humaine.** Le 12, le 26 et le 32 en ont une, et à chaque fois elle a
+  tranché en quelques minutes ce que des heures de solve laissaient ambigu. Ce serait le moyen le plus
+  court de savoir quel ordre marche sur ce plateau.
