@@ -387,6 +387,36 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 > états pour 14 Go. L'arène est le premier poste nommé par le §6.5, et il n'a jamais été attaqué.
 > Le second est le **STOCK** (journal-hybride, 2026-08-09) : deux notions distinctes et chiffrées —
 > « garder pour plus tard » et le stockage — qu'aucune ligne du solveur n'exprime.
+>
+> ⏸️ **EN PAUSE, à reprendre (2026-08-17, idée utilisateur — « on reprend quand je suis à la
+> maison »).** Discussion de recadrage, PAS ENCORE de mesure ni de code :
+> - Le cas « garder pour plus tard » se scinde en deux, et un seul compte : *on ne la pose pas
+>   maintenant parce que ça fermerait un passage* (généralise l'outil `porte`, qui ne teste que la
+>   caisse perdant SES PROPRES appuis, au cas où une AUTRE caisse perd son passage). L'autre lecture
+>   — « on pourrait la poser mais on ne le fait pas » — **n'est pas un cas** : sans conséquence, rien
+>   à modéliser.
+> - Rectifié ensuite : la caisse n'attend pas forcément « n'importe où hors du passage » mais à un
+>   **emplacement précis** — sauf que l'exemple vérifié (14, caisses (9,2) et (11,2), cf.
+>   `mesures/attente.py`) montre qu'ici l'emplacement précis, c'est **le point de départ lui-même** :
+>   (9,2) attend 1061/1216 coups (87 %) et (11,2) 1145/1216 (94 %), **jamais déplacées** avant la
+>   toute fin. Pas de recherche de case à faire pour ce couple — juste « ne pas y toucher » et savoir
+>   QUAND il devient enfin nécessaire de les bouger.
+> - **Prochaine étape convenue** : miner les parties gagnées pour repérer deux signatures, toutes
+>   deux lisibles dans les données DÉJÀ loguées, sans toucher au solveur :
+>   1. *poussable sur un but mais pas jouée tout de suite* — le mode hybride logue déjà
+>      `macro jouable : caisse (x,y) en N poussées` à chaque pas ; reste à repérer les caisses pour
+>      qui cette ligne apparaît plusieurs fois avant d'être enfin jouée ;
+>   2. *déplacée en plusieurs fois* (pas un trajet net vers le but) — `attente.py` reconstruit déjà
+>      `traj[i]`, la trajectoire complète de chaque caisse ; reste à compter les ruptures
+>      mouvement/immobilité/remouvement.
+> - **Données disponibles** : 11 des 15 non-résolus ont une partie gagnée rejouable exploitable
+>   (13, 14, 15, 16, 18, 19, 20, 22, 23, 24, 25) ; 4 n'en ont aucune (**28, 29, 30, 31** — jamais
+>   terminés à la main, le 31 à peine entamé, 374 o).
+> - ⚠️ **Piège à corriger avant de relancer `mesures/attente.py` sur cette machine** :
+>   `mesures/taches.py` a un chemin racine codé en dur pour une autre machine
+>   (`R="/Users/corentin/perso/qtiasoko"`, macOS). Contourné en mémoire (monkey-patch `taches.R` /
+>   `attente.R`) pour cette session, rien commité — à corriger proprement (chemin relatif au script,
+>   par ex.) avant de s'en resservir.
 
 > 🎯 **PROCHAIN CHANTIER (2026-07-28) — LE PLONGEON-SUR-RECORD** (idée utilisateur).
 > Le corral-N (§6.1 suite 3) a fait sa part : il élague le **bois mort**. Ce qui bloque
