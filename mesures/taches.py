@@ -1,5 +1,9 @@
 import re, os, glob, sys
-R="/Users/corentin/perso/qtiasoko"
+# Racine = le répertoire PARENT du script (mesures/taches.py -> racine du dépôt).
+# Surchargeable par la variable d'environnement QTIASOKO_ROOT. Auparavant codé en
+# dur sur un chemin macOS, ce qui rendait attente.py/taches.py muets ailleurs (§6.0).
+R=os.environ.get("QTIASOKO_ROOT",
+                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 re_m=re.compile(r'^\[mouv\] joueur \((\d+),(\d+)\)->\((\d+),(\d+)\)(?: POUSSE caisse ->\((\d+),(\d+)\))?')
 re_lan=re.compile(r'^\[macro\] LANCEE caisse \((\d+),(\d+)\) -> but \((\d+),(\d+)\) : (\d+) poussees')
 

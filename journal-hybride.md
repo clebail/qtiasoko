@@ -2494,3 +2494,106 @@ avait été violée trois fois : `juge_loi.py`, `corpus_ordre.py`, les scripts d
   « dominé par » comme « constitué de ». **Un banc n'est pur que si l'autre colonne est vide.**
   Conséquence énoncée AVANT le run : **le 14 ne devrait pas tomber par un simple changement d'ordre**,
   puisqu'il lui manque aussi le stockage.
+
+#### 🎯 Session du 2026-08-17 — LE MINING DU « STOCK » : « garder pour plus tard » se scinde en TROIS mécanismes, dont un seul est codable
+
+Reprise du chantier mis en pause le 2026-08-17 (§6.0). La **prochaine étape convenue** était de miner
+les parties gagnées pour deux signatures, **sans toucher au solveur**. Fait — et le mining a débordé
+son cadre : il a fallu **quatre** tests pour rendre compte des caisses « tenues », et le contre-exemple
+qui les a motivés a fait émerger un mécanisme absent du recadrage. **Zéro ligne de solveur**, tout
+validé par rejeu coup par coup des 28 parties gagnées rejouables.
+
+**LE PIÈGE CORRIGÉ D'ABORD.** `mesures/taches.py` avait `R="/Users/corentin/perso/qtiasoko"` codé en
+dur (macOS), ce qui rendait `attente.py`/`taches.py` muets sur cette machine (§6.0). Corrigé
+proprement : `R = dirname(dirname(__file__))`, surchargeable par `QTIASOKO_ROOT`. Plus de monkey-patch.
+
+**L'OUTIL : `mesures/stock.py`**, six modes, réutilise le parseur de `taches.py` (aucun second
+parseur écrit) plus un parseur enrichi `parties_riches` qui accroche à chaque coup la caisse LIVRABLE
+annoncée par le `[hybride]` qui le précède. Modes : `(défaut)` les deux signatures · `passage`
+transit strict · `cut` articulation sur G · `contention` corridor · `depart` bouchon · `bilan` la
+décomposition. Rapatrié dans `mesures/` le jour même (règle du §1).
+
+**LES DEUX SIGNATURES DEMANDÉES.**
+1. **Livrable mais différée** (`diff` = coups où la caisse est livrable vers le but actif mais pas
+   livrée). ⚠️ **K ∈ {0,1}** : à chaque pas, au plus UNE caisse est livrable (régime d'engagement de
+   la macro, un seul but actif). Brut : **90 % des caisses livrées ont diff > 0**, médiane 14 coups —
+   donc **inutile en brut**, c'est l'écart à `ordreButs` du §7. Le signal est dans les **outliers** :
+   (9,2)/14 **181c (14 %)**, (12,5)/15 **202c (22 %)**, (5,8)+(9,10)/16 **217/215c**, (10,10)/22
+   **218c**. Distribution très asymétrique : normal partout, délibéré sur une poignée.
+2. **Déplacée en plusieurs fois.** ⚠️ **Premier jet FAUX** : compter les salves par temps de poussée
+   consécutifs donnait ×9 à ×25 partout (96 %) — parce qu'une macro pousse une caisse avec des pas de
+   MARCHE entre deux poussées (« 34 pas de marche »), chaque poussée sortait comme une salve.
+   Redéfini : **une rupture = une AUTRE caisse est poussée entre deux poussées d'elle** (elle a été
+   garée). Indépendant de la marche. Résultat : **50 %**, extrêmes (3,7)/16 **×13**, (16,5)/18 ×7.
+
+**LE CROISEMENT AVEC `porte` — le résultat qui a ouvert le chantier.** `porte` (statique) n'explique
+**presque aucune** tenue : 0 contrainte sur 14/15/22, 1 seule sur 16 — et c'est (10,6), qui n'est
+même pas une des caisses tenues. Le mécanisme de « garder pour plus tard » **n'est pas** celui que
+`porte` capte (une caisse perdant ses PROPRES appuis). D'où le rejeu contrefactuel.
+
+**TEST 1 — TRANSIT STRICT (`passage`).** Chaque `[mouv]` est UN pas, donc toute la trajectoire est
+loguée. Poser B tôt revient à occuper G=but-final de B pendant la fenêtre de tenue `[tfirst, tdeliv)`.
+Le jeu humain touche-t-il G dans cette fenêtre ? Si oui, poser B là aurait bloqué un passage
+RÉELLEMENT emprunté ⇒ **(a) airtight**. Résultat : **24 (a), 82 (b)**. Les tenues extrêmes sont
+presque toutes (a). ⚠️ **Note de rigueur** : sur la trajectoire enregistrée, le transit strict est
+COMPLET pour ce qui bloque le jeu réel — si B-sur-G coupait un passage emprunté dans la fenêtre, le
+joueur aurait traversé G (l'unique pont). Le vrai apport des tests suivants est ailleurs.
+
+**TEST 2 — CUT D'ARTICULATION (`cut`), et un artefact instructif.** Prédicat du `porte` généralisé :
+au coup `tfirst`, poser B sur G déconnecte-t-il le joueur de l'accès à une caisse non livrée / un
+but ? ⚠️ **Premier jet : 90 (a) bidons** — poser B sur G rend trivialement la case G non-marchable,
+et comme G est un but, je la comptais elle-même comme « but perdu ». Occuper G *est* le but recherché.
+**G exclue du décompte** → **7 (a), 99 (b)** : le cut structurel est plus RARE que le transit, pas
+plus fréquent. Les 7 sont de vrais points d'articulation, dont **(16,2)/27 → (4,1) qui mure 4 buts
+d'un coup** — jeu de validation tout prêt pour un `porte` généralisé.
+
+**TEST 3 — CONTENTION DE CORRIDOR (`contention`), né du contre-exemple.** (10,10)/22 est la plus
+grosse tenue du corpus (218c) et sort **(b) aux DEUX** tests précédents. En le creusant : sa case-but
+(10,6) au sommet de la colonne 10 ne bloque rien après `tfirst=693`. Mais **(10,8) est un hub de
+transit massif — 15 caisses distinctes y passent jusqu'à t=894** — et box17 doit monter TOUTE la
+colonne 10 pour être livrée. Le transit strict avait rendu 0 parce que sa fenêtre `[693,1421)` rate
+ces transits, survenus AVANT `tfirst`. Le vrai verrou : box17 attend que **son corridor de livraison
+se libère** (dernier transit t=894, livrée t=1424). ⚠️ **C'est un TROISIÈME mécanisme, absent du
+recadrage** : pas la case-but qui bloque, mais le CHEMIN pour l'atteindre — pure **contention en
+TEMPS**, le démêlage PSPACE du §3/§4, qu'AUCUNE borne géométrique ne capture. Formalisé (P = cases
+traversées par la caisse ; busy = autres caisses sur P dans `[tfirst, tdeliv)`) : **31 en contention,
+75 corridor libre**.
+
+**TEST 4 — BOUCHON AU DÉPART (`depart`), réfuté.** Symétrique du transit : la caisse tenue à sa case
+de DÉPART est-elle un bouchon dont le retrait ouvrirait une région ? Résultat : **2/106 seulement**
+((5,3)/22 ouvre 27 cibles, (15,9)/24 en ouvre 7). L'hypothèse « départ bloque » est **réfutée comme
+mécanisme courant** — elle n'explique pas les 66 % restants. (Éliminer un faux signal est un
+résultat, §6.6.)
+
+**LE BILAN (`bilan`) — la décomposition des 106 caisses tenues (≥ 30 coups) :**
+
+| classe | n | % | nature | pour le solveur |
+|---|---|---|---|---|
+| **PORTE** (transit ∪ cut) | 24 | — | statique, géométrique | **codable** (extension `porte.cpp`, validée sur les 7 cuts) |
+| **CONGESTION** (corridor) | 31 | — | ordonnancement §3/§4 | **irréductible** (démêlage PSPACE) |
+| — dont PORTE seul | 5 | 4 % | | |
+| — dont CONGESTION seule | 12 | 11 % | | |
+| — dont les DEUX | 19 | 17 % | | |
+| **BOUCHON** | 2 | 2 % | statique, rare | négligeable |
+| **ORDRE libre** (aucun) | 70 | 66 % | rien ne force | latitude déjà offerte par A\* |
+| **expliqué par un passage** | **36** | **33 %** | | |
+
+**LA CONCLUSION DU CHANTIER.** La notion « garder pour plus tard » de l'utilisateur, minée dans les
+vraies parties, **se scinde nettement sur le cadre existant du projet** :
+- un **tiers** relève d'une contrainte de passage réelle ;
+- de ce tiers, **une moitié est statique donc codable** (le PORTE généralisé), l'autre moitié est de
+  la **congestion irréductible** (§3, « le mou est un résidu d'ordonnancement ») ;
+- **deux tiers** ne sont forcés par rien de mesurable — le solveur les réordonne déjà.
+
+C'est cohérent avec la thèse centrale du plan (§3/§4) : on ne trouve pas de raccourci géométrique au
+démêlage. Le seul actionnable est le **tiers-de-tiers PORTE** — la suite naturelle est de coder le
+`porte` généralisé statique (articulation-cut), validé sur les 7 cuts dont (16,2)/27.
+
+**⚠️ PIÈGES DE MESURE À NE PAS REFAIRE :**
+- **Compter la reachability de G elle-même est un artefact** (le cut à 90 → 7). Une case qu'on occupe
+  EXPRÈS ne doit pas compter comme « rendue inatteignable ».
+- **La fenêtre `[tfirst, tdeliv)` du transit rate ce qui précède `tfirst`.** (10,10)/22 est passé pour
+  (b) parce que son corridor était emprunté AVANT qu'il ne devienne livrable. Un test qui ne regarde
+  qu'à partir du moment où l'action est possible ne voit pas pourquoi elle ne l'était pas plus tôt.
+- **Les salves par temps consécutif comptent les pas de marche** (×25 bidons). La bonne maille d'un
+  « re-déplacement » est « une autre caisse a bougé entre-temps », pas « le temps a sauté ».

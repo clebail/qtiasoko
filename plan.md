@@ -85,6 +85,7 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `image <niv|fichier.xsb> [sortie.png] [taille]` | **(neuf, 2026-08-14, idée utilisateur)** UN PLATEAU EN PNG, AVEC LES SPRITES DE L'UI. ⚠️ Réutilise les classes de l'APPLICATION (`Sprite`, `Sol`/`SolHors`, `Mur`, `Caisse`, `GoalCaisse`, `Goal`, `Player`) et **le même empilement de couches que `WGame::paintEvent`**, flood-fill dedans/dehors compris — redessiner à côté produirait une image qui RESSEMBLE au jeu sans en être, et c'est justement quand les deux divergent qu'on regarde une image. Raison d'être : on lit des `.xsb` en ASCII en permanence, et **la géométrie du 12 a été mal lue trois fois de suite, dans les deux sens**, alors que la réponse était dans le dessin. Seul harnais de `mesures/` qui tire des sources de l'application et exige `QT += gui` (`QT_QPA_PLATFORM=offscreen` sans écran) |
 | `paquetcle` | **(neuf, 2026-08-13)** LE CODEC DE CLÉS EST-IL UNE BIJECTION ? Empaquetage/dépaquetage sur les dix tailles réelles de plateau — bords, valeurs identiques, cases croissantes, 200 k tirages aléatoires par taille — plus la **canonicité** (les bits de rab à zéro, sans quoi `memcmp` ment). 2 000 040 cas. ⚠️ À passer AVANT tout câblage : le canari ne verrait pas une clé subtilement fausse, il verrait un niveau non résolu ou rien du tout |
 | `attente.py <niv>` | **(neuf, 2026-08-09) LES CAISSES QU'IL NE FAUT PAS TRAITER COMME LES AUTRES.** Plus longue immobilité d'une caisse **sur une case qui n'est PAS un but**, en % de la partie gagnée — puis un seul critère de partage : attend-elle **là où elle a commencé** (on n'y a pas touché : *« ne gêne en rien, je la garde pour plus tard »*) ou **là où on l'a mise** (**stockage**, détour payé) ? ⚠️ Le filtre « pas un but » est indispensable : sans lui une caisse LIVRÉE tôt sort en tête (le 32, « immobile 96 % » = posée au coup 22 et finie). Les deux niveaux de référence sortent aux extrêmes sans réglage : le **14** n'a que du « sur place » (97/94/87/80 %), le **16** que du « déplacé » (90/89/87/81 %) |
+| `stock.py <niv> [mode]` | **(neuf, 2026-08-17)** POURQUOI UNE CAISSE EST TENUE. Prolonge `attente.py` : mine les parties gagnées et décompose les caisses **livrables mais différées** sur quatre tests contrefactuels (validés par rejeu, aucun solveur). Modes : `(défaut)` les deux signatures du §6.0 (différée / déplacée en plusieurs fois) · `passage` transit strict de la case-but · `cut` cut d'articulation (prédicat du porte généralisé) · `contention` corridor de livraison partagé (§3) · `depart` bouchon au départ · `bilan` la décomposition PORTE/CONGESTION/BOUCHON/ORDRE. ⚠️ Sur la **partie humaine** loguée, pas sur une trace de solveur. Résultat en [journal-hybride.md](journal-hybride.md), 2026-08-17 |
 | `diverge`, `paires`, `trace`, `passages`, `congestion` | mou de `h`, interactions de paires, solution pas à pas, cartes de trajets |
 | **historique des RECORDS + critique du solveur `C`** (dans l'app) | **(neuf, 2026-08-03) LE MIROIR DE L'ANNOTATION D'INTENTIONS, mais sur ce que le SOLVEUR fait.** Le solveur a DEUX points d'enfilage (recherche principale + `plonge()`) et `nouveauMaxCaisses` écrasait le chemin visionné à CHAQUE record — un sélecteur conserve tous les chemins d'un run, voir le record 7 ET le record 8 ne demande plus qu'un seul run. Touche `C` : boîte de texte LIBRE (pas de vocabulaire fermé — celui des intentions a mis deux sessions à se stabiliser, on ne le refait pas sans savoir ce qu'on y met), journal `solveur_niveau_XXXX_critique.txt`, plateau `.xsb` joint à chaque entrée pour que `mort`/A\* puisse juger l'état après coup. `C` inerte pendant une session d'intentions (deux journaux distincts, ne pas mélanger) |
 | `bench <fichier.xsb> record` → `.chemin` | **(neuf, 2026-08-03)** à côté de chaque `.xsb` exporté, une lettre par coup (H/D/B/G, ordre de `EDirection`) : permet de rejouer le chemin d'un record HORS de l'app, pour le passer à `mort`/`fp` |
@@ -388,8 +389,30 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 > Le second est le **STOCK** (journal-hybride, 2026-08-09) : deux notions distinctes et chiffrées —
 > « garder pour plus tard » et le stockage — qu'aucune ligne du solveur n'exprime.
 >
-> ⏸️ **EN PAUSE, à reprendre (2026-08-17, idée utilisateur — « on reprend quand je suis à la
-> maison »).** Discussion de recadrage, PAS ENCORE de mesure ni de code :
+> ✅ **REPRIS ET MINÉ le 2026-08-17 — « garder pour plus tard » se scinde en TROIS mécanismes.**
+> La prochaine étape convenue (miner les deux signatures, sans solveur) est faite, et le mining a
+> débordé son cadre. Outil neuf `mesures/stock.py` (six modes), piège `taches.py` corrigé (chemin
+> dérivé du script). Décomposition des **106 caisses tenues** (livrables ≥ 30 coups) des 28 parties
+> gagnées, sur quatre tests contrefactuels validés par rejeu :
+> - **PORTE** (poser sur le but bloque un passage : transit strict OU cut d'articulation) : **24**,
+>   dont **7 cuts** francs — (16,2)/27 mure 4 buts. **Statique, donc CODABLE** (extension de
+>   `porte.cpp`), et les 7 cuts sont le jeu de validation prêt.
+> - **CONGESTION** (le CORRIDOR de livraison est encore emprunté par d'autres) : **31**. Le
+>   contre-exemple (10,10)/22 (tenue 218c, (b) au porte) l'a fait émerger : sa colonne de livraison est
+>   l'autoroute de 15 caisses. C'est le démêlage **§3/§4, IRRÉDUCTIBLE** — aucune borne géométrique.
+> - **BOUCHON** (la caisse au départ ouvre une région si on la retire) : **2/106**, hypothèse
+>   « départ bloque » **réfutée** comme mécanisme courant.
+> - **ORDRE libre** (rien ne force) : **66 %** — le solveur les réordonne déjà (§7 : `diff` brut = écart
+>   à `ordreButs`).
+>
+> **Bilan : un tiers des tenues relève d'un passage (33 %) ; de ce tiers, une moitié est statique-codable
+> (PORTE), l'autre est congestion irréductible ; deux tiers sont de l'ordre libre.** Cohérent avec la
+> thèse du plan (§3/§4). Seul actionnable : le **PORTE généralisé statique** (articulation-cut),
+> non encore codé. Détail, chiffres et pièges de mesure en [journal-hybride.md](journal-hybride.md),
+> session du 2026-08-17. ⚠️ Pièges relevés : compter la reachability du but qu'on occupe exprès (artefact
+> 90→7) ; la fenêtre du transit rate ce qui précède la livrabilité ; les salves par temps comptent la marche.
+>
+> ⏸️ **RECADRAGE INITIAL (2026-08-17, avant le mining) — conservé pour mémoire :**
 > - Le cas « garder pour plus tard » se scinde en deux, et un seul compte : *on ne la pose pas
 >   maintenant parce que ça fermerait un passage* (généralise l'outil `porte`, qui ne teste que la
 >   caisse perdant SES PROPRES appuis, au cas où une AUTRE caisse perd son passage). L'autre lecture
@@ -412,11 +435,10 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 > - **Données disponibles** : 11 des 15 non-résolus ont une partie gagnée rejouable exploitable
 >   (13, 14, 15, 16, 18, 19, 20, 22, 23, 24, 25) ; 4 n'en ont aucune (**28, 29, 30, 31** — jamais
 >   terminés à la main, le 31 à peine entamé, 374 o).
-> - ⚠️ **Piège à corriger avant de relancer `mesures/attente.py` sur cette machine** :
->   `mesures/taches.py` a un chemin racine codé en dur pour une autre machine
->   (`R="/Users/corentin/perso/qtiasoko"`, macOS). Contourné en mémoire (monkey-patch `taches.R` /
->   `attente.R`) pour cette session, rien commité — à corriger proprement (chemin relatif au script,
->   par ex.) avant de s'en resservir.
+> - ✅ **Piège corrigé le 2026-08-17** : `mesures/taches.py` avait `R="/Users/corentin/perso/qtiasoko"`
+>   codé en dur (macOS). Passé à `R = dirname(dirname(__file__))`, surchargeable par `QTIASOKO_ROOT`.
+>   Plus de monkey-patch. (Les deux signatures ci-dessus sont maintenant minées par `stock.py`, qui
+>   réutilise ce parseur réparé.)
 
 > 🎯 **PROCHAIN CHANTIER (2026-07-28) — LE PLONGEON-SUR-RECORD** (idée utilisateur).
 > Le corral-N (§6.1 suite 3) a fait sa part : il élague le **bois mort**. Ce qui bloque
