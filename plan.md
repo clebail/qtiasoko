@@ -446,13 +446,51 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 > (le 6, le 26, le 27 et le 32 — tous résolus — l'ont aussi) : cohérent avec §3/§4, le porte
 > généralisé attaque un COIN du problème (comme le corral en son temps), pas le mur PSPACE.
 >
-> **Reste à trancher, pas encore fait** : le câblage dans `butActif()` (comme `porteBloquee`)
-> suppose de savoir QUELLE caisse remplirait un but candidat — le couplage hongrois assigne déjà
-> `cout[caisse][but]`, mais le brancher est une décision séparée, non prise ici. Vu l'ampleur
-> mesurée (9/28 niveaux, jamais plus de 4 jalons par niveau), le gain attendu d'un câblage est
-> probablement LOCALISÉ (débloquer un blocage ponctuel sur 22/25, pas un levier massif) — à
-> confirmer si le chantier reprend, en premier lieu sur le 22 et le 25 où les coupures sont les
-> plus grosses.
+> ✅ **CÂBLÉ le 2026-08-18 — `Game::porteGeneraliseeBloquee`, dans les trois points d'appel de
+> `porteBloquee` au sein de `butActif()`.** ⚠️ Le design naïf (« occuper G sans savoir quelle caisse
+> le remplirait », `idxCaisse=-1`) est **RÉFUTÉ AVANT câblage** : `fpporte.py` en variante « sans
+> libération » trouve **1 faux positif prouvé sur le niveau 25** — la case que la vraie caisse
+> libère en partant rouvre exactement le passage qu'on croyait couper. Corrigé en balayant TOUTES
+> les caisses non livrées et en ne bloquant que si TOUTES coupent (`game.cpp`, juste après
+> `porteGeneraliseeCoupe`) : sûr par construction, puisque la caisse RÉELLEMENT jouée dans une
+> partie gagnante fait partie du balayage et y est toujours trouvée sûre (déduit du 0 FP/1650 de
+> `fpporte.py` en variante AVEC libération). **Canari revérifié binaire contre binaire** (`git
+> worktree` sur HEAD) sur 0,1,2,3,4,5,6,7,9,17,190,191 en régime `macro` : identique à l'unité —
+> attendu par construction, le code câblé n'est jamais atteint hors de `ordreDynamique`.
+> **Essai sur 22 et 25 (`ordre-dyn`) : NON CONCLUANT, interrompu pour préserver la machine** (RAM
+> quasi épuisée, swap plein). Avant coupure : le 22 a montré `max 8/27` (contre `max 1` au
+> profilage de juillet — premier vrai mouvement sur ce niveau), le 25 `max 2/19`, aucun des deux
+> plafonds confirmé définitif ni aucune solution. **Rien de tranché** : à refaire avec surveillance
+> mémoire et un seul run à la fois si le chantier reprend.
+
+> 🧭 **BILAN DE TRAJECTOIRE (2026-08-18, idée utilisateur) — LA RÉDUCTION D'ÉTATS MARQUE LE PAS
+> DEPUIS `ordre-look`.** Point explicitement demandé : distinguer un vrai LEVIER (réduit le nombre
+> d'états à explorer) d'un simple AGRANDISSEMENT DE BUDGET (mémoire, temps) qui permet seulement
+> d'aller plus loin en force brute sur un espace inchangé. Relu chronologiquement :
+> - **Le dernier vrai levier structurel est `ordre-look`** (2026-08-08/09, §6.2) : a fait tomber
+>   12, 26 et 27 d'un coup — des niveaux auparavant insolubles, pas juste accélérés.
+> - **Les dix jours qui suivent (2026-08-11 à 08-17) sont presque exclusivement de la mémoire**
+>   (`TableG` en deux tableaux −25 %, arène empaquetée −46 %, `noeuds` restructuré −15 %, plafond
+>   `QVector` à 2 Go levé) — cf. §6.5, dont le **propre bilan dit déjà** « la mémoire était un
+>   PLAFOND, pas le problème [...] on a acheté de l'espace d'exploration, pas des idées ». Le run
+>   le plus gros jamais lancé (470 M états, niveau 29) n'a débloqué **aucun niveau**. C'est un
+>   agrandissement de budget, pas un levier — la distinction que ce bilan reprend explicitement.
+> - **Le porte généralisé (aujourd'hui) est la première tentative de levier depuis `ordre-look`,
+>   et sa propre mesure d'ampleur le classe petit** : 9 niveaux touchés sur 28, jamais plus de 4
+>   jalons par niveau (§6.0 ci-dessus). Pas dans la même catégorie que goal-ordering ou corral —
+>   localisé, pas structurel.
+> - **Raison structurelle probable, pas juste une mauvaise passe** : le mining du stock
+>   (2026-08-17, ci-dessus) décompose déjà les caisses tenues par un mécanisme de PASSAGE en deux
+>   moitiés égales — PORTE (statique, codable, c'est ce qu'on vient de câbler) et **CONGESTION,
+>   explicitement qualifiée d'IRRÉDUCTIBLE** (démêlage PSPACE pur, §3/§4, aucune borne géométrique
+>   ne la capture). La moitié statique-codable du gisement vient d'être exploitée ; l'autre moitié
+>   n'est PAS un levier possible par définition — seul le budget de recherche (mémoire, anytime)
+>   peut la traverser, jamais la court-circuiter.
+> - **Ce qui reste non essayé** : le RN comme MINEUR HORS-LIGNE de motifs sûrs (§6.4) — jamais
+>   câblé, jamais tenté. C'est la seule piste du plan qui ouvrirait une CLASSE de leviers statiques
+>   nouvelle (motifs découverts automatiquement) plutôt que d'en dériver un de plus à la main sur un
+>   gisement qui donne des rendements décroissants (loi de l'ordre ÷2,98 sur un niveau et zéro sur
+>   un autre §6.6 ; porte généralisé sur 9/28 aujourd'hui).
 >
 > ⏸️ **RECADRAGE INITIAL (2026-08-17, avant le mining) — conservé pour mémoire :**
 > - Le cas « garder pour plus tard » se scinde en deux, et un seul compte : *on ne la pose pas
