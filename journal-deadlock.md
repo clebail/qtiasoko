@@ -941,3 +941,12 @@ résolus avant d'en faire quoi que ce soit.
 - [ ] Le réglage du budget, ou un gate fondé sur l'amortissement.
 - [ ] **Le motif ne débloque PAS le 16** : 8/15 au lieu de 7/15, le niveau reste non résolu.
 - [ ] `paquet <fichier.xsb> [budget]` juge un plateau isolé — c'est ce mode qui a servi de juge `fp`.
+
+✅ **CLOS le 2026-08-18 — RETIRÉ, jamais promu.** Revue du code (`solveurastar.h/.cpp`) : quinze
+jours après ce chantier, toujours « RIEN N'EST PROMU », le réglage jamais tranché, et le motif n'a
+jamais débloqué le niveau qui l'avait motivé. Poids mort dans le chemin chaud (deux points
+d'enfilage à maintenir synchronisés, cf. le bug de câblage ci-dessus). Retiré entièrement :
+`paquetActif`/`paquetBudget`/`paquetHorsBut`/`StatsPaquet` (`solveurastar.h/.cpp`), l'outil
+`mesures/paquet` (`.cpp`/`.pro`). `Game::sousSolveEnclos` reste — elle sert aussi au corral-N,
+qui lui est promu. Rien n'empêche de rouvrir le motif plus tard si un niveau neuf le justifie ;
+ce chantier-ci n'a rien produit d'assez solide pour rester câblé sans jamais servir.

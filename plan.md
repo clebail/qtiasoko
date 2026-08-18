@@ -89,10 +89,8 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `diverge`, `paires`, `trace`, `passages`, `congestion` | mou de `h`, interactions de paires, solution pas à pas, cartes de trajets |
 | **historique des RECORDS + critique du solveur `C`** (dans l'app) | **(neuf, 2026-08-03) LE MIROIR DE L'ANNOTATION D'INTENTIONS, mais sur ce que le SOLVEUR fait.** Le solveur a DEUX points d'enfilage (recherche principale + `plonge()`) et `nouveauMaxCaisses` écrasait le chemin visionné à CHAQUE record — un sélecteur conserve tous les chemins d'un run, voir le record 7 ET le record 8 ne demande plus qu'un seul run. Touche `C` : boîte de texte LIBRE (pas de vocabulaire fermé — celui des intentions a mis deux sessions à se stabiliser, on ne le refait pas sans savoir ce qu'on y met), journal `solveur_niveau_XXXX_critique.txt`, plateau `.xsb` joint à chaque entrée pour que `mort`/A\* puisse juger l'état après coup. `C` inerte pendant une session d'intentions (deux journaux distincts, ne pas mélanger) |
 | `bench <fichier.xsb> record` → `.chemin` | **(neuf, 2026-08-03)** à côté de chaque `.xsb` exporté, une lettre par coup (H/D/B/G, ordre de `EDirection`) : permet de rejouer le chemin d'un record HORS de l'app, pour le passer à `mort`/`fp` |
-| `paquet <niv> [depiles] [budget] [mode]` | **(neuf, 2026-08-03)** fréquence + coût du motif « paquet de caisses hors but non livrable » (cf. §6.1). `paquet <fichier.xsb> [budget]` = mode JUGE, verdict MORT/vivant/inconnu sur UN plateau — sert de `fp` pour ce motif |
 | `gabarit.py <niv>` | **(neuf, 2026-08-03, scratchpad)** un plateau ASCII par but ACTIF (buts déjà remplis affichés comme posés, rien pré-rempli) — support pour DESSINER une règle de cases mortes à la main sans que l'instrument ne suggère le vocabulaire (cf. §6.2) |
 | `juge_loi.py` | **(neuf, 2026-08-03, scratchpad)** juge une loi de cases mortes contre TOUTES les parties humaines gagnantes d'un coup (murs seuls, ordre injectable) : toute caisse sur une case déclarée morte est un faux positif PROUVÉ. A validé la loi du §6.2 sur 21/24 parties, et localisé les 3 exceptions à des ordres faux. ⚠️ **PERDU avec le scratchpad de sa session** — les scratchpads sont éphémères, tout outil qui doit resservir se rapatrie dans `mesures/` le jour même |
-| `loi <niv> [gabarit.txt]` | **(neuf, 2026-08-04)** LE JUGE DE LA LOI DE L'ORDRE (§6.2). Sans argument : la table des cases mortes but par but. Avec un gabarit : compare la table CALCULÉE au dessin FAIT À LA MAIN, case par case, et sort non nul au moindre écart — la loi n'étant dérivée d'aucun théorème, ce dessin est sa seule vérité de référence, et le canari ne verrait jamais un écart (un élagage trop mordant ne casse que des niveaux qu'on ne finit pas). Compare le **SURPLUS** (loi moins table ordinaire). Accepte aussi un `.xsb` : verdict `geleHorsTour` + cases mortes sur un plateau isolé |
 | `porte <niv>` | **(neuf, 2026-08-04) LA PRÉCÉDENCE CAISSE → BUT** — d'espèce neuve, toutes les autres sont but → but. *Si remplir G prive le joueur de TOUS les appuis d'une caisse C, alors C doit avoir bougé avant G.* Statique, O(caisses × buts × plateau), relaxation optimiste (une contrainte est une preuve, un silence ne promet rien). ⚠️ Une poussée dont la destination est une case MORTE ne compte pas comme une issue — sans ce test l'outil est muet. Rend **0 sur les 15 résolus**, et 2 sur 18 non résolus : le 16 (avant le rang 0) et le 30 — *comptes du 2026-08-04, quand la carte était à 15/33* |
 | `portegen <niv\|plateau.xsb>` | **(neuf, 2026-08-18) LE PORTE GÉNÉRALISÉ** — `Game::porteGeneraliseeCoupe(idxCaisse, idxBut)` (game.cpp). Généralise `porteBloquee` : au lieu des seuls appuis de LA caisse, teste si occuper un but coupe l'accès du joueur à N'IMPORTE QUELLE AUTRE caisse non livrée ou but non rempli — un point d'articulation du graphe de marche COURANT (toutes les caisses réellement posées comme obstacles), pas la géométrie du départ seule. ⚠️ **DYNAMIQUE** contrairement à `porteBloquee` : deux flood-fills par appel, à interroger sur un état (`.xsb` de milieu de partie, comme `bench`/`ordre`/`pas0`), pas seulement un départ. Validé bit-à-bit contre le mineur `stock.py cut` sur les 10 tenues du niveau 27 (2 positifs, 8 négatifs, 10/10 identiques) |
 | `fpporte.py [niv…]` | **(neuf, 2026-08-18) LE JUGE FP DU PORTE GÉNÉRALISÉ** — même protocole que `fp`/`juge_loi.py` : rejoue la dernière partie GAGNÉE de chaque niveau, teste le prédicat sur chaque livraison réelle, toute détection est un faux positif prouvé. **0 FP sur 1 650 livraisons, 28 niveaux.** ⚠️ Ne teste QUE la DERNIÈRE poussée de chaque caisse (sa position finale) — les poses de PASSAGE (une caisse qui transite par plusieurs buts d'un couloir aligné avant sa destination réelle) ne sont pas des livraisons ; les confondre a produit ~100 faux positifs bidons au premier jet (cf. §7) |
@@ -334,6 +332,16 @@ Histogramme des `f` au dépilement (`INSTRUM_F`) :
 - **Couplage hongrois pur** (avant le joueur-aware) : ne corrige que les collisions de buts,
   ~0 % sur le 17 (dont l'erreur est du coût de manœuvre). C'est le joueur-aware qui l'a rendu
   décisif.
+- **Deadlock de LIVRAISON, dit « but orphelin »** (§6.1, 2026-07-20/21, **retiré entièrement le
+  2026-08-18** en reprenant le code en main) : un but vide qu'aucune caisse ne peut plus atteindre.
+  Six variantes mesurées par `mesures/fp.cpp`, **cinq en faux positif prouvé** (une caisse déjà
+  posée tenue pour un obstacle fixe, alors que le vrai jeu autorise à la ressortir — cassait le
+  canari du niveau 2, 131→133 poussées) et **la sixième, seule sûre, ne capture rien de plus que
+  `staticDeadlock`**. Aucun réglage ne pouvait sauver l'idée : les deux défauts des variantes
+  dangereuses sont structurels (BFS non joueur-aware, caisses posées en obstacles permanents), pas
+  un curseur à ajuster. Retiré en entier : `Game::butNonLivrable`, l'interrupteur `LIVRAISON`
+  (`game.cpp`, `solveurastar.cpp`), et les variantes correspondantes dans `mesures/fp.cpp` (qui
+  garde ses modes corral/gate/précédence, désormais le défaut).
 
 ---
 
@@ -939,6 +947,22 @@ vrai partout.
 > à faire, et la moins chère : relever les stats `[LOI]` (enfilages / PRUNES / gel hors tour) sur les
 > deux runs — elles partent avec la jauge, donc elles sont déjà là. Détail en
 > [journal-hybride.md](journal-hybride.md), session du 2026-08-07.
+
+> ❌ **LOI DE L'ORDRE RETIRÉE ENTIÈREMENT le 2026-08-18** (idée utilisateur, en reprenant en main le
+> code du solveur). Le contre-exemple ci-dessus n'a jamais été résolu, et la mesure du jour l'a
+> aggravé : `bench 6 loi` rend **`AUCUNE`** — le régime rend **insoluble un niveau RÉSOLU par
+> défaut**, pas juste plus lent. Un commentaire déjà présent dans `solveur.h` (§ régime
+> `AstarMacroCouplagePlongeonOrdreLoi`, retiré le même jour) l'avait déjà mesuré sans que la
+> conclusion soit tirée jusqu'au bout : « la loi seule ne perd que le 6 », classé comme un cas isolé
+> plutôt que comme un défaut structurel. Cohérent avec ce que la règle dit d'elle-même dans son propre
+> commentaire de code (retiré aussi) : ni `caseMorteLoi` ni `geleHorsTour` ne sont des élagages
+> PROUVÉS — une exigence d'ordre, jamais un théorème de géométrie, donc rien ne garantissait qu'elle
+> ne coupe pas la seule branche gagnante d'un niveau. **Retiré en entier** : le câblage solveur
+> (`loiOrdre`/`loiTropTot`/`StatsLoi`, les régimes `...Loi`/`...OrdreLoi`), la table `Game`
+> (`mortesLoi`/`caseMorteLoi`/`casesMortesLoi`/`geleHorsTour`/`calculCasesMortesLoi`), l'overlay UI
+> (case à cocher « cases mortes (loi de l'ordre) ») et l'outil `mesures/loi.cpp`. `rangDeBut`/
+> `rangDuBut` sont CONSERVÉS (extraits dans `calculRangDeBut()`) : utilisés par `porteBloquee` et par
+> les outils `porte`/`ordre`, indépendamment de la loi. Canari revérifié intact.
 
 **Ce qui manque : ces prédicteurs sont tous A POSTERIORI** — ils exigent un solve ou un
 échantillonnage par sous-solves. Pour choisir le régime AVANT de lancer, deux voies :

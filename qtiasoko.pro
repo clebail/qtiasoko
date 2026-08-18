@@ -30,6 +30,7 @@ SOURCES += \
     player.cpp \
     solveur.cpp \
     solveurastar.cpp \
+    solveurdiagnostic.cpp \
     sol.cpp \
     solveurbfs.cpp \
     sprite.cpp \
@@ -48,6 +49,7 @@ HEADERS += \
     player.h \
     solveur.h \
     solveurastar.h \
+    solveurdiagnostic.h \
     sol.h \
     solveurbfs.h \
     sprite.h \

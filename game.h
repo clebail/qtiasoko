@@ -193,69 +193,10 @@ public:
     // chemin chaud (piège §7).
     const QVector<int>& getOrdreButs() const { return ordreButs; }
 
-    // ── LOI DE L'ORDRE (§6.2, 2026-08-03 — idée utilisateur) ────────────────────
-    // « Vu du solveur, seul le but ACTIF existe ; les autres buts ne sont que du
-    // SOL. » D'où une table de cases mortes PAR BUT au lieu d'une seule :
-    //
-    //   morte pour le but B  ssi  aucune caisse posée là ne peut être poussée
-    //                             jusqu'à B, quelle que soit la région du joueur,
-    //   SAUF si la case est ALIGNÉE avec B (même ligne ou même colonne) — auquel
-    //   cas elle redevient du sol.
-    //
-    // ⚠️ CE N'EST PAS UN ÉLAGAGE PROUVÉ, et il ne doit jamais entrer dans
-    // `checkDefaite`. Poser une caisse sur un but hors de son tour reste LÉGAL au
-    // Sokoban : la règle repose sur la justesse de l'ORDRE, pas sur la géométrie.
-    // Elle a été jugée sur 24 parties humaines gagnantes — 0 faux positif sur 19
-    // niveaux, et les trois seuls fautifs (12, 14, 15) sont exactement ceux dont on
-    // savait déjà l'ordre calculé faux, tous trois guéris par l'ordre humain injecté.
-    // C'est donc un test de COHÉRENCE entre un ordre et une partie, pas un test
-    // d'ordre absolu : le niveau 6 admet deux ordres valides, et la loi condamne
-    // celui des deux qu'on ne lui a pas donné. Régime SÉPARÉ, comme le plongeon.
-    //
-    // ⚠️ La table n'est pas un sur-ensemble de `casesMortes` : l'exemption
-    // d'alignement peut rendre au sol une case globalement morte. C'est sans
-    // conséquence — la loi s'AJOUTE à `checkDefaite`, elle ne le remplace pas.
-    //
-    // Gratuit : `distanceParBut` fait déjà le BFS à rebours par but, sur les murs
-    // seuls (aucune caisse, aucun autre but en obstacle) — soit exactement la vue
-    // « murs seuls » sous laquelle la loi a été jugée. Il ne reste qu'une réduction
-    // booléenne, calculée une fois au chargement comme `casesMortes`.
-    bool caseMorteLoi(int idxBut, int cell) const {
-        return mortesLoi.at((qsizetype)idxBut * size + cell);
-    }
-    // La tranche du but 'idxBut', pour l'affichage. Vide si 'idxBut' < 0 (état gagné).
-    // ⚠️ Ne rend que le SURPLUS de la loi — les cases déjà mortes dans la table
-    // ordinaire en sont retirées. C'est ce qui se lit et se dessine : le reste,
-    // `checkDefaite` le coupe depuis toujours, l'afficher en gris ne dirait rien de
-    // la loi et noierait le plateau sous le remplissage hors contour.
-    QVector<bool> casesMortesLoi(int idxBut) const;
     // Case morte au sens ORDINAIRE (table unique, tous buts confondus) — exposée
-    // pour que le juge de la loi puisse en isoler le surplus.
+    // pour que `porte`/`ordre` puissent tester une poussée dont la destination est
+    // une case morte (une telle poussée n'est pas une issue, cf. game.cpp).
     bool caseMorteOrdinaire(int cell) const { return casesMortes.at(cell); }
-
-    // ── GEL HORS TOUR (§6.2, 2026-08-04) — LA SECONDE MOITIÉ DE LA LOI ──────────
-    // Même principe qu'au-dessus, poussé jusqu'au bout : si seul le but ACTIF
-    // existe, une caisse posée sur un but de rang SUPÉRIEUR est une caisse sur du
-    // SOL. Or une caisse gelée sur du sol est morte — c'est le tout premier élagage
-    // du projet, et il n'a jamais tourné ici.
-    //
-    // Rien de neuf n'est calculé : `caisseGelee`/`bloqueeSurAxe` travaillent déjà
-    // sur `estCaisse()`, qui couvre `tcCaisse` ET `tcGoalCaisse`. Le seul obstacle
-    // était la boucle de `checkDefaite`, qui ne présente que les `tcCaisse` — pour
-    // une raison juste au niveau de la CAISSE (« une caisse gelée sur un but est un
-    // morceau de la solution ») et fausse au niveau de la RÉGION : quatre caisses
-    // posées trop tôt, collées en carré, scellent onze buts derrière elles. C'est le
-    // plateau du 2026-08-04, prouvé mort en 10 états par réduction à une caisse.
-    //
-    // ⚠️ CE N'EST PAS UNE PREUVE, et le sens de l'erreur est connu : une caisse
-    // gelée sur un but de rang supérieur REMPLIT quand même ce but, donc la partie
-    // reste gagnable dans l'absolu. On coupe des états réellement gagnables. Même
-    // statut que la loi — une exigence d'ORDRE, pas un théorème de géométrie —
-    // donc régime SÉPARÉ, et le canari des résolus pour juge.
-    //
-    // ⚠️ Les buts de rang INFÉRIEUR sont exemptés, comme dans la table : ceux-là
-    // sont rangés à leur tour, une caisse gelée dessus est une caisse posée.
-    bool geleHorsTour(int idxButActif) const;
 
     // ── PRÉCÉDENCE CAISSE → BUT (§6.2, 2026-08-04) ──────────────────────────────
     // Toutes les précédences du projet sont but → but. Celle-ci est d'une autre
@@ -623,28 +564,6 @@ public:
     // Renvoie le nombre de caisses posées sur un but (compté gratuitement pendant
     // le placement), pour la jauge de progression du diagnostic (§10).
     int appliqueEtat(const quint16* cle);
-    // Deadlock de LIVRAISON (§6.1) : vrai s'il reste un but VIDE qu'aucune caisse
-    // ne peut plus atteindre. 'variante' choisit la relaxation (cf. game.cpp) ;
-    // 0 = celle de la variable d'environnement LIVRAISON (défaut : test COUPÉ).
-    //
-    // ⚠️ DÉSACTIVÉ, ET POUR CAUSE (mesuré le 2026-07-21 avec mesures/fp.cpp, qui
-    // rejoue une solution GAGNANTE et interroge le test sur chacun de ses états —
-    // tous solubles par construction, donc toute détection est un faux positif
-    // PROUVÉ). Deux défauts indépendants :
-    //   1. le BFS de livraison n'est PAS joueur-aware — il ne retient qu'UNE
-    //      position de joueur par case atteinte, alors qu'une même case atteinte
-    //      « par l'autre côté » ouvre d'autres poussées. C'est la faille du
-    //      prototype mesures/mort.cpp, et elle rend 86 faux positifs sur le 17 ;
-    //   2. tenir les caisses posées pour des obstacles fixes est faux, même
-    //      restreint aux caisses GELÉES (1 faux positif sur le 2).
-    // Seule la variante 3, qui lit distanceParBut (joueur-aware, elle), est sûre —
-    // et elle ne capture rien de plus que staticDeadlock.
-    //
-    // PUBLIC parce que le point d'appel naturel, checkDefaite, est le mauvais :
-    // marquer 'perdu' sur un état INTERMÉDIAIRE de goal macro fait avorter la
-    // macro entière (move() refuse de jouer sur un état perdu) — niveaux 3 et 5
-    // perdus. Le solveur peut donc l'appeler sur les états qu'il ENFILE.
-    bool butNonLivrable(int variante = 0) const;
 private:
     // Coeur du corral unitaire pour UNE case S : facteur commun du balayage
     // complet et de la forme incrémentale (cf. corralUnitaireMort ci-dessus).
@@ -704,18 +623,15 @@ private:
     // poussée depuis la caisse la plus proche. Statique, partagé par COW.
     QVector<int> ordreButs;
 
-    // LOI DE L'ORDRE (cf. caseMorteLoi) : mortesLoi[BUT * size + CASE], et
-    // rangDeBut[BUT] = rang de ce but dans ordreButs (l'inverse de celui-ci).
-    // ⚠️ Une seule table PLATE, pas un QVector<QVector<bool>> : le solveur copie
-    // Game par candidate, et un vecteur de vecteurs coûterait nbButs incréments de
-    // compteur par copie là où la table plate n'en coûte qu'un (COW).
-    QVector<bool> mortesLoi;
-    QVector<int>  rangDeBut;
+    // rangDeBut[BUT] = rang de ce but dans ordreButs (l'inverse de celui-ci),
+    // cf. calculRangDeBut(). Sert à `porteBloquee`, `geleHorsTour` (retiré avec
+    // la loi de l'ordre) et aux outils `porte`/`ordre` (mesures/).
+    QVector<int> rangDeBut;
 
     // PRÉCÉDENCE CAISSE → BUT (cf. porteBloquee) : les cases à dégager avant chaque
     // but, en CSR — `porteCases` concaténées, `porteDebut` les offsets (nbButs+1).
-    // Deux vecteurs plats et non un vecteur de vecteurs : même raison que mortesLoi,
-    // le solveur copie Game par candidate.
+    // Deux vecteurs plats et non un vecteur de vecteurs : le solveur copie Game
+    // par candidate.
     QVector<int> porteCases, porteDebut;
 
     bool move(EDirection dir);
@@ -727,7 +643,7 @@ private:
     short getMinIdx(const QVector<bool>& zone) const;
     bool isLibre(int idx) const;
     void calculCaseMorte();
-    void calculCasesMortesLoi();
+    void calculRangDeBut();
     void calculPorteRequis();
     // Coeur de porteGeneraliseeCoupe, prenant 'r0' déjà calculé — partagé par
     // porteGeneraliseeBloquee entre tous les candidats du même appel (cf. game.cpp).

@@ -1,18 +1,22 @@
 // Harnais FP — le juge des tests de deadlock (§6.1).
 //
-//   fp <numNiveau> [variante] [astar|macro]      (défaut : variante 4, macro)
+//   fp <numNiveau> [variante] [astar|macro]      (défaut : variante -1, macro)
 //
 // La question, la seule qui compte pour un élagage : le test invente-t-il des
-// morts ? On résout le niveau (avec LIVRAISON=0, donc SANS le test), puis on
-// rejoue la solution coup par coup et on interroge butNonLivrable(variante) sur
-// CHAQUE état traversé. Tous ces états sont solubles par construction — une
-// solution y passe. Donc :
+// morts ? On résout le niveau, puis on rejoue la solution coup par coup et on
+// interroge le test sur CHAQUE état traversé. Tous ces états sont solubles par
+// construction — une solution y passe. Donc :
 //
 //        toute détection sur ce chemin est un FAUX POSITIF PROUVÉ.
 //
 // C'est ce que l'échantillonnage de `mort` ne pouvait pas voir : lui classait des
 // états quelconques par sous-solve borné ; ici on part d'états dont la solubilité
 // est certaine.
+//
+// ⚠️ Le test « but orphelin » (variantes >= 0, `Game::butNonLivrable`) a été
+// retiré entièrement le 2026-08-18 : c'est LUI qui avait produit son propre
+// verdict, via cet outil — cinq variantes en faux positif prouvé, la sixième
+// sans capture. Seuls les tests négatifs restent (corral, gate, précédence).
 #include <QCoreApplication>
 #include <QString>
 #include <QList>
@@ -26,17 +30,10 @@
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
 
-    if (argc < 2) { fprintf(stderr, "usage: fp <niveau> [variante|-1=corral] [astar|macro]\n"); return 2; }
+    if (argc < 2) { fprintf(stderr, "usage: fp <niveau> [-1=corral|-2=gate|-3=precedence] [astar|macro]\n"); return 2; }
     const int num      = QString(argv[1]).toInt();
-    const int variante = (argc > 2) ? QString(argv[2]).toInt() : 4;
+    const int variante = (argc > 2) ? QString(argv[2]).toInt() : -1;
     const QString md   = (argc > 3) ? argv[3] : "macro";
-
-    // Le solveur doit chercher SANS le test, sinon on jugerait le test avec
-    // lui-même : c'est sa solution qu'on lui oppose.
-    if (variante >= 0 && qgetenv("LIVRAISON") != "0") {
-        fprintf(stderr, "fp: relancer avec LIVRAISON=0 (le solveur doit ignorer le test)\n");
-        return 2;
-    }
 
     Level level;
     level.load(QString("%1/level%2.xsb").arg(LEVELS_DIR).arg(num, 4, 10, QChar('0')));
@@ -49,17 +46,15 @@ int main(int argc, char** argv) {
         Game g(game);
         int coup = 0, poussees = 0, faux = 0, premier = -1;
 
-        // variante < 0 : on juge le CORRAL UNITAIRE (§6.1 item 4) au lieu du test
-        // « but orphelin ». Même juge, même verdict binaire : toute détection sur
-        // un chemin gagnant est un faux positif prouvé.
+        // Même verdict binaire pour les trois tests : toute détection sur un
+        // chemin gagnant est un faux positif prouvé.
         auto detecte = [variante](const Game& e) {
             // -3 : PRÉCÉDENCE PAR PAIRES (mesures/precedencepaires.h). Objet de
             // diagnostic, pas encore un élagage — c'est précisément ce juge qui doit
             // dire s'il pourrait le devenir un jour.
             if (variante == -3) return PrecedencePaires::violations(e) > 0;
             if (variante == -2) return e.gateEnclosMort();     // gate corral-N (item B)
-            if (variante <  0)  return e.corralUnitaireMort(); // corral unitaire + pince
-            return e.butNonLivrable(variante);
+            return e.corralUnitaireMort();                     // corral unitaire + pince (défaut)
         };
 
         if (detecte(g)) { faux++; premier = 0; }   // l'état de départ !

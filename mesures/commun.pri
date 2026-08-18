@@ -13,6 +13,6 @@ DEFINES += SCRATCH=\\\"$$OUT_PWD\\\"
 INCLUDEPATH += $$P
 
 SOURCES += $$P/game.cpp $$P/level.cpp $$P/astar.cpp \
-           $$P/solveur.cpp $$P/solveurbfs.cpp $$P/solveurastar.cpp
+           $$P/solveur.cpp $$P/solveurbfs.cpp $$P/solveurastar.cpp $$P/solveurdiagnostic.cpp
 HEADERS += $$P/game.h $$P/level.h $$P/astar.h \
-           $$P/solveur.h $$P/solveurbfs.h $$P/solveurastar.h $$P/cle.h
+           $$P/solveur.h $$P/solveurbfs.h $$P/solveurastar.h $$P/cle.h $$P/solveurdiagnostic.h

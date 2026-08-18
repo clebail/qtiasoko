@@ -20,9 +20,6 @@ QVector<Solveur::SType> Solveur::types() {
         {AstarMacroPlongeon, "A* macro — plongeon sur record (essai)"},
         {AstarMacroCouplagePlongeon, "A* macro — couplage + plongeon (essai)"},
         {AstarMacroCouplagePlongeonOrdre, "A* macro — couplage + plongeon + ordre dynamique (essai)"},
-        {AstarMacroCouplagePlongeonCoins, "A* macro — couplage + plongeon + buts en coin dans l'ordre (essai)"},
-        {AstarMacroCouplagePlongeonLoi, "A* macro — couplage + plongeon + loi de l'ordre (essai)"},
-        {AstarMacroCouplagePlongeonOrdreLoi, "A* macro — couplage + plongeon + ordre dynamique + loi (essai)"},
         {AstarMacroCouplagePlongeonLook, "A* macro — couplage + plongeon + ordre lookahead rang 0 (essai)"}
     };
 }
@@ -52,19 +49,6 @@ Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
             depart.setOrdreDynamique(true);
             return new SolveurAStar(depart, 1, true, parent, true, true);
         }
-        // BUTS EN COIN DANS L'ORDRE (§6.2, 2026-08-03) : une caisse ne peut pas se
-        // poser sur un but en coin dont le rang dépasse l'actif. Régime d'ESSAI :
-        // la règle repose sur la justesse de l'ordre, pas sur la géométrie.
-        case AstarMacroCouplagePlongeonCoins:
-            return new SolveurAStar(etatDepart, 1, true, parent, true, true, true);
-        // LOI DE L'ORDRE (§6.2, 2026-08-03) : une caisse ne peut pas se tenir sur une
-        // case morte vue du BUT ACTIF. Régime d'ESSAI, même raison que ci-dessus —
-        // la règle repose sur la justesse de l'ordre, pas sur la géométrie.
-        case AstarMacroCouplagePlongeonLoi:
-            return new SolveurAStar(etatDepart, 1, true, parent, true, true, false, true);
-        // LES DEUX MOITIÉS ENSEMBLE (§6.2, 2026-08-04) : l'ordre dynamique porte la
-        // contrainte de PORTE (dans butActif), le drapeau porte la LOI et le GEL (à
-        // l'enfilage). Aucun run ne les avait jamais eues toutes les deux.
         // ORDRE-LOOK (§6.2, 2026-08-08) : le drapeau vit dans le Game, comme
         // `ordreDynamique` — posé ici sur l'état de départ, il RECALCULE `ordreButs`
         // et se propage ensuite par copie à toute la recherche.
@@ -72,11 +56,6 @@ Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
             Game depart(etatDepart);
             depart.setOrdreLookahead(true);
             return new SolveurAStar(depart, 1, true, parent, true, true);
-        }
-        case AstarMacroCouplagePlongeonOrdreLoi: {
-            Game depart(etatDepart);
-            depart.setOrdreDynamique(true);
-            return new SolveurAStar(depart, 1, true, parent, true, true, false, true);
         }
     }
     return nullptr;
