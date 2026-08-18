@@ -893,6 +893,87 @@ bool Game::porteBloquee(int idxBut) const {
     return false;
 }
 
+// PORTE GÉNÉRALISÉ (cf. game.h) — DYNAMIQUE : contrairement à porteBloquee,
+// tout est recalculé sur l'état COURANT à chaque appel, deux flood-fills.
+//
+// Factorisé en deux : le coeur prend 'r0' déjà calculé (partagé entre tous les
+// candidats testés pour le MÊME jalon par porteGeneraliseeBloquee, qui appelle
+// ceci une fois par caisse — sans partage, ce serait le même flood-fill refait
+// nbCaisses fois).
+bool Game::porteGeneraliseeCoupeAvecZone(int idxCaisse, int idxBut, const QVector<bool>& r0) const {
+    const int gb = goals.at(idxBut);
+    const int depart = playerPoint.x() + playerPoint.y() * largeur;
+    if (depart == gb) return false;   // situation dégénérée (cf. calculPorteRequis)
+
+    // r1 : zone de marche si 'idxCaisse' avait déjà quitté sa case pour occuper
+    // 'gb'. Flood-fill dédié — celui de getZoneJoueur ne sait pas exempter une
+    // case à la volée, et cette route n'est pas assez chaude pour justifier de
+    // le lui apprendre.
+    QVector<bool> r1(size, false);
+    QVarLengthArray<short, 512> file(size);
+    r1[depart] = true; file.append(depart);
+    for (int k = 0; k < file.size(); k++) {
+        const int idx = file[k], x = idx % largeur, y = idx / largeur;
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int nx = x + directions[d].dx, ny = y + directions[d].dy;
+            if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+            const int n = nx + ny * largeur;
+            if (r1[n] || n == gb || cases[n] == Level::tcMur) continue;
+            if (n != idxCaisse && estCaisse(n)) continue;
+            r1[n] = true; file.append(n);
+        }
+    }
+
+    auto accessible = [&](int cell, const QVector<bool>& r) {
+        const int x = cell % largeur, y = cell / largeur;
+        for (int d = 0; d < NB_DIRECTION; d++) {
+            const int nx = x + directions[d].dx, ny = y + directions[d].dy;
+            if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+            if (r.at(nx + ny * largeur)) return true;
+        }
+        return false;
+    };
+
+    // Caisses NON livrées (hors 'idxCaisse' elle-même) qui perdraient tout accès.
+    for (int c = 0; c < size; c++) {
+        if (c == idxCaisse || cases[c] != Level::tcCaisse) continue;
+        if (accessible(c, r0) && !accessible(c, r1)) return true;
+    }
+    // Buts NON remplis (hors 'idxBut', qu'on occupe EXPRÈS — l'exclure a coupé
+    // 90 faux positifs à la création du prédicat, cf. journal-hybride.md).
+    for (int b = 0; b < nbButs; b++) {
+        if (b == idxBut) continue;
+        const int cell = goals.at(b);
+        if (cases[cell] == Level::tcGoalCaisse) continue;
+        if (accessible(cell, r0) && !accessible(cell, r1)) return true;
+    }
+    return false;
+}
+
+bool Game::porteGeneraliseeCoupe(int idxCaisse, int idxBut) const {
+    QVector<bool> r0; getZoneJoueur(r0);
+    return porteGeneraliseeCoupeAvecZone(idxCaisse, idxBut, r0);
+}
+
+// ⚠️ NE PAS tester idxCaisse=-1 (« aucune case libérée ») : c'est PLUS
+// PESSIMISTE que la réalité — ignorer la case que la caisse choisie libère en
+// partant peut faire manquer un contournement réel. Mesuré, un FAUX POSITIF
+// PROUVÉ sur le niveau 25 (fpporte.py, 2026-08-18, variante « sans
+// libération » : coupe (13,4)->(13,3) alors que la partie humaine gagnante
+// joue exactement ce coup). D'où le balayage ci-dessous : la caisse RÉELLEMENT
+// jouée dans une partie gagnante fait partie de ce balayage et y est TOUJOURS
+// trouvée sûre (déduit de fpporte.py, 0 FP/1650 AVEC libération de la vraie
+// caisse) — donc ce prédicat ne peut jamais être un faux positif sur un coup
+// qu'une partie gagnante joue réellement.
+bool Game::porteGeneraliseeBloquee(int idxBut) const {
+    QVector<bool> r0; getZoneJoueur(r0);
+    for (int c = 0; c < size; c++) {
+        if (cases[c] != Level::tcCaisse) continue;
+        if (!porteGeneraliseeCoupeAvecZone(c, idxBut, r0)) return false;   // une caisse sûre suffit
+    }
+    return true;
+}
+
 bool Game::geleHorsTour(int idxButActif) const {
     if (idxButActif < 0 || rangDeBut.isEmpty()) return false;
     const int rangActif = rangDeBut.at(idxButActif);
@@ -2725,7 +2806,7 @@ int Game::butActif() const {
     // rendrait un but devenu non mûr jusqu'au prochain remplissage — c'est-à-dire
     // exactement pendant la phase où le mal se fait.
     if (butCourant >= 0 && cases[goals[butCourant]] != Level::tcGoalCaisse
-        && !porteBloquee(butCourant))
+        && !porteBloquee(butCourant) && !porteGeneraliseeBloquee(butCourant))
         return butCourant;
 
     // Jalon atteint (ou premier appel) : on rechoisit depuis l'ÉTAT COURANT.
@@ -2785,7 +2866,9 @@ int Game::butActif() const {
         // on ne coupe rien. Sur le 16, c'est (12,7) rang 0 tant que (10,6) est occupée.
         // ⚠️ Placé AVANT `premierLivrable` : ce filet ne doit pas non plus le retenir,
         // sinon le relâchement d'en dessous reposerait le but qu'on vient d'écarter.
-        if (porteBloquee(b)) continue;
+        // PORTE GÉNÉRALISÉ (§6.0, 2026-08-18) : même principe, étendu à N'IMPORTE
+        // QUELLE caisse/but qui perdrait accès — pas seulement les appuis propres.
+        if (porteBloquee(b) || porteGeneraliseeBloquee(b)) continue;
         if (premierLivrable < 0) premierLivrable = b;            // filet, cf. plus bas
 
         bloque[goals[b]] = true;
@@ -2818,7 +2901,7 @@ int Game::butActif() const {
     for (int k = 0; k < nbButs; k++) {
         const int b = ordreButs[k];
         if (cases[goals[b]] == Level::tcGoalCaisse) continue;
-        if (porteBloquee(b)) continue;
+        if (porteBloquee(b) || porteGeneraliseeBloquee(b)) continue;
         return choisit(b, "(REPLI STATIQUE : aucun but livrable)");
     }
     // … et on ne se retrouve à en rendre un bloqué que s'ils le sont TOUS. Rendre -1

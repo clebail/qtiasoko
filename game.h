@@ -283,6 +283,48 @@ public:
     // contrainte est une PREUVE, un silence ne promet rien. Mesuré à sa création :
     // 0 contrainte sur les 15 résolus, 2 sur 18 non résolus (16 et 30).
     bool porteBloquee(int idxBut) const;
+
+    // ── PORTE GÉNÉRALISÉ (§6.0, chantier 2026-08-18) ────────────────────────────
+    // `porteBloquee` ne teste QUE les appuis de la caisse qui perdrait les siens.
+    // Le mining du stock (journal-hybride, 2026-08-17) a montré que ce n'est
+    // qu'une moitié du motif « PORTE » : l'autre moitié, ce sont les cas où
+    // occuper un but coupe l'accès à une AUTRE caisse ou à un AUTRE but — un
+    // point d'articulation du graphe de marche, pas une histoire d'appuis d'UNE
+    // caisse précise. Prédicat validé hors-solveur (`mesures/stock.py cut`) sur
+    // les parties gagnées : 7 cas sur 106 caisses tenues, dont (16,2)/27 qui
+    // condamne 4 buts d'un coup.
+    //
+    // ⚠️ DYNAMIQUE, contrairement à `porteBloquee` : elle interroge l'état
+    // COURANT (toutes les caisses réellement en jeu comme obstacles), pas la
+    // géométrie du départ. Coût d'un flood-fill par appel — comme
+    // `getZoneJoueur`, jamais à appeler dans une boucle chaude sans réflexion.
+    //
+    // 'idxCaisse' = la CASE (pas un rang) qu'occuperait la caisse testée si elle
+    // quittait sa position ; 'idxBut' = le but qu'elle irait remplir. Teste : en
+    // comparant la zone de marche AVANT et APRÈS ce déplacement hypothétique
+    // (idxCaisse libérée, le but occupé), une caisse NON livrée ou un but NON
+    // rempli perd-il tout accès (aucune case voisine dans la zone atteignable) ?
+    //
+    // ⚠️ Le but testé lui-même est exclu du décompte des « buts perdus » —
+    // l'occuper EXPRÈS n'est pas une perte (piège capté à la création du
+    // prédicat python, cf. journal-hybride.md 2026-08-17 : 90 faux positifs
+    // avant cette exclusion).
+    //
+    // ⚠️ N'EST PAS UN ÉLAGAGE, même statut que `porteBloquee` : un DÉLAI de
+    // remplissage, jamais une preuve de mort. Un silence ne promet rien.
+    bool porteGeneraliseeCoupe(int idxCaisse, int idxBut) const;
+
+    // Câblage dans `butActif()` (§6.0, 2026-08-18) : « ce but est-il mûr, QUELLE
+    // QUE SOIT la caisse qui le remplirait ? » Balaie toutes les caisses non
+    // livrées et rend vrai seulement si TOUTES coupent quelque chose — une
+    // seule caisse sûre suffit à dire non. ⚠️ Ne PAS simplifier en testant
+    // « occuper le but sans libérer aucune case » (idxCaisse=-1) : c'est PLUS
+    // PESSIMISTE que la réalité (ignore le contournement que la case libérée
+    // peut ouvrir) et donne un FAUX POSITIF PROUVÉ sur le niveau 25 — cf.
+    // game.cpp. Le balayage, lui, est prouvé sûr : la caisse RÉELLEMENT jouée
+    // dans une partie gagnante en fait partie et y est toujours trouvée sûre.
+    bool porteGeneraliseeBloquee(int idxBut) const;
+
     // Rang de remplissage du but 'idxBut' dans `ordreButs` (l'inverse de celui-ci).
     int rangDuBut(int idxBut) const { return rangDeBut.at(idxBut); }
     // Champ de distances vers le BUT ACTIF, SPARSE : une valeur uniquement sur
@@ -687,6 +729,9 @@ private:
     void calculCaseMorte();
     void calculCasesMortesLoi();
     void calculPorteRequis();
+    // Coeur de porteGeneraliseeCoupe, prenant 'r0' déjà calculé — partagé par
+    // porteGeneraliseeBloquee entre tous les candidats du même appel (cf. game.cpp).
+    bool porteGeneraliseeCoupeAvecZone(int idxCaisse, int idxBut, const QVector<bool>& r0) const;
     // Test de gel : une caisse est gelée si elle est bloquée sur LES DEUX axes.
     // 'enCours' est la garde de récursion (cf. game.cpp).
     bool caisseGelee(int idxCaisse, QVector<bool>& enCours) const;

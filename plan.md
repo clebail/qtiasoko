@@ -94,6 +94,9 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `juge_loi.py` | **(neuf, 2026-08-03, scratchpad)** juge une loi de cases mortes contre TOUTES les parties humaines gagnantes d'un coup (murs seuls, ordre injectable) : toute caisse sur une case déclarée morte est un faux positif PROUVÉ. A validé la loi du §6.2 sur 21/24 parties, et localisé les 3 exceptions à des ordres faux. ⚠️ **PERDU avec le scratchpad de sa session** — les scratchpads sont éphémères, tout outil qui doit resservir se rapatrie dans `mesures/` le jour même |
 | `loi <niv> [gabarit.txt]` | **(neuf, 2026-08-04)** LE JUGE DE LA LOI DE L'ORDRE (§6.2). Sans argument : la table des cases mortes but par but. Avec un gabarit : compare la table CALCULÉE au dessin FAIT À LA MAIN, case par case, et sort non nul au moindre écart — la loi n'étant dérivée d'aucun théorème, ce dessin est sa seule vérité de référence, et le canari ne verrait jamais un écart (un élagage trop mordant ne casse que des niveaux qu'on ne finit pas). Compare le **SURPLUS** (loi moins table ordinaire). Accepte aussi un `.xsb` : verdict `geleHorsTour` + cases mortes sur un plateau isolé |
 | `porte <niv>` | **(neuf, 2026-08-04) LA PRÉCÉDENCE CAISSE → BUT** — d'espèce neuve, toutes les autres sont but → but. *Si remplir G prive le joueur de TOUS les appuis d'une caisse C, alors C doit avoir bougé avant G.* Statique, O(caisses × buts × plateau), relaxation optimiste (une contrainte est une preuve, un silence ne promet rien). ⚠️ Une poussée dont la destination est une case MORTE ne compte pas comme une issue — sans ce test l'outil est muet. Rend **0 sur les 15 résolus**, et 2 sur 18 non résolus : le 16 (avant le rang 0) et le 30 — *comptes du 2026-08-04, quand la carte était à 15/33* |
+| `portegen <niv\|plateau.xsb>` | **(neuf, 2026-08-18) LE PORTE GÉNÉRALISÉ** — `Game::porteGeneraliseeCoupe(idxCaisse, idxBut)` (game.cpp). Généralise `porteBloquee` : au lieu des seuls appuis de LA caisse, teste si occuper un but coupe l'accès du joueur à N'IMPORTE QUELLE AUTRE caisse non livrée ou but non rempli — un point d'articulation du graphe de marche COURANT (toutes les caisses réellement posées comme obstacles), pas la géométrie du départ seule. ⚠️ **DYNAMIQUE** contrairement à `porteBloquee` : deux flood-fills par appel, à interroger sur un état (`.xsb` de milieu de partie, comme `bench`/`ordre`/`pas0`), pas seulement un départ. Validé bit-à-bit contre le mineur `stock.py cut` sur les 10 tenues du niveau 27 (2 positifs, 8 négatifs, 10/10 identiques) |
+| `fpporte.py [niv…]` | **(neuf, 2026-08-18) LE JUGE FP DU PORTE GÉNÉRALISÉ** — même protocole que `fp`/`juge_loi.py` : rejoue la dernière partie GAGNÉE de chaque niveau, teste le prédicat sur chaque livraison réelle, toute détection est un faux positif prouvé. **0 FP sur 1 650 livraisons, 28 niveaux.** ⚠️ Ne teste QUE la DERNIÈRE poussée de chaque caisse (sa position finale) — les poses de PASSAGE (une caisse qui transite par plusieurs buts d'un couloir aligné avant sa destination réelle) ne sont pas des livraisons ; les confondre a produit ~100 faux positifs bidons au premier jet (cf. §7) |
+| `ampleurporte.py` / `ampleurporte2.py [niv…]` | **(neuf, 2026-08-18) L'AMPLEUR DU MOTIF** — `ampleurporte.py` (premier jet, RÉFUTÉ comme signal) scanne TOUTES les paires (caisse × but) à chaque jalon : 71 % coupées, mais **ne discrimine rien** — résolus et non-résolus touchés aux mêmes taux (67-81 % partout), signal trivial de géométrie (coins disjoints). `ampleurporte2.py` restreint au SEUL but que `butActif()` choisirait réellement (rang minimal de `getOrdreButs()`, lu via l'outil `ordre` — jamais recalculé en Python, trop de règles) : **17/435 jalons (3,9 %)**, 9 niveaux sur 28 touchés, dont plusieurs non-résolus (13, 14, 15, 22, 25) avec des coupures parfois massives (10 caisses/7 buts sur le 25) |
 
 **Règles de mesure, non négociables :**
 - **Comparer un binaire à un AUTRE binaire** (ancien reconstruit depuis `HEAD` via
@@ -411,6 +414,45 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 > non encore codé. Détail, chiffres et pièges de mesure en [journal-hybride.md](journal-hybride.md),
 > session du 2026-08-17. ⚠️ Pièges relevés : compter la reachability du but qu'on occupe exprès (artefact
 > 90→7) ; la fenêtre du transit rate ce qui précède la livrabilité ; les salves par temps comptent la marche.
+>
+> ✅ **CODÉ ET VALIDÉ le 2026-08-18 — `Game::porteGeneraliseeCoupe` (game.cpp), toujours HORS
+> SOLVEUR.** Généralise `porteBloquee` : plus de flood-fill « murs + G + C seuls », deux flood-fills
+> sur l'état COURANT (toutes les caisses réellement posées comme obstacles), et le test porte sur
+> N'IMPORTE QUELLE caisse non livrée / but non rempli, pas seulement les appuis de la caisse
+> testée. Deux validations, dans cet ordre :
+> 1. **Bit-à-bit contre `stock.py cut`** (outil neuf `mesures/portegen`, cf. §1) : les 10 tenues du
+>    niveau 27 exportées en `.xsb` de milieu de partie, 10/10 verdicts identiques entre le mineur
+>    Python (validé sur les vraies parties) et le prédicat C++ intégré au moteur — dont les deux
+>    positifs, (16,2)→(4,1) qui mure 4 buts et (4,10)→(5,2).
+> 2. **`fpporte.py` (juge FP, cf. §1), 0 faux positif sur 1 650 livraisons, 28 niveaux.** Même
+>    protocole que `fp`/`juge_loi.py` : toute détection sur un coup réellement joué dans une partie
+>    GAGNÉE est une preuve de faux positif. Piège capté en le construisant, cf. §7 (« une pose sur
+>    un but n'est pas une livraison »).
+>
+> Le prédicat est donc établi comme SÛR au même titre que `porteBloquee` — un DÉLAI de
+> remplissage, jamais une preuve de mort.
+>
+> ✅ **AMPLEUR MESURÉE le 2026-08-18 (outils `ampleurporte`/`ampleurporte2`, §1).** Premier réflexe
+> réfuté : scanner TOUTES les paires (caisse × but) à chaque jalon rend 71 % de coupes — mais **ne
+> discrimine rien**, résolus et non-résolus touchés aux mêmes taux (67-81 % partout). C'est un fait
+> trivial de géométrie (des coins disjoints du plateau ne se voient jamais), pas un signal. La
+> mesure qui compte restreint le test au SEUL but que `butActif()` choisirait réellement — rang
+> minimal de `ordreButs`, lu STATIQUEMENT via l'outil `ordre` (jamais recalculé en Python, trop de
+> règles pour être rejouées fidèlement hors du moteur) — sans présumer quelle caisse le remplirait
+> (occuper G comme un mur de plus, aucune case libérée). Résultat : **17/435 jalons (3,9 %)**, sur
+> **9 niveaux touchés sur 28** — dont des non-résolus notables (**13, 14, 15, 22, 25**), avec
+> parfois des coupures MASSIVES quand ça touche (10 caisses + 7 buts d'un coup sur le 25, 10
+> caisses + 4 buts sur le 22). **Un signal réel mais modeste, pas concentré sur les non-résolus**
+> (le 6, le 26, le 27 et le 32 — tous résolus — l'ont aussi) : cohérent avec §3/§4, le porte
+> généralisé attaque un COIN du problème (comme le corral en son temps), pas le mur PSPACE.
+>
+> **Reste à trancher, pas encore fait** : le câblage dans `butActif()` (comme `porteBloquee`)
+> suppose de savoir QUELLE caisse remplirait un but candidat — le couplage hongrois assigne déjà
+> `cout[caisse][but]`, mais le brancher est une décision séparée, non prise ici. Vu l'ampleur
+> mesurée (9/28 niveaux, jamais plus de 4 jalons par niveau), le gain attendu d'un câblage est
+> probablement LOCALISÉ (débloquer un blocage ponctuel sur 22/25, pas un levier massif) — à
+> confirmer si le chantier reprend, en premier lieu sur le 22 et le 25 où les coupures sont les
+> plus grosses.
 >
 > ⏸️ **RECADRAGE INITIAL (2026-08-17, avant le mining) — conservé pour mémoire :**
 > - Le cas « garder pour plus tard » se scinde en deux, et un seul compte : *on ne la pose pas
@@ -1051,6 +1093,30 @@ plateau × leviers disponibles.**
   `CORRAL_DETECT`. Un interrupteur ne doit vivre que le temps d'un chantier ; à la promotion, il
   part. Ceux qui restent (`CORRAL=0`) ne servent qu'aux outils de mesure et **coupent**, jamais
   n'ajoutent : un défaut coupé se voit tout de suite, un défaut manquant ne se voit jamais.
+- ⚠️ **UNE POSE SUR UN BUT N'EST PAS UNE LIVRAISON — une caisse peut TRANSITER par
+  plusieurs buts avant sa destination réelle** (2026-08-18, en construisant `fpporte.py`). Un
+  couloir de buts alignés (niveau 10, colonne x=17) fait glisser chaque nouvelle caisse jusqu'au
+  but le plus profond encore libre, en passant par tous les buts plus proches SANS s'y arrêter —
+  le journal humain montre `POUSSE caisse ->(16,2) [POSE]` puis, deux coups plus tard,
+  `POUSSE caisse ->(17,2) [POSE]`, la MÊME caisse continuant son chemin. Un premier juge FP qui
+  testait le porte généralisé (cf. §1 `portegen`) sur CHAQUE pose a rendu ~100 « faux positifs » —
+  tous bidons, la caisse n'étant jamais restée sur ces buts intermédiaires. Corrigé en ne testant
+  que la DERNIÈRE poussée de chaque caisse (sa position finale, `dernier_coup_de` dans
+  `fpporte.py`) : 0 FP sur 1 650 livraisons. Même famille que le piège « compter G elle-même »
+  de `stock.py cut` (§6.0, 2026-08-17) : le prédicat était juste, c'est la définition de
+  « livrée » qui était trop large.
+- ⚠️ **UN SCAN EXHAUSTIF SANS FILTRE MESURE LA GÉOMÉTRIE, PAS LE PROBLÈME** (2026-08-18, en
+  mesurant l'ampleur du porte généralisé). Tester TOUTES les paires (caisse × but) à chaque
+  jalon rend 71 % de coupes (`ampleurporte.py`) — un chiffre qui a l'air massif mais qui NE
+  DISCRIMINE RIEN : résolus et non-résolus sont touchés aux mêmes taux (67-81 % partout). La
+  raison est bête une fois vue : la plupart des paires testées sont des caisses et des buts dans
+  des coins du plateau qui n'ont jamais eu vocation à interagir — le test mesure alors « des
+  régions disjointes ne se voient pas », un fait trivial de géométrie. Restreindre au SEUL but
+  que le solveur choisirait réellement (rang minimal de `ordreButs`, cf. `ampleurporte2.py`) fait
+  tomber le chiffre à 3,9 % — la mesure utile. **Un scan exhaustif est un test de PRÉSENCE, pas de
+  PERTINENCE : sans filtrer sur ce que le solveur regarderait VRAIMENT, un grand nombre ne prouve
+  rien** — même leçon que le §6.6 sur les prédicteurs a posteriori, appliquée ici à une mesure
+  d'ampleur plutôt qu'à un gain.
 
 ---
 
