@@ -52,7 +52,7 @@ Game::Game(const Level& level, int numNiveau) : numNiveau(numNiveau) {
 
     calculDistancePoussee();
     calculCaseMorte();
-    calculRangDeBut();
+    calculCasesMortesLoi();
     calculPorteRequis();
 }
 
@@ -60,13 +60,14 @@ Game::Game(const Game& other)
     : largeur(other.largeur), hauteur(other.hauteur), size(other.size),
       playerPoint(other.playerPoint),
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
-      ordreDynamique(other.ordreDynamique), ordreLookahead(other.ordreLookahead), butCourant(other.butCourant),
+      ordreDynamique(other.ordreDynamique), ordreLookahead(other.ordreLookahead),
+      ordreAlignement(other.ordreAlignement), butCourant(other.butCourant),
       nbCaisses(other.nbCaisses),
     gagne(other.gagne), perdu(other.perdu), goals(other.goals), casesMortes(other.casesMortes),
     regions(other.regions), nbRegions(other.nbRegions), distancePoussee(other.distancePoussee),
     distanceParBut(other.distanceParBut), nbButs(other.nbButs),
     maxRegions(other.maxRegions), ordreButs(other.ordreButs),
-    rangDeBut(other.rangDeBut),
+    mortesLoi(other.mortesLoi), rangDeBut(other.rangDeBut),
     porteCases(other.porteCases), porteDebut(other.porteDebut)
 {
     if (other.cases) {
@@ -88,6 +89,7 @@ Game& Game::operator=(const Game& other) {
     numNiveau = other.numNiveau;
     ordreDynamique = other.ordreDynamique;
     ordreLookahead = other.ordreLookahead;
+    ordreAlignement = other.ordreAlignement;
     butCourant = other.butCourant;
     nbCaisses = other.nbCaisses;
     gagne = other.gagne;
@@ -101,6 +103,7 @@ Game& Game::operator=(const Game& other) {
     distanceParBut = other.distanceParBut;
     nbButs = other.nbButs;
     ordreButs = other.ordreButs;
+    mortesLoi = other.mortesLoi;
     rangDeBut = other.rangDeBut;
     porteCases = other.porteCases;
     porteDebut = other.porteDebut;
@@ -121,7 +124,8 @@ Game::Game(Game&& other) noexcept
       playerPoint(other.playerPoint),
       cases(other.cases),
       nbDep(other.nbDep), nbDepCaisse(other.nbDepCaisse), numNiveau(other.numNiveau),
-      ordreDynamique(other.ordreDynamique), ordreLookahead(other.ordreLookahead), butCourant(other.butCourant),
+      ordreDynamique(other.ordreDynamique), ordreLookahead(other.ordreLookahead),
+      ordreAlignement(other.ordreAlignement), butCourant(other.butCourant),
       nbCaisses(other.nbCaisses),
       gagne(other.gagne), perdu(other.perdu),
       goals(std::move(other.goals)), casesMortes(std::move(other.casesMortes)),
@@ -129,7 +133,7 @@ Game::Game(Game&& other) noexcept
       distancePoussee(std::move(other.distancePoussee)),
       distanceParBut(std::move(other.distanceParBut)), nbButs(other.nbButs),
       maxRegions(other.maxRegions), ordreButs(std::move(other.ordreButs)),
-      rangDeBut(std::move(other.rangDeBut)),
+      mortesLoi(std::move(other.mortesLoi)), rangDeBut(std::move(other.rangDeBut)),
       porteCases(std::move(other.porteCases)), porteDebut(std::move(other.porteDebut))
 {
     other.cases = nullptr;   // sinon les deux destructeurs libéreraient le même tableau
@@ -147,6 +151,7 @@ Game& Game::operator=(Game&& other) noexcept {
     numNiveau = other.numNiveau;
     ordreDynamique = other.ordreDynamique;
     ordreLookahead = other.ordreLookahead;
+    ordreAlignement = other.ordreAlignement;
     butCourant = other.butCourant;
     nbCaisses = other.nbCaisses;
     gagne = other.gagne;
@@ -160,6 +165,7 @@ Game& Game::operator=(Game&& other) noexcept {
     distanceParBut = std::move(other.distanceParBut);
     nbButs = other.nbButs;
     ordreButs = std::move(other.ordreButs);
+    mortesLoi = std::move(other.mortesLoi);
     rangDeBut = std::move(other.rangDeBut);
     porteCases = std::move(other.porteCases);
     porteDebut = std::move(other.porteDebut);
@@ -491,15 +497,111 @@ void Game::calculCaseMorte()  {
     }
 }
 
-// rangDeBut[BUT] = rang de ce but dans ordreButs (l'inverse de celui-ci) — sert
-// à `porte`/`ordre` (mesures/) et à l'affichage. Extrait de l'ancienne « loi de
-// l'ordre » (retirée le 2026-08-18, cf. plan.md §7 : cassait le niveau 6 sans
-// être un élagage prouvé), qui calculait ce rang au passage.
+// LOI DE L'ORDRE (cf. game.h pour la règle et sa portée). Une réduction booléenne
+// de `distanceParBut`, plus l'exemption d'alignement.
 //
-// ⚠️ APPELER APRÈS calculDistancePoussee() : elle lit `ordreButs`.
-void Game::calculRangDeBut() {
+// ⚠️ APPELER APRÈS calculDistancePoussee() : elle lit `distanceParBut`, `ordreButs`
+// et `nbButs`, que celle-ci produit. C'est la même dépendance que calculCaseMorte.
+//
+// ⚠️ L'ALIGNEMENT S'ARRÊTE AU PREMIER MUR (précision de l'utilisateur, 2026-08-04,
+// après un premier jet qui le prenait au pied de la lettre). « Aligné » veut dire
+// qu'on pourrait encore pousser la caisse EN LIGNE DROITE jusqu'au but, et un mur
+// entre les deux l'interdit.
+//
+// ⚠️ AUCUNE MESURE NE DÉPARTAGE ENCORE LES DEUX VERSIONS — vérifié, pas supposé :
+// le gabarit du niveau 16 rend 15 plateaux sur 15 avec l'une COMME avec l'autre
+// (essayé le 2026-08-04). Cette version-ci tient donc de l'énoncé de son auteur, pas
+// d'un juge. Et c'est la plus MORDANTE des deux : ses cases mortes sont un
+// sur-ensemble de celles de la version littérale, donc si un faux positif doit
+// apparaître, c'est ici qu'il apparaîtra d'abord. Un niveau où les deux diffèrent
+// reste à trouver.
+// UN COIN N'EST JAMAIS EXEMPTÉ (précision de l'utilisateur, 2026-08-04, sur
+// relevé à l'écran du 16 puis du 6). Deux murs perpendiculaires : aucune des
+// quatre poussées n'est possible, chacune demandant une destination ou un appui
+// dans l'un des deux murs. Or « aligné » veut dire « on pourrait encore la
+// pousser en ligne droite jusqu'au but » — d'un coin on ne la pousse nulle part,
+// l'exemption n'a donc aucun sens là.
+//
+// Même ligne ou même colonne que le but, ET rien qu'on puisse traverser entre les
+// deux. Les cases intermédiaires ne sont testées QUE sur les murs : une caisse ou
+// une position de joueur sont de l'état, or cette table est statique — c'est la
+// même convention que tout le reste du précalcul.
+//
+// Factorisé le 2026-08-19 pour `precedenceAlignement()`, qui teste le MÊME
+// critère entre deux BUTS plutôt qu'entre un but et une case courante — cf. game.h.
+bool Game::alignementLoi(int cell, int idxBut) const {
+    const int g = goals[idxBut];
+    if (cell == g) return true;
+    const int gx = g % largeur, gy = g / largeur;
+    const int x = cell % largeur, y = cell / largeur;
+    const bool mN = (y == 0)           || cases[cell - largeur] == Level::tcMur;
+    const bool mS = (y == hauteur - 1) || cases[cell + largeur] == Level::tcMur;
+    const bool mO = (x == 0)           || cases[cell - 1]       == Level::tcMur;
+    const bool mE = (x == largeur - 1) || cases[cell + 1]       == Level::tcMur;
+    if ((mN || mS) && (mO || mE)) return false;   // coin : jamais exempté
+
+    if (x != gx && y != gy) return false;
+    const int dx = (gx > x) - (gx < x), dy = (gy > y) - (gy < y);
+    for (int cx = x + dx, cy = y + dy; cx != gx || cy != gy; cx += dx, cy += dy)
+        if (cases[cx + cy * largeur] == Level::tcMur) return false;
+    return true;
+}
+
+void Game::calculCasesMortesLoi() {
+    mortesLoi = QVector<bool>((qsizetype)nbButs * size, false);
     rangDeBut = QVector<int>(nbButs, -1);
     for (int k = 0; k < ordreButs.size(); k++) rangDeBut[ordreButs[k]] = k;
+
+    if (maxRegions <= 0) return;        // niveau dégénéré : rien à calculer
+
+    QVector<bool> estBut(size, false);
+    for (int b : goals) estBut[b] = true;
+
+    for (int j = 0; j < nbButs; j++) {
+        const int* dpb = distanceParBut.constData() + (qsizetype)j * size * maxRegions;
+
+        for (int c = 0; c < size; c++) {
+            if (cases[c] == Level::tcMur) continue;
+
+            // ⚠️ LA MORT DYNAMIQUE NE CONCERNE QUE LES CASES-BUTS (précision de
+            // l'utilisateur, 2026-08-04 : « (3,1) c'est du sol, ce n'est pas un but,
+            // donc ça ne peut pas être mort dynamique »). Une case ordinaire qui
+            // n'atteint pas le but ACTIF reste un garage parfaitement licite : la
+            // caisse qui s'y trouve attendra le but qu'elle sait servir, et rien ne
+            // l'oblige à partir maintenant. La condamner serait un faux positif — et
+            // c'est le §4 en énième déguisement (« interdire de remplir dans le
+            // désordre »). Ce que la loi vise, c'est la caisse posée sur un BUT hors
+            // de son tour, là où la table ordinaire ne voit jamais rien puisqu'un but
+            // est sa propre graine du BFS à rebours.
+            if (!estBut.at(c)) continue;
+
+            // Atteignable depuis AU MOINS une région du joueur ? Même lecture que
+            // calculCaseMorte, mais sur la tranche d'un seul but au lieu du min.
+            bool atteint = false;
+            for (int r = 0; r < nbRegions[c] && !atteint; r++)
+                if (dpb[c * maxRegions + r] != -1) atteint = true;
+            if (atteint) continue;
+
+            // Alignée avec le but, mur non franchi, et pas un coin : du sol.
+            if (alignementLoi(c, j)) continue;
+
+            mortesLoi[(qsizetype)j * size + c] = true;
+        }
+
+        // TROISIÈME TEMPS DE LA LOI : « les buts déjà remplis sont des obstacles ».
+        // Un but de rang INFÉRIEUR à celui-ci est rempli par construction — butActif()
+        // rend le PREMIER but non rempli — donc sa case porte une caisse rangée à son
+        // tour. Ce n'est pas une case où l'on pourrait poser : elle ne peut jamais
+        // être « morte ». Sans ce temps-là, la règle condamnerait l'état juste après
+        // chaque pose, sur presque tous les niveaux — la case d'un but rangé n'a
+        // aucune raison d'atteindre le suivant.
+        // ⚠️ Les buts de rang SUPÉRIEUR, eux, restent jugés : une caisse posée là est
+        // hors de son tour, et c'est exactement ce que la loi vise.
+        const int rangJ = rangDeBut[j];
+        for (int m = 0; m < nbButs; m++)
+            if (rangDeBut[m] < rangJ)
+                mortesLoi[(qsizetype)j * size + goals[m]] = false;
+    }
 }
 
 // PRÉCÉDENCE CAISSE → BUT (cf. game.h). Statique, calculée au chargement comme
@@ -674,6 +776,14 @@ bool Game::porteGeneraliseeBloquee(int idxBut) const {
         if (!porteGeneraliseeCoupeAvecZone(c, idxBut, r0)) return false;   // une caisse sûre suffit
     }
     return true;
+}
+
+QVector<bool> Game::casesMortesLoi(int idxBut) const {
+    if (idxBut < 0 || idxBut >= nbButs) return QVector<bool>();
+    QVector<bool> v = mortesLoi.mid((qsizetype)idxBut * size, size);
+    for (int c = 0; c < size; c++)
+        if (casesMortes.at(c)) v[c] = false;      // déjà coupée par checkDefaite
+    return v;
 }
 
 // Coût d'une paire caisse->but inatteignable dans la matrice du couplage. GRAND
@@ -1666,6 +1776,54 @@ QVector<QVector<int>> Game::precedenceGlobale() const {
     return requis;
 }
 
+// PRÉCÉDENCE PAR ALIGNEMENT (cf. game.h). Contrairement à `precedenceGlobale`
+// (reachability PHYSIQUE, aveugle au SENS de poussée), celle-ci reprend le
+// critère exact de `caseMorteLoi` — reachable-vers-A (distanceParBut) OU
+// aligné avec A (alignementLoi) — appliqué à la case d'un AUTRE but B. Si ni
+// l'un ni l'autre, une caisse posée sur B pendant que A est actif serait
+// condamnée par la loi.
+//
+// ⚠️ ARÊTE ASYMÉTRIQUE SEULEMENT (correction 2026-08-19, idée utilisateur — « il
+// prend des caisses de la petite salle pour les mettre dans la grande »). Le
+// premier jet ajoutait l'arête dès que B n'atteint pas A, SANS vérifier que A
+// atteint B en retour — ce qui condamne aussi bien un vrai passage à SENS UNIQUE
+// (niveau 6 : (2,5) atteint (1,5), jamais l'inverse) qu'une paire de buts dans
+// deux salles simplement DISJOINTES (aucun des deux n'atteint l'autre, ce qui
+// n'est PAS une précédence, juste une absence de rapport). Mesuré sur le niveau
+// 10 (salle 28 + salle 4, cf. plan.md) : sans ce garde, la petite salle héritait
+// d'une dette `attente` de 29-30 (quasi tous les autres buts), la reléguant en
+// fin d'ordre alors qu'elle n'a aucune raison d'attendre — corrigé du même coup.
+QVector<QVector<int>> Game::precedenceAlignement() const {
+    QVector<QVector<int>> requis(nbButs);
+    if (maxRegions <= 0) return requis;
+
+    auto atteintDepuis = [&](int idxBut, int cell) {
+        const int* dp = distanceParBut.constData() + (qsizetype)idxBut * size * maxRegions;
+        for (int r = 0; r < nbRegions[cell]; r++)
+            if (dp[cell * maxRegions + r] != -1) return true;
+        return false;
+    };
+
+    for (int a = 0; a < nbButs; a++) {
+        const int ga = goals[a];
+        for (int b = 0; b < nbButs; b++) {
+            if (b == a) continue;
+            const int gb = goals[b];
+
+            if (atteintDepuis(a, gb)) continue;         // B atteint A : rien à en tirer
+            if (alignementLoi(gb, a)) continue;         // aligné avec A : sol légitime
+
+            // L'ASYMÉTRIE : A doit pouvoir atteindre B, sinon les deux buts sont
+            // simplement SANS RAPPORT (deux salles disjointes) et non-B→A ne prouve
+            // rien sur leur ORDRE relatif.
+            if (!atteintDepuis(b, ga)) continue;
+
+            requis[a].append(b);   // A ne doit pas être actif tant que B n'est pas posé
+        }
+    }
+    return requis;
+}
+
 // Ordre de remplissage par PRÉCÉDENCE DE LIVRAISON (§6.2, session du 2026-07-20).
 //
 // Le fait mesuré : sur la salle du 11, l'ordre décide de tout (28 états contre 1,3 M
@@ -1714,6 +1872,29 @@ void Game::setOrdreLookahead(bool actif) {
     installeOrdreParPrecedence();
 }
 
+// RÉGIME `loi` (2026-08-19) — même mécanique que `setOrdreLookahead` ci-dessus
+// (drapeau, recalcul immédiat, garde d'injection), mais pour la précédence par
+// alignement (cf. game.h : SCOPÉE ici plutôt que fondue dans l'ordre par défaut,
+// parce qu'elle casse le niveau 10 une fois généralisée).
+//
+// ⚠️ APPELLE calculCasesMortesLoi() APRÈS installeOrdreParPrecedence(), et
+// `setOrdreLookahead` ci-dessus NE LE FAIT PAS — piège trouvé en mesurant : sans
+// ça, `ordreButs` change mais `rangDeBut`/`mortesLoi` restent ceux de l'ordre PAR
+// DÉFAUT (calculés une fois dans le ctor `Game(Level)`, jamais revus). `caseMorteLoi`
+// jugerait alors avec le mauvais rang — silencieusement, puisque `butActif()` lit
+// le NOUVEL `ordreButs` pendant que la loi juge sur l'ANCIEN `rangDeBut`. Mesuré :
+// sans cet appel, `bench 6 loi` retombe à `AUCUNE` malgré l'ordre corrigé.
+void Game::setOrdreAlignement(bool actif) {
+    if (ordreAlignement == actif) return;
+    ordreAlignement = actif;
+    if (!cheminOrdreInjecte(numNiveau).isEmpty() || !qgetenv("ORDRE_HUMAIN").isEmpty()) {
+        fprintf(stderr, "[ORDRE-ALIGN] ordre INJECTE present — recalcul IGNORE\n");
+        return;
+    }
+    installeOrdreParPrecedence();
+    calculCasesMortesLoi();
+}
+
 QVector<int> Game::ordreParPrecedence() const {
     QVector<bool> bloque(size, false);
     QVector<bool> pose(nbButs, false);
@@ -1757,7 +1938,21 @@ QVector<int> Game::ordreParPrecedence() const {
     // de repli équivalentes) a été codée et mesurée le 2026-07-30 : **cartes de rangs
     // identiques sur les 35 niveaux**, donc strictement INERTE. Retirée. Ne pas la
     // reproposer sans un cas qui la distingue.
-    const QVector<QVector<int>> requis = precedenceGlobale();
+    // PRÉCÉDENCE PAR ALIGNEMENT (2026-08-19, cf. game.h), fusionnée UNIQUEMENT si
+    // `ordreAlignement` est armé. ⚠️ Mesuré en fusion INCONDITIONNELLE (donc dans
+    // l'ordre PAR DÉFAUT, utilisé par TOUS les régimes) : corrige bien le niveau 6,
+    // mais casse SÉVÈREMENT le niveau 10 (32 buts — 2/32 caisses posées en 227 000
+    // états quand la référence en pose 32 en 250 000) et fait apparaître un murage
+    // LOCAL sur 6 niveaux auparavant propres (2, 8, 9, 12, 21, 32). L'ajout mord
+    // bien plus large que le seul motif visé — d'où le drapeau, armé SEULEMENT par
+    // le régime d'essai `loi` (solveur.cpp), jamais l'ordre par défaut.
+    QVector<QVector<int>> requis = precedenceGlobale();
+    if (ordreAlignement) {
+        const QVector<QVector<int>> align = precedenceAlignement();
+        for (int b = 0; b < nbButs; b++)
+            for (int g : align[b])
+                if (!requis[b].contains(g)) requis[b].append(g);
+    }
     auto attente = [&](int b) -> int {
         int n = 0;
         for (int g : requis[b]) if (!pose[g]) n++;

@@ -236,6 +236,20 @@
         </widget>
        </item>
        <item>
+        <widget class="QCheckBox" name="cbMortesLoi">
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
+         </property>
+         <property name="text">
+          <string>Cases mortes (loi de l'ordre)</string>
+         </property>
+         <property name="toolTip">
+          <string>Gris PÂLE : cases mortes ordinaires, vraies toute la partie (dont les coins qui ne sont pas des buts).
+Gris FONCÉ : le surplus de la loi de l'ordre — une caisse posée là n'atteindrait plus le BUT ACTIF, les autres buts comptant pour du sol, sauf si la case est alignée avec lui sans mur entre les deux. Suit le but actif en direct.</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <spacer name="horizontalSpacer_2">
          <property name="orientation">
           <enum>Qt::Orientation::Horizontal</enum>

@@ -59,8 +59,12 @@ int main(int argc, char** argv) {
     // `ordre <niv|fichier> look` : arme le régime ordre-look (§6.2, 2026-08-08) avant
     // de lire l'ordre. Permet de DIFFER les deux ordres sans lancer un solve — et
     // c'est ce diff qui prouve l'équivalence sur les niveaux que la clé ne touche pas.
-    for (int i = 2; i < argc; i++)
+    // `ordre <niv|fichier> align` : arme la précédence par alignement (2026-08-19,
+    // scopée exprès — cf. game.h) avant de lire l'ordre.
+    for (int i = 2; i < argc; i++) {
         if (QString(argv[i]) == "look") game.setOrdreLookahead(true);
+        if (QString(argv[i]) == "align") game.setOrdreAlignement(true);
+    }
     const int L = game.getLargeur(), H = game.getHauteur();
     const QVector<int>& ordre = game.getOrdreButs();
     const int nb = game.getNbButs();

@@ -83,9 +83,16 @@ public:
     // une recherche gloutonne bornée (best-first sur h seul) avant de revenir à
     // l'A* normal. Renonce à l'optimalité — mesuré : +2 poussées sur le 4, l'optimum
     // exact sur 2/3/5/6/7/9/17.
+    // 'loi' (régime d'essai, RESTAURÉ ISOLÉ le 2026-08-19, cf. game.h) : une caisse
+    // ne peut pas se tenir sur une case morte VUE DU BUT ACTIF (`caseMorteLoi`).
+    // Extrait de l'ancien régime combiné 'loiOrdre' (retiré le 2026-08-18) : celui-ci
+    // testait CETTE table ET le gel hors tour sous un seul drapeau, jamais isolés.
+    // Le gel, testé seul le 2026-08-19, casse LUI AUSSI le niveau 6 — donc « gel=0
+    // sur le 6 » dans la mesure combinée de 2026-08-04 ne disculpait rien : cette
+    // table-ci n'a jamais non plus été mesurée seule. À faire AVANT toute promotion.
     explicit SolveurAStar(const Game& etatDepart, int poids = 1, bool macro = false,
                           QObject* parent = nullptr, bool macroCouplage = false,
-                          bool plongeon = false);
+                          bool plongeon = false, bool loi = false);
 
 protected:
     void run() override;
@@ -148,10 +155,19 @@ private:
     template<typename Enfiler>
     void poussesSimples(Game& etat, const QVector<quint8>& caisses, int gCur, Enfiler&& enfiler);
 
+    // LOI DE L'ORDRE (régime 'loi', cf. constructeur et game.h) : vrai si une caisse
+    // se tient sur une case morte vue du but actif. Appelée aux DEUX points
+    // d'enfilage (recherche principale + plonge()), même raison que le corral : un
+    // élagage câblé au premier seul laisse le second explorer des états déjà
+    // prouvés morts. 'arrivee' = case de repos de la caisse qui vient de bouger
+    // (-1 si aucune, cf. les points d'appel).
+    bool loiTropTot(const Game& e, int arrivee) const;
+
     const int poids;
     const bool macro;
     const bool macroCouplage;
     const bool plongeon;
+    const bool loi;
 };
 
 #endif // SOLVEURASTAR_H

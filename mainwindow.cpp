@@ -56,8 +56,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             if (i >= 0 && i < recordsVus.size())
                 chargeCheminVisionne(departSolveur, recordsVus[i].second, false);
         });
-
     }
+
+    // Cases mortes de la LOI DE L'ORDRE (§6.2, 2026-08-03 — restauré ISOLÉ le
+    // 2026-08-19), en gris sur le plateau. Déclarée dans le .ui (cbMortesLoi,
+    // juste après cbEtatMax) : seul cbRecords ci-dessus reste construit par code,
+    // parce que lui a besoin de l'index RUNTIME de cbEtatMax dans son layout.
+    connect(cbMortesLoi, &QCheckBox::toggled, this, [this](bool on) {
+        wGame->showCasesMortesLoi(on);
+    });
 
     for (const Solveur::SType& t : Solveur::types()) {
         cbSolveur->addItem(t.libelle, static_cast<int>(t.type));

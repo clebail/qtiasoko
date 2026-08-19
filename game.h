@@ -183,6 +183,15 @@ public:
     // reste est INCHANGÉ — 26 ordres sur 35 sont bit-à-bit identiques. D'où le
     // régime séparé : le canari des résolus ne doit pas en dépendre.
     void setOrdreLookahead(bool actif);
+    // RÉGIME `loi` (2026-08-19) : mêle la PRÉCÉDENCE PAR ALIGNEMENT (game.h,
+    // `precedenceAlignement`) dans `attente()`, la clé de tête du comparateur de
+    // `ordreParPrecedence`. ⚠️ SCOPÉ EXPRÈS : mesuré en fusion directe dans l'ordre
+    // PAR DÉFAUT (sans ce drapeau), ça corrige le niveau 6 mais CASSE le niveau 10
+    // (32 buts — 2/32 posées en 227 000 états contre 32/32 en 250 000 sans le
+    // changement) et fait apparaître un murage local sur 6 niveaux auparavant
+    // propres (2, 8, 9, 12, 21, 32). Recalcule `ordreButs` sur place, comme
+    // `setOrdreLookahead` — donc à poser sur l'état de DÉPART. Jamais le défaut.
+    void setOrdreAlignement(bool actif);
     // Case (index plat) du but d'indice 'indexBut' — même indexation que
     // butActif()/ordreButs. Pour l'UI, qui a besoin d'une position à surligner.
     int getCaseBut(int indexBut) const { return goals[indexBut]; }
@@ -193,9 +202,55 @@ public:
     // chemin chaud (piège §7).
     const QVector<int>& getOrdreButs() const { return ordreButs; }
 
+    // ── LOI DE L'ORDRE (§6.2, 2026-08-03 — RESTAURÉE SEULE le 2026-08-19) ───────
+    // « Vu du solveur, seul le but ACTIF existe ; les autres buts ne sont que du
+    // SOL. » D'où une table de cases mortes PAR BUT au lieu d'une seule :
+    //
+    //   morte pour le but B  ssi  aucune caisse posée là ne peut être poussée
+    //                             jusqu'à B, quelle que soit la région du joueur,
+    //   SAUF si la case est ALIGNÉE avec B (même ligne ou même colonne) — auquel
+    //   cas elle redevient du sol.
+    //
+    // ⚠️ CE N'EST PAS UN ÉLAGAGE PROUVÉ, et il ne doit jamais entrer dans
+    // `checkDefaite`. Poser une caisse sur un but hors de son tour reste LÉGAL au
+    // Sokoban : la règle repose sur la justesse de l'ORDRE, pas sur la géométrie.
+    // Elle a été jugée sur 24 parties humaines gagnantes — 0 faux positif sur 19
+    // niveaux, et les trois seuls fautifs (12, 14, 15) sont exactement ceux dont on
+    // savait déjà l'ordre calculé faux, tous trois guéris par l'ordre humain injecté.
+    // C'est donc un test de COHÉRENCE entre un ordre et une partie, pas un test
+    // d'ordre absolu : le niveau 6 admet deux ordres valides, et la loi condamne
+    // celui des deux qu'on ne lui a pas donné. Régime SÉPARÉ, comme le plongeon.
+    //
+    // ⚠️ La table n'est pas un sur-ensemble de `casesMortes` : l'exemption
+    // d'alignement peut rendre au sol une case globalement morte. C'est sans
+    // conséquence — la loi s'AJOUTE à `checkDefaite`, elle ne le remplace pas.
+    //
+    // Gratuit : `distanceParBut` fait déjà le BFS à rebours par but, sur les murs
+    // seuls (aucune caisse, aucun autre but en obstacle) — soit exactement la vue
+    // « murs seuls » sous laquelle la loi a été jugée. Il ne reste qu'une réduction
+    // booléenne, calculée une fois au chargement comme `casesMortes`.
+    //
+    // Retirée en entier le 2026-08-18 avec le GEL HORS TOUR (sa « seconde moitié »,
+    // §6.6/§7 : `bench 6 loi` — les deux ensemble — rendait `AUCUNE` sur un niveau
+    // résolu par défaut). RESTAURÉE SEULE le 2026-08-19 : le gel, testé ISOLÉ le
+    // jour même (`bench 6 gel`), casse LUI AUSSI le niveau 6 (62 prunes, `AUCUNE`) —
+    // la mesure combinée de 2026-08-04 (« gel=0 sur le 6 ») ne prouvait rien, la loi
+    // masquait déjà les états où le gel aurait mordu. Le gel N'EST PAS restauré ;
+    // cette table, elle, n'a encore jamais été mesurée seule, sans lui — à faire
+    // AVANT toute promotion (canari en régime `loi`, cf. solveurastar.h).
+    bool caseMorteLoi(int idxBut, int cell) const {
+        return mortesLoi.at((qsizetype)idxBut * size + cell);
+    }
+    // La tranche du but 'idxBut', pour l'affichage. Vide si 'idxBut' < 0 (état gagné).
+    // ⚠️ Ne rend que le SURPLUS de la loi — les cases déjà mortes dans la table
+    // ordinaire en sont retirées. C'est ce qui se lit et se dessine : le reste,
+    // `checkDefaite` le coupe depuis toujours, l'afficher en gris ne dirait rien de
+    // la loi et noierait le plateau sous le remplissage hors contour.
+    QVector<bool> casesMortesLoi(int idxBut) const;
     // Case morte au sens ORDINAIRE (table unique, tous buts confondus) — exposée
-    // pour que `porte`/`ordre` puissent tester une poussée dont la destination est
-    // une case morte (une telle poussée n'est pas une issue, cf. game.cpp).
+    // pour que `porte`/`ordre`/le juge de la loi puissent tester une poussée dont la
+    // destination est une case morte (une telle poussée n'est pas une issue, cf.
+    // game.cpp), et pour isoler le surplus de la loi (`casesMortesLoi`).
     bool caseMorteOrdinaire(int cell) const { return casesMortes.at(cell); }
 
     // ── PRÉCÉDENCE CAISSE → BUT (§6.2, 2026-08-04) ──────────────────────────────
@@ -585,6 +640,8 @@ private:
     bool ordreDynamique = false;
     // cf. setOrdreLookahead. Copié dans les ctors de copie/déplacement (§7).
     bool ordreLookahead = false;
+    // cf. setOrdreAlignement. Copié dans les ctors de copie/déplacement (§7).
+    bool ordreAlignement = false;
     // Exemplaire unique de l'installation de l'ordre (repli rebours compris).
     void installeOrdreParPrecedence();
     mutable int butCourant = -1;
@@ -623,10 +680,14 @@ private:
     // poussée depuis la caisse la plus proche. Statique, partagé par COW.
     QVector<int> ordreButs;
 
-    // rangDeBut[BUT] = rang de ce but dans ordreButs (l'inverse de celui-ci),
-    // cf. calculRangDeBut(). Sert à `porteBloquee`, `geleHorsTour` (retiré avec
-    // la loi de l'ordre) et aux outils `porte`/`ordre` (mesures/).
-    QVector<int> rangDeBut;
+    // LOI DE L'ORDRE (cf. caseMorteLoi) : mortesLoi[BUT * size + CASE], et
+    // rangDeBut[BUT] = rang de ce but dans ordreButs (l'inverse de celui-ci) — sert
+    // aussi à `porteBloquee` et aux outils `porte`/`ordre` (mesures/).
+    // ⚠️ Une seule table PLATE, pas un QVector<QVector<bool>> : le solveur copie
+    // Game par candidate, et un vecteur de vecteurs coûterait nbButs incréments de
+    // compteur par copie là où la table plate n'en coûte qu'un (COW).
+    QVector<bool> mortesLoi;
+    QVector<int>  rangDeBut;
 
     // PRÉCÉDENCE CAISSE → BUT (cf. porteBloquee) : les cases à dégager avant chaque
     // but, en CSR — `porteCases` concaténées, `porteDebut` les offsets (nbButs+1).
@@ -643,7 +704,13 @@ private:
     short getMinIdx(const QVector<bool>& zone) const;
     bool isLibre(int idx) const;
     void calculCaseMorte();
-    void calculRangDeBut();
+    // Une caisse posée sur 'cell' compte-t-elle pour du SOL vu du but 'idxBut' —
+    // même ligne/colonne, sans mur entre les deux (et jamais un coin) ? Factorisé
+    // hors de calculCasesMortesLoi() (§7 : une règle écrite à deux endroits diverge)
+    // pour que precedenceAlignement() puisse tester le MÊME critère entre buts,
+    // sans repartir d'une copie qui finirait par ne plus dire la même chose.
+    bool alignementLoi(int cell, int idxBut) const;
+    void calculCasesMortesLoi();
     void calculPorteRequis();
     // Coeur de porteGeneraliseeCoupe, prenant 'r0' déjà calculé — partagé par
     // porteGeneraliseeBloquee entre tous les candidats du même appel (cf. game.cpp).
@@ -669,6 +736,29 @@ QVector<int> distanceLivraison(const QVector<bool>& bloque) const;
 // PRÉCÉDENCE GLOBALE (§6.2 famille B) : requis[B] = les buts qui doivent être
 // remplis AVANT B, parce que sans eux plus aucune caisse n'atteint B. Statique.
 QVector<QVector<int>> precedenceGlobale() const;
+
+// PRÉCÉDENCE PAR ALIGNEMENT (2026-08-19, idée utilisateur — « pourquoi (2,5)
+// d'abord, ce n'est pas intuitif »). `precedenceGlobale` teste une reachability
+// PHYSIQUE (une caisse peut-elle un jour arriver) ; elle ne voit donc AUCUNE arête
+// entre deux colonnes reliées par un passage à SENS UNIQUE (niveau 6 : une caisse
+// en colonne 2 peut encore rejoindre la colonne 1 par une poussée vers l'ouest,
+// l'inverse est géométriquement impossible — mur en x=0). Résultat mesuré : 0
+// arête cassée par l'ordre calculé, et pourtant la loi de l'ordre (game.h) le
+// condamne — parce qu'ELLE teste un critère plus strict, l'alignement.
+//
+// La règle : si le but B n'est ni ATTEIGNABLE depuis le but A (distanceParBut,
+// déjà calculée) ni ALIGNÉ avec lui (alignementLoi, le même test que
+// caseMorteLoi), alors une caisse posée sur B serait condamnée pendant que A est
+// encore actif — donc B doit être rempli AVANT A. C'est très exactement le
+// critère de `caseMorteLoi`, appliqué BUT à BUT au lieu de BUT à case courante,
+// pour l'injecter dans `attente()` — le seul tie-break qui prime sur tout,
+// comme `precedenceGlobale`, dont c'est le complément et non un remplacement.
+//
+// ⚠️ RELAXATION IDENTIQUE à `caseMorteLoi` (distanceParBut ignore les autres
+// caisses) : une arête ici est un indice fort, pas une preuve physique comme
+// `precedenceGlobale` — mais elle prévient exactement ce que la loi punira plus
+// tard, ce qui est le seul but de cette fonction.
+QVector<QVector<int>> precedenceAlignement() const;
 
 public:
 // Le fichier `ordre_niveau_XXXX.txt` du répertoire courant s'il existe, sinon "".

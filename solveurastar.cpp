@@ -27,9 +27,52 @@ static bool compare(const SolveurAStar::SElement& a, const SolveurAStar::SElemen
 }
 
 SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, bool macro, QObject *parent,
-                           bool macroCouplage, bool plongeon)
+                           bool macroCouplage, bool plongeon, bool loi)
     : Solveur(etatDepart, parent), poids(poids), macro(macro), macroCouplage(macroCouplage),
-      plongeon(plongeon) {
+      plongeon(plongeon), loi(loi) {
+}
+
+// ── LOI DE L'ORDRE (régime d'essai 'loi', RESTAURÉE ISOLÉE le 2026-08-19) ─────
+// Stats de chantier, mêmes raisons que StatsCorral : runtime, lues sans recompiler.
+// 'balayages' compte les passes complètes — c'est lui qui dit si le coût est resté
+// là où on l'a voulu.
+struct StatsLoi { qint64 enfilages = 0, prunes = 0, balayages = 0; };
+static StatsLoi& statsLoi() { static StatsLoi s; return s; }
+
+// Vrai = une caisse se tient sur une case morte vue du but actif → on coupe.
+//
+// QUELLES CAISSES SONT JUGÉES. Toutes, sans exception ici : l'exemption des buts
+// déjà remplis (« buts déjà remplis = obstacles ») est portée par la TABLE, qui les
+// rend vivants d'office.
+//
+// POURQUOI ON NE BALAIE PAS TOUTES LES CAISSES À CHAQUE FOIS. Si le parent
+// satisfaisait déjà la règle, seule la caisse déplacée peut la violer — sauf si le
+// BUT ACTIF a changé, auquel cas toutes changent de juge d'un coup. Or l'actif ne
+// change que lorsqu'un but vient d'être rempli, c'est-à-dire quand la caisse arrivée
+// se pose sur un but. Ce test-là est local et gratuit, donc le balayage complet ne
+// se paie qu'une poignée de fois par chemin au lieu d'une fois par enfilage.
+bool SolveurAStar::loiTropTot(const Game& e, int arrivee) const {
+    if (!loi) return false;
+    const int actif = e.butActif();
+    if (actif < 0) return false;                        // plus de but : état gagnant
+    StatsLoi& s = statsLoi();
+    s.enfilages++;
+
+    auto condamne = [&](int cell) { return e.caseMorteLoi(actif, cell); };
+
+    if (arrivee >= 0 && condamne(arrivee)) { s.prunes++; return true; }
+
+    if (arrivee >= 0 && e.getCase(arrivee) == Level::tcGoalCaisse) {
+        s.balayages++;
+        const int N = e.getLargeur() * e.getHauteur();
+        for (int c = 0; c < N; c++) {
+            const Level::ETypeCase t = e.getCase(c);
+            if (t != Level::tcCaisse && t != Level::tcGoalCaisse) continue;
+            if (condamne(c)) { s.prunes++; return true; }
+        }
+    }
+
+    return false;
 }
 
 // PLONGEON SUR RECORD (plan.md §6.0) — budget = (états déjà développés) /
@@ -85,6 +128,7 @@ int SolveurAStar::plonge(const Game& etatDepart, int gDepart, int idxNoeudDepart
                                                                 &cacheEnclos, CORRAL_BUDGET);
             if (inf.dursMorts > 0) return;
         }
+        if (loiTropTot(c, arrivee)) return;
         const QByteArray cle = c.getEtat();
         if (vus.contains(cle)) return;
         vus.insert(cle);
@@ -171,6 +215,16 @@ void SolveurAStar::imprimeJauge(qint64 compteur, int& fileAvant, size_t fileSize
     // §6.6 — seul ce qui part en continu se relève.
     imprimeMemoire("jauge", arene, meilleurG, noeuds.octets(),
                    fileCap * sizeof(SElement), meilleurG.size());
+    if (loi) {
+        const StatsLoi& l = statsLoi();
+        fprintf(stderr, "[LOI] enfilages=%lld PRUNES=%lld (%.2f%%)"
+                        " | balayages complets=%lld (%.2f%% des enfilages)\n",
+                (long long)l.enfilages, (long long)l.prunes,
+                l.enfilages ? 100.0 * (double)l.prunes / (double)l.enfilages : 0.0,
+                (long long)l.balayages,
+                l.enfilages ? 100.0 * (double)l.balayages / (double)l.enfilages : 0.0);
+        fflush(stderr);
+    }
 }
 
 // PLONGEON SUR RECORD (§6.0) — régime d'essai. A* optimal ne « fonce » jamais :
@@ -365,6 +419,21 @@ void SolveurAStar::run() {
     // run : rien à réinitialiser d'un solve à l'autre.
     QHash<QByteArray,Game::VerdictEnclos> cacheEnclos;
 
+    if (loi) {
+        // La densité de la table DÉCIDE si le régime peut rapporter quoi que ce
+        // soit : à 0 case morte par but il ne coupera rien, et il vaut mieux le lire
+        // au démarrage que de l'apprendre après une heure de solve.
+        qint64 total = 0;
+        const int N = etat.getLargeur() * etat.getHauteur();
+        for (int j = 0; j < etat.getNbButs(); j++)
+            for (int c = 0; c < N; c++) if (etat.caseMorteLoi(j, c)) total++;
+        fprintf(stderr, "[LOI] regime loi ACTIF (isole, sans gel) — %.1f cases mortes par but "
+                        "en moyenne (%d buts, %d cases).\n",
+                etat.getNbButs() ? (double)total / etat.getNbButs() : 0.0,
+                etat.getNbButs(), N);
+        fflush(stderr);
+    }
+
     while(file.size()) {
         // Arrêt demandé depuis l'UI : on sort AVANT de dépiler, de sorte que le
         // compteur affiché soit bien le nombre d'états réellement développés.
@@ -543,6 +612,7 @@ void SolveurAStar::run() {
                 // PRUNE : une mort PROUVÉE (strip + exhaustion) est sound → on coupe.
                 if (inf.dursMorts > 0) { sd.enfilagesPrunes++; return; }
             }
+            if (loiTropTot(e, arrivee)) return;
             QVarLengthArray<quint16, 40> tCle(e.tailleCle());
             e.getEtat(tCle.data(), zoneEnfant);
             arene.ecrit(tCle.data());

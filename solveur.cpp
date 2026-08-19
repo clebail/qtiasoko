@@ -20,7 +20,8 @@ QVector<Solveur::SType> Solveur::types() {
         {AstarMacroPlongeon, "A* macro — plongeon sur record (essai)"},
         {AstarMacroCouplagePlongeon, "A* macro — couplage + plongeon (essai)"},
         {AstarMacroCouplagePlongeonOrdre, "A* macro — couplage + plongeon + ordre dynamique (essai)"},
-        {AstarMacroCouplagePlongeonLook, "A* macro — couplage + plongeon + ordre lookahead rang 0 (essai)"}
+        {AstarMacroCouplagePlongeonLook, "A* macro — couplage + plongeon + ordre lookahead rang 0 (essai)"},
+        {AstarMacroCouplagePlongeonLoi, "A* macro — couplage + plongeon + loi de l'ordre, isolee (essai)"}
     };
 }
 
@@ -56,6 +57,18 @@ Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
             Game depart(etatDepart);
             depart.setOrdreLookahead(true);
             return new SolveurAStar(depart, 1, true, parent, true, true);
+        }
+        // LOI DE L'ORDRE (§6.2, 2026-08-03 — restaurée ISOLÉE le 2026-08-19, cf.
+        // solveur.h) : une caisse ne peut pas se tenir sur une case morte vue du
+        // but actif. Le PRUNE (caseMorteLoi) vit dans le solveur, comme avant ;
+        // l'ORDRE, lui, doit être armé sur l'état de départ (`setOrdreAlignement`,
+        // game.h) — sans lui, `ordreButs` reste celui par défaut, qui met (2,5)
+        // avant (1,5) sur le niveau 6 et que `caseMorteLoi` condamne alors à
+        // coup sûr (`AUCUNE`, mesuré le 2026-08-19).
+        case AstarMacroCouplagePlongeonLoi: {
+            Game depart(etatDepart);
+            depart.setOrdreAlignement(true);
+            return new SolveurAStar(depart, 1, true, parent, true, true, true);
         }
     }
     return nullptr;

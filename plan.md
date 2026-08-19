@@ -500,6 +500,119 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 >   gisement qui donne des rendements décroissants (loi de l'ordre ÷2,98 sur un niveau et zéro sur
 >   un autre §6.6 ; porte généralisé sur 9/28 aujourd'hui).
 >
+> 🚧 **EN COURS le 2026-08-19, NON COMMITÉ, SESSION INTERROMPUE — restauration de la loi de
+> l'ordre + découverte d'un vrai bug dans `ordreParPrecedence`.** Point de reprise détaillé,
+> à lire avant de continuer.
+>
+> **Point de départ** : demande utilisateur de restaurer « les cases mortes dynamiques »
+> retirées le 2026-08-18 (§6.6 ci-dessous). Deux mécanismes distincts s'y cachaient
+> (`caseMorteLoi` et `geleHorsTour`) — testés ISOLÉS l'un de l'autre pour la première fois :
+> - **`geleHorsTour` seul** (régime jetable, retiré depuis) : casse AUSSI le niveau 6
+>   (`AUCUNE`, 62 prunes). Réfute l'hypothèse qui semblait ressortir du raccord du
+>   2026-08-04 (« gel=0 sur le 6, c'est la loi qui coupe, pas le gel ») — cette mesure ne
+>   disculpait rien, la loi masquait déjà les états où le gel aurait mordu.
+> - **`caseMorteLoi` seule** (régime `AstarMacroCouplagePlongeonLoi`, conservé, cf.
+>   solveur.h/solveurastar.h) : casse ÉGALEMENT le niveau 6 au premier essai. Mais cette
+>   fois la cause a été **trouvée et corrigée**, pas juste constatée.
+>
+> **LA VRAIE CAUSE, prouvée par test minimal** : ce n'est PAS `caseMorteLoi` qui est fautive
+> — c'est **`Game::ordreParPrecedence()`** (game.cpp) qui produit un ordre erroné sur le
+> niveau 6. Preuve : déplacer SEULEMENT le but (2,3) du rang 2 au rang 9 (dernier), sans
+> rien changer d'autre, suffit à faire résoudre le niveau (`ORDRE_HUMAIN`, testé à la
+> main). Le niveau 6 a deux colonnes de buts parallèles (x=1 et x=2) séparées par un mur
+> à x=0 : une caisse en colonne 2 PEUT encore rejoindre la colonne 1 (poussée vers l'ouest),
+> l'inverse est géométriquement IMPOSSIBLE. `ordreParPrecedence` traite pourtant la colonne 2
+> en premier, parce que son dernier critère de tie-break (`d`, distance de poussée depuis la
+> caisse la plus proche — `game.cpp` vers la ligne 2088, `if (da != dc) return (da < dc);`)
+> préfère systématiquement « le plus proche », et la colonne 2 est mécaniquement UNE poussée
+> plus proche que la colonne 1 à chaque rangée. Ce critère est juste quand la distance reflète
+> l'enclavement (le niveau 1 s'en sort parce que son critère `mur`, prioritaire, capture déjà
+> la bonne colonne — la distance n'y tranche jamais) ; il est backward face à un passage à
+> SENS UNIQUE, où « un pas de plus » signifie « plus jamais accessible », pas « moins urgent ».
+> Vérifié avec `TRACE_ORDRE=1 mesures/ordre` (imprime les clés de tri à chaque rang).
+>
+> **LE CORRECTIF, scopé en régime d'essai** (jamais l'ordre par défaut) :
+> - `Game::alignementLoi(cell, idxBut)` — factorisé hors de `calculCasesMortesLoi()`, le
+>   même test (aligné + pas un coin) réutilisable ailleurs (§7 : une règle à deux endroits
+>   diverge).
+> - `Game::precedenceAlignement()` — nouvelle précédence but-à-but : si B ne peut pas
+>   atteindre A (`distanceParBut`) ni s'aligner avec lui, ET que A, LUI, peut atteindre B
+>   (asymétrie prouvée), alors B doit précéder A. Fusionnée dans `attente()`
+>   (`ordreParPrecedence`), le tie-break de TÊTE — mais **seulement si `Game::ordreAlignement`
+>   est armé** (`setOrdreAlignement()`, même mécanique que `setOrdreLookahead`).
+> - Câblé UNIQUEMENT par le nouveau régime solveur `AstarMacroCouplagePlongeonLoi`
+>   (`Solveur::creer`, solveur.cpp) : `depart.setOrdreAlignement(true)` avant de construire
+>   le `SolveurAStar` avec `loi=true`. Aucun autre régime n'y touche.
+>
+> **DEUX BUGS TROUVÉS ET CORRIGÉS EN COURS DE ROUTE, à ne pas reproduire :**
+> 1. ❌ **Fusion INCONDITIONNELLE dans `attente()`** (premier jet, sans le drapeau) : corrige
+>    le 6, mais CASSE SÉVÈREMENT le niveau 10 (32 buts) — 2/32 caisses posées en 227 000
+>    états quand la référence en pose 32 en 250 000 — et fait apparaître un murage LOCAL sur
+>    6 niveaux auparavant propres (2, 8, 9, 12, 21, 32). Reverti, re-câblé derrière le
+>    drapeau `ordreAlignement`. **Leçon reconfirmée : un signal qui répare un niveau via le
+>    tie-break de tête de `ordreParPrecedence` doit être scopé, jamais fusionné dans l'ordre
+>    par défaut sans repasser le canari des 35 niveaux.**
+> 2. ❌ **`rangDeBut`/`mortesLoi` restaient périmés après le recalcul d'`ordreButs`** :
+>    `setOrdreLookahead` a le MÊME angle mort (jamais débusqué faute d'avoir été combiné à la
+>    loi) — recalculer `ordreButs` sans recalculer `rangDeBut` laisse `caseMorteLoi` juger
+>    avec l'ANCIEN rang pendant que `butActif()` lit le NOUVEL ordre. `setOrdreAlignement`
+>    appelle maintenant `calculCasesMortesLoi()` juste après `installeOrdreParPrecedence()`.
+>    Sans ce correctif, `bench 6 loi` retombait à `AUCUNE` malgré l'ordre corrigé.
+> 3. ❌ **Arête asymétrique manquante** (trouvé par l'utilisateur, en lisant l'export du
+>    niveau 10 : « il prend des caisses de la petite salle pour les mettre dans la grande »).
+>    Le premier jet de `precedenceAlignement` ajoutait une arête dès que B n'atteint pas A,
+>    SANS vérifier que A atteint B en retour — condamnant aussi bien un vrai passage à sens
+>    unique qu'une paire de buts simplement dans des salles DISJOINTES (aucun rapport de
+>    précédence réel). Mesuré sur le niveau 10 (salle 28 + salle 4) : la petite salle
+>    héritait d'une dette `attente` de 29-30 (quasi tous les autres buts), reléguée en fin
+>    d'ordre sans raison. Corrigé en exigeant l'asymétrie dans les DEUX sens.
+>
+> **RÉSULTAT VALIDÉ** : niveau 6 résolu en régime `loi`, SANS INJECTION, 557 états/110
+> poussées (optimal, identique au défaut). Canari binaire contre binaire intact — 0-9, 17,
+> 190, 191 en macro/coupl-plongeon, ET le niveau 10 en régime PAR DÉFAUT (`coupl-plongeon`,
+> jamais affecté par `ordreAlignement`) — tous identiques à l'unité près.
+>
+> 🔴 **OUVERT, PAS TRANCHÉ — le niveau 10 en régime `loi` LUI-MÊME ne converge pas.** Deux
+> tentatives : la première (avant le correctif d'asymétrie) plafonnait à `max 1/32` après
+> 37 000 dépilements (tuée à 300 s) puis à `max 1/32` encore après 281 000 dépilements/896 000
+> états vus (tuée à ~5 min, `h(reste)` ne descend jamais). La seconde (après le correctif)
+> est bien meilleure — `max 22/32` atteint vers 1,7-2,7 M dépilements — mais reste ARRÊTÉE
+> MANUELLEMENT avant conclusion (ni `OK` ni `AUCUNE`), à la demande de l'utilisateur pour
+> écrire ce point d'étape.
+> - **Indice fort, NON VÉRIFIÉ** : `[LOI] enfilages=20 567 278 PRUNES=0 (0,00 %)` sur
+>   l'intégralité du second run — la loi n'a JAMAIS rien coupé. Sur le niveau 6, en
+>   comparaison, `PRUNES=62` sur seulement 2269 enfilages. Hypothèse de l'utilisateur,
+>   plausible et non réfutée : **la macro ne s'engage quasiment jamais sur ce niveau**, la
+>   recherche retombe en poussées simples qui ignorent totalement `ordreButs` — ce qui
+>   expliquerait des buts posés hors tour observés dans l'export à 22/32 ((2,10) = rang 31,
+>   (16,4)/(16,5) = rangs 26-27, alors que seuls les rangs 0-21 auraient dû être faits).
+> - **À VÉRIFIER EN PREMIER À LA REPRISE** : `pas0 <fichier.xsb> trace` sur les fixtures
+>   `record_niv10_r*.xsb` déjà exportées (répertoire `records10/` du scratchpad de CETTE
+>   session — **PROBABLEMENT PERDU**, le scratchpad est éphémère ; réexporter avec
+>   `bench 10 loi record` si besoin, cf. §1). Si `pas0` confirme qu'aucune macro n'est
+>   disponible à ces états, le problème n'est plus dans l'ORDRE (déjà corrigé) mais dans le
+>   RÉGIME D'ENGAGEMENT de la macro sur ce niveau précis — un chantier différent.
+> - **État 22/32 mort ou vivant, non tranché** : un A* complet (`bench <fichier.xsb> astar`,
+>   preuve exhaustive) a été lancé sur `record_niv10_r22_g0354.xsb` mais tué avant conclusion
+>   (deux tentatives, 120 s puis fond perdu — jamais laissé aller au bout).
+>
+> **Fichiers modifiés, NON COMMITÉS à la coupure** : `game.h`/`game.cpp` (`alignementLoi`,
+> `precedenceAlignement`, `ordreAlignement`, `setOrdreAlignement`, `calculCasesMortesLoi` +
+> `caseMorteLoi`/`mortesLoi` restaurés), `solveur.h`/`solveur.cpp` (régime
+> `AstarMacroCouplagePlongeonLoi`), `solveurastar.h`/`solveurastar.cpp` (`loiTropTot`,
+> `StatsLoi`), `mesures/bench.cpp` (mode `loi`), `mesures/ordre.cpp` (mode `align`),
+> `wgame.h`/`wgame.cpp` + `mainwindow.h`/`mainwindow.cpp`/`mainwindow.ui` (checkbox « Cases
+> mortes (loi de l'ordre) » restaurée, déclarée dans le `.ui` cette fois — pas construite en
+> code, sur demande explicite). `geleHorsTour`/`caissesGeleesHorsTour` NE SONT PAS
+> restaurés (réfutés, cf. plus haut) : zéro trace dans le code actuel, vérifié.
+>
+> **Objectif affirmé par l'utilisateur, à garder en tête pour la suite** : *« Je veux que les
+> niveaux se résolvent avec un même et seul solveur [...] je suis sûr que le 16 notamment ne
+> sera jamais résolu [sans la loi] »* — refus explicite de conclure « ça corrige le 6 mais pas
+> le 10, donc c'est un correctif ciblé » sans avoir vraiment épuisé la piste. Ne pas abandonner
+> le régime `loi` sur la seule base d'un run à budget borné (§6.6 : « la progression à budget
+> borné ne prédit RIEN » — déjà mesuré comme piège sur CE niveau, en juillet).
+>
 > ⏸️ **RECADRAGE INITIAL (2026-08-17, avant le mining) — conservé pour mémoire :**
 > - Le cas « garder pour plus tard » se scinde en deux, et un seul compte : *on ne la pose pas
 >   maintenant parce que ça fermerait un passage* (généralise l'outil `porte`, qui ne teste que la

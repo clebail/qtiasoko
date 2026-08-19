@@ -97,7 +97,15 @@ public:
         // régénéré est exactement l'ordre humain de juillet) mais fait DÉCROCHER le
         // 32, qui est résolu. Tout le reste est inchangé : 26 ordres sur 35 sont
         // bit-à-bit identiques, donc le canari est préservé par construction.
-        AstarMacroCouplagePlongeonLook
+        AstarMacroCouplagePlongeonLook,
+        // LOI DE L'ORDRE (§6.2, 2026-08-03 — RESTAURÉE ISOLÉE le 2026-08-19). Une
+        // caisse ne peut pas se tenir sur une case morte VUE DU BUT ACTIF
+        // (`Game::caseMorteLoi`). Retirée en entier le 2026-08-18 avec le GEL HORS
+        // TOUR (les deux vivaient sous un seul drapeau, `bench 6 loi+gel` rendait
+        // AUCUNE) ; le gel, testé SEUL le 2026-08-19, casse LUI AUSSI le niveau 6 —
+        // donc cette table n'a JAMAIS été mesurée sans lui. Régime d'ESSAI, jamais
+        // le défaut, tant que le canari n'a pas été repassé isolément.
+        AstarMacroCouplagePlongeonLoi
     };
 
     struct SType {
