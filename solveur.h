@@ -105,7 +105,19 @@ public:
         // AUCUNE) ; le gel, testé SEUL le 2026-08-19, casse LUI AUSSI le niveau 6 —
         // donc cette table n'a JAMAIS été mesurée sans lui. Régime d'ESSAI, jamais
         // le défaut, tant que le canari n'a pas été repassé isolément.
-        AstarMacroCouplagePlongeonLoi
+        AstarMacroCouplagePlongeonLoi,
+        // RELÉGATION DES POUSSÉES SIMPLES (2026-08-20, cf. solveurastar.h pour la
+        // mesure qui l'impose). Le régime d'engagement n'est pas seulement
+        // sous-optimal, il est INCOMPLET : sur le 16 il rend AUCUNE — espace épuisé
+        // — alors qu'une partie humaine gagnante existe sous le même ordre, et 42 %
+        // de ses coups sont des poussées simples jouées macro engagée. Ici on ne
+        // jette plus ces poussées, on les enfile RELÉGUÉES (f gonflée).
+        // Deux régimes plutôt qu'un, pour pouvoir isoler les variables (§7) :
+        // celui-ci garde l'ordre PAR DÉFAUT…
+        AstarMacroCouplagePlongeonRelegue,
+        // …et celui-là y ajoute l'ordre par alignement, c'est-à-dire la
+        // configuration EXACTE de la partie humaine gagnante du 16.
+        AstarMacroCouplagePlongeonLoiRelegue
     };
 
     struct SType {
@@ -114,6 +126,12 @@ public:
     };
 
     static QVector<SType> types();
+    // Pénalité de f des poussées simples reléguées (régimes ...Relegue). Vit ici
+    // et non dans un qgetenv du solveur : un interrupteur d'environnement DANS le
+    // solveur fait diverger l'app du bench en silence (§7). Le harnais la pose,
+    // l'app garde le défaut. 2 = un recul de retard (le mou est toujours pair, §3).
+    static int penaliteRelegation;
+
     static Solveur* creer(EType type, const Game& etatDepart, QObject* parent = nullptr);
 
     explicit Solveur(const Game& etatDepart, QObject* parent = nullptr);

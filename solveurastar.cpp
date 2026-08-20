@@ -27,9 +27,9 @@ static bool compare(const SolveurAStar::SElement& a, const SolveurAStar::SElemen
 }
 
 SolveurAStar::SolveurAStar(const Game &etatDepart, int poids, bool macro, QObject *parent,
-                           bool macroCouplage, bool plongeon, bool loi)
+                           bool macroCouplage, bool plongeon, bool loi, int relegueSimples)
     : Solveur(etatDepart, parent), poids(poids), macro(macro), macroCouplage(macroCouplage),
-      plongeon(plongeon), loi(loi) {
+      plongeon(plongeon), loi(loi), relegueSimples(relegueSimples) {
 }
 
 // ── LOI DE L'ORDRE (régime d'essai 'loi', RESTAURÉE ISOLÉE le 2026-08-19) ─────
@@ -327,14 +327,14 @@ int SolveurAStar::tenteMacro(Game& etat, const QVector<quint8>& caisses, const Q
 
 template<typename Enfiler>
 void SolveurAStar::poussesSimples(Game& etat, const QVector<quint8>& caisses, int gCur,
-                                  Enfiler&& enfiler) {
+                                  Enfiler&& enfiler, int bonusF) {
     for (int i = 0; i < caisses.size(); i++) {
         const quint8 dirs = caisses[i];
         for (int d = 0; d < NB_DIRECTION; d++) {
             if (!(dirs & (1 << d))) continue;
             Game e(etat);
             if (e.pousse(i, (Game::EDirection)d) && !e.isPerdu())
-                enfiler(e, gCur + 1, {{i, d}}, false);
+                enfiler(e, gCur + 1, {{i, d}}, false, bonusF);
         }
     }
 }
@@ -536,7 +536,7 @@ void SolveurAStar::run() {
         // poussée, pour que reconstruire() rejoue une macro à l'identique) et le
         // push_heap. Partagé entre poussées simples et goal macro.
         auto enfiler = [&](Game& e, int gE, const QVector<QPair<int,int>>& chaine,
-                           [[maybe_unused]] bool estMacro) {
+                           [[maybe_unused]] bool estMacro, int bonusF = 0) {
             // Case de REPOS de la caisse déplacée : destination de la DERNIÈRE
             // poussée de 'chaine'. Les deux étages du corral en partent — leurs
             // formes incrémentales reposent sur le même argument : une transition
@@ -633,7 +633,12 @@ void SolveurAStar::run() {
             }
             qint64 score;
             const int hE = e.getHeuristique(&score);
-            const int fE = gE + poids * hE;
+            // 'bonusF' n'est jamais autre chose que la RELÉGATION du régime éponyme
+            // (0 partout ailleurs, donc f inchangée et régimes existants intacts).
+            // Il gonfle f SANS toucher g : la dédup meilleurG continue de raisonner
+            // sur le vrai coût, donc un état relégué que la macro retrouve ensuite
+            // par un chemin plus court est bien ré-enfilé au bon rang.
+            const int fE = gE + poids * hE + bonusF;
 #ifdef INSTRUM_DELTAF
             {
                 StatsDeltaF& sd = statsDeltaF();
@@ -713,6 +718,13 @@ void SolveurAStar::run() {
         // la congestion — la recherche doit d'abord démêler).
         const int macrosOk = macro ? tenteMacro(etat, caisses, zone, cur.g, enfiler) : 0;
         if (macrosOk == 0) poussesSimples(etat, caisses, cur.g, enfiler);
+        // RELÉGATION (cf. solveurastar.h) : la macro a produit un enfant, mais on
+        // n'abandonne plus les poussées simples pour autant — on les enfile
+        // reléguées. C'est ce qui rend le régime COMPLET, et c'est mesuré comme
+        // nécessaire : 42 % des coups d'une partie humaine gagnante du 16 sont des
+        // poussées simples jouées alors qu'une macro était engagée.
+        else if (relegueSimples > 0)
+            poussesSimples(etat, caisses, cur.g, enfiler, relegueSimples);
     }
 
     qDebug() << "SolveurAStar: aucune solution," << compteur << "etats explores.";

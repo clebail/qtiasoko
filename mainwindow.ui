@@ -250,6 +250,21 @@ Gris FONCÉ : le surplus de la loi de l'ordre — une caisse posée là n'attein
         </widget>
        </item>
        <item>
+        <widget class="QCheckBox" name="cbOrdreAlign">
+         <property name="focusPolicy">
+          <enum>Qt::NoFocus</enum>
+         </property>
+         <property name="text">
+          <string>Ordre par alignement (régime loi)</string>
+         </property>
+         <property name="toolTip">
+          <string>Arme Game::setOrdreAlignement() sur le plateau de DÉPART, comme le fait le régime solveur « loi » : l'ordre de remplissage devient celui de la précédence par alignement, pas l'ordre par défaut.
+Recharge le niveau à chaque bascule — l'ordre se calcule sur la position de départ, le recalculer en cours de partie donnerait un autre ordre.
+Sans effet si un ordre est injecté par ordre_niveau_XXXX.txt : l'injection garde la main.</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <spacer name="horizontalSpacer_2">
          <property name="orientation">
           <enum>Qt::Orientation::Horizontal</enum>

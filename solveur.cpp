@@ -21,9 +21,13 @@ QVector<Solveur::SType> Solveur::types() {
         {AstarMacroCouplagePlongeon, "A* macro — couplage + plongeon (essai)"},
         {AstarMacroCouplagePlongeonOrdre, "A* macro — couplage + plongeon + ordre dynamique (essai)"},
         {AstarMacroCouplagePlongeonLook, "A* macro — couplage + plongeon + ordre lookahead rang 0 (essai)"},
-        {AstarMacroCouplagePlongeonLoi, "A* macro — couplage + plongeon + loi de l'ordre, isolee (essai)"}
+        {AstarMacroCouplagePlongeonLoi, "A* macro — couplage + plongeon + loi de l'ordre, isolee (essai)"},
+        {AstarMacroCouplagePlongeonRelegue, "A* macro — couplage + plongeon + poussees simples RELEGUEES (essai)"},
+        {AstarMacroCouplagePlongeonLoiRelegue, "A* macro — couplage + plongeon + loi + poussees simples RELEGUEES (essai)"}
     };
 }
+
+int Solveur::penaliteRelegation = 2;
 
 Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
     switch (type) {
@@ -69,6 +73,20 @@ Solveur* Solveur::creer(EType type, const Game& etatDepart, QObject* parent) {
             Game depart(etatDepart);
             depart.setOrdreAlignement(true);
             return new SolveurAStar(depart, 1, true, parent, true, true, true);
+        }
+        // RELÉGATION (§6.4 forme (a) : dé-prioriser, jamais élaguer). La pénalité
+        // est un BUDGET À BALAYER et non une constante à figer (méthode
+        // CORRAL_BUDGET, §6.2) : le harnais la fixe par RELEG_F, le solveur ne fait
+        // que la recevoir. ⚠️ Elle n'est PAS lue ici par qgetenv — un interrupteur
+        // d'environnement DANS le solveur fait diverger l'app du bench en silence
+        // (§7, le cas CORRAL_DETECT). Défaut 2 = un recul de retard, le mou étant
+        // toujours pair (§3).
+        case AstarMacroCouplagePlongeonRelegue:
+            return new SolveurAStar(etatDepart, 1, true, parent, true, true, false, penaliteRelegation);
+        case AstarMacroCouplagePlongeonLoiRelegue: {
+            Game depart(etatDepart);
+            depart.setOrdreAlignement(true);
+            return new SolveurAStar(depart, 1, true, parent, true, true, true, penaliteRelegation);
         }
     }
     return nullptr;

@@ -392,6 +392,197 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 
 ### 6.0 Feuille de route — ordre de reprise (décidé le 2026-07-17)
 
+> 🔴 **SESSION DU 2026-08-20 — LA LOI DE L'ORDRE EST RÉFUTÉE, ET LE RÉGIME D'ENGAGEMENT
+> EST INCOMPLET.** Rien n'est commité ; l'arbre de travail porte tout ce qui suit.
+> Session interrompue (orage) — ce bloc est le point de reprise.
+>
+> **1. LE MURAGE LOCAL, CÂBLÉ DANS `ordreParPrecedence` (game.cpp/game.h).**
+> Parti du plateau du 21 exporté par l'utilisateur : **mort à 7/13**, deux buts —
+> (11,10) et (11,11) — qu'aucune poussée ne peut plus atteindre, la colonne x=13 étant
+> gelée par pure géométrie. Cause : l'ordre align remplit (13,10)/(13,11) — les APPUIS
+> des seules manœuvres restantes — avant les buts qu'ils desservent. Même espèce que le
+> verrou du 10 ((17,2), 2026-08-19).
+> - `Game::butMureLocalement(idxBut, bloque)` — la précédence par approches du §6.2,
+>   remontée de `mesures/ordre.cpp` dans le moteur en **exemplaire unique** (§7) ;
+>   l'outil l'appelle et confronte son propre détail au verdict du moteur.
+> - Câblé DEUX fois : dans la garde anti-échouage du glouton **et** dans la post-passe
+>   de tri topologique. ⚠️ **Le premier est INERTE** (cartes de rangs identiques sur les
+>   35 niveaux) : c'est la POST-PASSE qui décide de l'ordre dès qu'il y a des arêtes de
+>   précédence, elle défaisait ce que le glouton avait bien choisi. Quatre déductions
+>   perdues avant d'aller **imprimer** l'ordre installé.
+> - La post-passe est passée du glouton à une **recherche avec retour arrière** (budget
+>   500) : le garde myope déplaçait simplement le murage ((11,10) sauvé au rang 8
+>   condamnait (13,10) au rang 9).
+> - `precedenceAlignement` est un **indice**, `precedenceGlobale` une **preuve** : quand
+>   respecter l'indice mure un but, la preuve gagne (passe 3 du tri).
+> - **RÉSULTAT** : ordre par défaut identique sur 33/35 (seuls 18 et 22, tous deux
+>   murés auparavant, changent) ; en align, 12/21/31 réparés, 20 toujours muré.
+>   **CANARI 29 mesures binaire contre binaire (worktree sur `92f3ecd`) : 29 identiques.**
+>   Coût du ctor `Game(Level)` inchangé (22 : 4,64 → 4,42 s CPU).
+>
+> **2. L'ANOMALIE DES +3 EST TRANCHÉE — `setOrdreAlignement` fait bien ce qu'on croit.**
+> Le test que le plan réclamait, sur le 17, trois runs une seule variable :
+> A défaut+ordre défaut = **18 636** · B `loi` = **18 639** · C défaut + ordre align
+> **injecté** = **18 639**. **B = C à l'unité** ⇒ le régime applique réellement son
+> ordre, et **le régime `loi` en lui-même est GRATUIT** : tout ce qu'il produit vient de
+> l'ordre, jamais de `caseMorteLoi`. Les lignes « neutre » du 2026-08-19 tiennent.
+>
+> **3. LE 21 EST REPRIS PAR `loi`, MAIS NE BAT PAS LE DÉFAUT.** Sans injection :
+> `loi` = **2 922 397 / 159 p.** (545 s) là où le régime ne rendait RIEN en 2 400 s
+> hier. Ligne de base re-mesurée ici : défaut = **2 922 383 / 159 p.** (544 s), et
+> défaut + align injecté = **2 922 397**, soit **B = C** encore. Le garde guérit une
+> blessure que `precedenceAlignement` s'infligeait ; il n'améliore pas le défaut.
+> Le 11 rend **13 913 050 / 243**, exactement le chiffre du plan, à l'unité.
+>
+> **4. LE 32 : C'EST L'ORDRE, PROUVÉ PAR ISOLATION.** Même binaire, même régime
+> `coupl-plongeon`, seule variable l'ordre : défaut = **6 591 366 / 153 p.** en 676 s ;
+> ordre align **injecté** = **rien en 1 800 s**, 15,9 M états vus, mur `max 10/15` —
+> exactement le mur que le plan attribuait au régime `loi`. Ce n'est donc ni
+> `caseMorteLoi` (PRUNES=0 ici) ni le murage local (le 32 n'en a jamais eu) :
+> **`precedenceAlignement` produit un mauvais ordre sur ce niveau.** ⚠️ 1 800 s est un
+> budget, pas une preuve (§6.6).
+>
+> **5. ❌ `caseMorteLoi` EST RÉFUTÉE — 19 NIVEAUX SUR 29 EN FAUX POSITIF PROUVÉ.**
+> Outils neufs, rapatriés dans `mesures/` le jour même (§1 : `juge_loi.py` avait été
+> perdu avec son scratchpad) : **`mesures/jugeloi.cpp`** (+`.pro`) rejoue une partie
+> GAGNÉE et applique le contrat EXACT de `SolveurAStar::loiTropTot` ; toute détection
+> est un faux positif **prouvé**. **`mesures/poussees_journal.py`** en extrait les
+> poussées, partie validée par rejeu.
+> Faux positifs (défaut / align) : 4 → 0/9 · 5 → 0/5 · **6 → 21/17** · 7 → 0/21 ·
+> 8 → 0/2 · 9 → 0/9 · 12 → 0/6 · 14 → 35/0 · 15 → 52/30 · 16 → 39/0 · **18 → 22/22** ·
+> 19 → 0/19 · **22 → 116/24** · 23 → 0/10 · 24 → 0/46 · 26 → 3/18 · **27 → 79/57** ·
+> 32 → 27/21. Zéro sur 1, 2, 3, 10, 11, 13, 17, 20, 25, 190.
+> ⚠️ **Le niveau 6 — le seul que la loi était censée réparer — en porte 21.**
+> **LA CAUSE, lue dans le code puis vérifiée** : `calculCasesMortesLoi` n'exempte que
+> les buts de rang INFÉRIEUR au but actif et juge les buts de rang SUPÉRIEUR, avec ce
+> commentaire assumé : « une caisse posée là est hors de son tour, et c'est exactement
+> ce que la loi vise ». C'est-à-dire **interdire de remplir dans le désordre** — l'idée
+> que le §4 a réfutée (« le désordre valide n'est pas de la redondance → niveau 1 rendu
+> insoluble »). Le même fichier refuse pourtant ce raisonnement quinze lignes plus haut
+> pour les cases ordinaires (« c'est le §4 en énième déguisement »).
+> Cas type, niveau 18 : la caisse (14,9) est livrée sur son but (9,3) à la **44ᵉ
+> poussée** d'une partie gagnante de 132 et n'en bouge plus ; la loi la condamne dès
+> **le coup 39**, parce que (9,3) est le rang **10** alors que l'actif est le rang 0.
+> Le run mesure `PRUNES = 1 101 923 / 28,9 M enfilages (3,82 %)` et progresse MOINS que
+> le témoin (`max 6/11` contre `8/11`). **Le noyau valide de la loi est déjà implémenté
+> ailleurs et prouvé sûr : `porteGeneraliseeCoupe` (0 FP sur 1 650 livraisons).**
+>
+> **6. 🎯 LE RÉGIME D'ENGAGEMENT N'EST PAS SOUS-OPTIMAL, IL EST INCOMPLET.**
+> Le §6.3 le notait comme une perte d'OPTIMALITÉ. C'est une perte de COMPLÉTUDE, et
+> elle rend des niveaux insolubles. Deux preuves indépendantes :
+> - **16** : l'utilisateur le gagne à la main sous l'ordre align (196 poussées,
+>   validées par rejeu) ; `bench 16 loi` rend **AUCUNE** — espace ÉPUISÉ, pas un budget
+>   — en 811 s. Le journal dit pourquoi : sur 55 poussées vraiment choisies, **23
+>   (42 %)** portent `HORS REGIME MACRO : 1 macro engagee, le solveur ne genere aucune
+>   poussee simple`.
+> - **18** : une macro est jouable **DÈS LA RACINE** (caisse (11,5) → but actif (7,4),
+>   5 poussées), donc le solveur ne génère qu'elle ; **aucune des dix premières
+>   poussées de la partie humaine gagnante n'existe dans son arbre**.
+> **CORRECTIF CODÉ — RELÉGATION DES POUSSÉES SIMPLES** (§6.4 forme (a) : dé-prioriser,
+> jamais élaguer). `enfiler` prend un `bonusF` (0 partout ailleurs) ajouté à `f` et
+> **jamais à `g`** — la dédup `meilleurG` continue de raisonner sur le vrai coût. Deux
+> régimes SÉPARÉS : `AstarMacroCouplagePlongeonRelegue` (ordre défaut) et
+> `...LoiRelegue` (ordre align). Pénalité = `Solveur::penaliteRelegation`, posée par le
+> HARNAIS via `RELEG_F` — **jamais lue par un `qgetenv` du solveur** (§7, CORRAL_DETECT).
+> **MESURÉ sur le 18** : témoin `max 8/11` (11,98 M états) — valeur restée identique de
+> 120 s en juillet à 1 200 s ce soir — contre **`relegue` F=2 : `max 9/11`** en
+> **9,42 M états**, donc plus loin avec MOINS d'états. Le plateau le plus stable du
+> corpus cède. ⚠️ Le niveau n'est PAS résolu, et `max` est un mauvais prédicteur —
+> démontré le jour même : l'état à **7/11** du 18 est à **6 états** de la victoire,
+> quand le solveur explore des 8/11 qui sont des impasses.
+> **BALAYAGE DE LA PÉNALITÉ (méthode CORRAL_BUDGET, §6.2), sur le 18, budget 1 200 s :**
+> témoin `max 8/11` (11,98 M) · **`F=2` → `max 9/11` (9,42 M)** · `F=64` → `max 8/11`
+> (13,21 M). **La pénalité est donc un vrai levier, et 2 bat 64** — cohérent avec le §3
+> (le mou est toujours PAIR, les paliers de `f` valent 2, donc `F=2` = « un recul de
+> retard » et `F=64` relègue si loin que la poussée simple n'est jamais dépilée).
+> ⚠️ Trois points seulement : ne pas figer 2 sans balayer 4 et 6, et sur d'autres niveaux.
+> ⚠️ Le premier jet du balayage — faire varier la FIXTURE à `F=2` — était le mauvais
+> plan d'expérience : `p25` du 16 est à 12 caisses de la fin, c'est le niveau entier.
+> ⚠️ La relégation est appliquée UNE FOIS, à l'enfilage ; elle n'est PAS cumulative le
+> long d'une branche. Rendre cumulatif est réfuté d'avance : la partie humaine du 16
+> contient 23 poussées simples jouées macro engagée, donc `23·K` d'inflation.
+>
+> **7. 🔴 LE MURAGE PAR ACCÈS DU JOUEUR (contre-exemple utilisateur, non stabilisé).**
+> Le test d'occupation seul est insuffisant : la poche haute du 18
+> `{(8,2),(9,2),(9,1),(10,1),(9,3),(10,3)}` n'a que deux portes, (8,1) et (10,2).
+> Remplir (10,3) exige une caisse en (10,2) — qui bouche la porte droite — et le joueur
+> en (10,1), donc DEDANS, accessible seulement par (8,1). L'ordre pose (8,1) au rang 8
+> et (10,3) au rang 9 : **mort au rang 9**, et les deux cases de l'approche n'étant même
+> pas des buts, le test d'occupation n'y voyait rien.
+> `butMureLocalement` prend donc un troisième temps : l'appui doit être **joignable par
+> le joueur**, obstacles = murs + buts posés + **la caisse d'approche elle-même**.
+> Relaxation optimiste depuis la position de DÉPART, donc sound.
+> **Ampleur** : ordre par défaut changé sur **2 niveaux seulement** (18, 26) ; murage
+> RÉVÉLÉ sur le **23** (`ok → r17`, ordre inchangé : il existait, invisible) ; le 13
+> passe de `r14` à `r12`. ⚠️ **NE RÉPARE PAS LE 18** et y dégrade l'ordre (muré r4).
+> ⚠️ **NI CANARI NI MESURE DE TEMPS depuis ce changement, et le 26 est RÉSOLU et son
+> ordre a bougé : à ne pas garder en l'état.**
+>
+> **8. 🎯 POURQUOI LE 18 RÉSISTE, ET C'EST STRUCTUREL.** Sa partie gagnante **ressort
+> les caisses des buts** : (7,5) posé 5 fois / **4 sorties**, (8,1) 4 fois / **3
+> sorties**, (5,6) 3/2, (6,5) 3/2, (6,6) 2/1 — **12 sorties de but sur 132 poussées**.
+> Un `ordreButs` est une PERMUTATION : chaque but rempli une fois, définitivement.
+> **Aucun ordre ne peut décrire cette solution.** D'où : la recherche gardée se vide
+> jusqu'au rang 0 (elle cherche ce qui n'existe pas) ; (8,1) ne peut aller ni avant
+> (le poser mure (10,3)) ni après (le poser après rend (8,1) non livrable) ; et la
+> macro, qui pousse VERS un but et ne l'en ressort jamais, est structurellement muette.
+> Même angle mort que le « but orphelin » du §4.
+>
+> **9. PIÈGES DE LA SESSION, à ne pas refaire.**
+> - ⚠️ **`pkill -f` / `pgrep -f` tuent le shell qui les lance** : le motif figure dans
+>   sa propre ligne de commande — **et le texte d'un heredoc en fait partie**. Trois
+>   auto-kills, dont un qui a fait croire un script lancé alors qu'il n'avait jamais
+>   été écrit. Utiliser `grep '[b]ench'` et séparer l'écriture du script de son
+>   lancement.
+> - ⚠️ **Lire une sortie avec `tail` et conclure sur « le premier »** : le premier faux
+>   positif du 18 était au coup **39**, pas 114. Toute une explication (« la caisse n'a
+>   pas bougé, c'est le juge qui a changé ») bâtie sur cette troncature, et fausse.
+> - ⚠️ **Ne jamais désigner une case en la lisant sur une IMAGE** : deux caisses mal
+>   identifiées d'affilée. `mesures/image` imprime désormais son verdict en clair
+>   (`[loi] but actif`, cases mortes, caisses concernées). Même leçon que le §7 sur le
+>   widget invisible.
+> - ⚠️ **Les binaires de `mesures/` sont des Mach-O arm64** (macOS) : sur Linux ils se
+>   font exécuter par `sh` et rendent « Syntax error ». Tout rebâtir.
+> - ⚠️ `bench 2 astar` rend **582 469** états ici contre **590 066** écrit au §1 pour
+>   l'étalon USok — même valeur sur les deux binaires, donc pas une régression.
+>   **L'étalon USok du plan ne vaut pas sur cette machine**, à recalibrer avant tout
+>   chronométrage. (Le 21 et le 11, eux, se rejouent à l'unité près.)
+>
+> **10. FIXTURES CONSERVÉES** dans `mesures/fixtures_20260820/` (sorties du scratchpad,
+> qui est éphémère — §1) : les trois plateaux du 16 (`niv16_p19/p60/p180.xsb`), l'état
+> élagué du 18 (`niv18_elague_coup114.xsb`) et ses deux PNG annotés, la liste de
+> poussées du 18 (`p18.txt`, entrée de `jugeloi`), et les trois ordres align injectables
+> (16, 21, 32). ⚠️ Le plateau mort du 21 est `plateau_niveau21.xsb` à la racine.
+>
+> **OUTILS NEUFS** (tous dans `mesures/`) : `jugeloi.cpp`/`.pro`,
+> `poussees_journal.py`, et `image` étendu — `--rejeu <poussees.txt> --stop <n> --loi
+> --align`. ⚠️ `--rejeu` charge le VRAI niveau puis applique les poussées : charger un
+> `.xsb` de milieu de partie recalculerait `ordreButs` et `mortesLoi` pour ce plateau-là
+> (§7) et l'image montrerait un autre but actif que celui du run.
+>
+> **11. CAMPAGNE NON-RÉSOLUS (ordre changé aujourd'hui), budget 1 200 s, aucun résolu :**
+> 18 → défaut `max 8/11`, `loi` `max 6/11` · 22 → défaut `max 8/27` (contre `max 1/27`
+> au profilage de juillet — mouvement réel, l'ordre par défaut n'est plus muré), `loi`
+> `max 3/27` · 31 → 12/20 des deux côtés · 20 → défaut `max 1/18`.
+> **`loi` est strictement PIRE partout où il diffère** — cohérent avec le §5 ci-dessus.
+>
+> **12. LE 16, MINÉ (partie gagnée à la main par l'utilisateur, 196 poussées).**
+> L'ordre joué **est l'ordre align**, donc sa jouabilité est PROUVÉE (§6.6 :
+> 0 inversion prouve, un grand nombre ne prouve rien) — première preuve de ce genre
+> pour `precedenceAlignement`. Profil macro : aucune macro des poussées 0→19, trous
+> jusqu'à 60, puis **120 poussées d'affilée** avec macro, un nœud de 5 poussées à
+> 180-184. **Fixtures exportées** : `p19` → `bench … macro` rend **AUCUNE** (0,05 s) ;
+> `p60` → **OK en 106 états** ; `p180` → OK en 8 états. **Toute la difficulté du 16 est
+> dans ses 60 premières poussées.**
+> 🎯 **ET LE DÉMÊLAGE EST LE STOCKAGE** (§6.0, chantier STOCK) : les **8 mises en stock**
+> de la partie tombent toutes entre les poussées **3 et 48**, aucune ensuite — les 148
+> poussées restantes ne font que livrer et REPRENDRE le stock. Mettre une caisse en
+> stock, c'est pousser vers une case qui n'est PAS un but : hors du vocabulaire de la
+> macro, donc exactement la poussée simple que le régime d'engagement refuse de générer.
+> Les deux chantiers — STOCK et complétude de la macro — sont le même verrou vu des
+> deux bouts.
+
+
 > ⚠️ **CETTE FEUILLE DE ROUTE EST HISTORIQUE — relire d'abord ce qui suit** (2026-08-11). Le plongeon
 > ci-dessous a été codé, promu, et a fait tomber 10/11/21/32 ; l'ordre a fait tomber 12/26/27 par le
 > régime `ordre-look`. **Le prochain chantier n'est plus ici** : c'est la **MÉMOIRE** (§6.5), devenue
@@ -500,9 +691,11 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 >   gisement qui donne des rendements décroissants (loi de l'ordre ÷2,98 sur un niveau et zéro sur
 >   un autre §6.6 ; porte généralisé sur 9/28 aujourd'hui).
 >
-> 🚧 **EN COURS le 2026-08-19, NON COMMITÉ, SESSION INTERROMPUE — restauration de la loi de
-> l'ordre + découverte d'un vrai bug dans `ordreParPrecedence`.** Point de reprise détaillé,
-> à lire avant de continuer.
+> 🚧 **EN COURS le 2026-08-19 — restauration de la loi de l'ordre + découverte d'un vrai bug
+> dans `ordreParPrecedence`.** Point de reprise détaillé, à lire avant de continuer.
+> ⚠️ **Ce bloc disait « NON COMMITÉ, SESSION INTERROMPUE » — c'est PÉRIMÉ** : tout ce qu'il
+> énumère est commité dans **`92f3ecd`** (« Reprise de la loi de l'ordre »), à la liste de
+> fichiers près. Corrigé le 2026-08-19 (session du soir, cf. la suite plus bas).
 >
 > **Point de départ** : demande utilisateur de restaurer « les cases mortes dynamiques »
 > retirées le 2026-08-18 (§6.6 ci-dessous). Deux mécanismes distincts s'y cachaient
@@ -572,7 +765,10 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 > 190, 191 en macro/coupl-plongeon, ET le niveau 10 en régime PAR DÉFAUT (`coupl-plongeon`,
 > jamais affecté par `ordreAlignement`) — tous identiques à l'unité près.
 >
-> 🔴 **OUVERT, PAS TRANCHÉ — le niveau 10 en régime `loi` LUI-MÊME ne converge pas.** Deux
+> 🔴 ~~**OUVERT, PAS TRANCHÉ — le niveau 10 en régime `loi` LUI-MÊME ne converge pas.**~~
+> ✅ **TRANCHÉ le 2026-08-19 au soir — la cause est un ORDRE FAUX, et elle est prouvée.** Le
+> paragraphe qui suit reste pour son récit et ses mesures ; sa conclusion est dépassée, lire
+> la session du soir plus bas (« LE VERROU DU 10 »). Deux
 > tentatives : la première (avant le correctif d'asymétrie) plafonnait à `max 1/32` après
 > 37 000 dépilements (tuée à 300 s) puis à `max 1/32` encore après 281 000 dépilements/896 000
 > états vus (tuée à ~5 min, `h(reste)` ne descend jamais). La seconde (après le correctif)
@@ -605,6 +801,108 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 > mortes (loi de l'ordre) » restaurée, déclarée dans le `.ui` cette fois — pas construite en
 > code, sur demande explicite). `geleHorsTour`/`caissesGeleesHorsTour` NE SONT PAS
 > restaurés (réfutés, cf. plus haut) : zéro trace dans le code actuel, vérifié.
+>
+> 🎯 **LE VERROU DU 10, TROUVÉ ET PROUVÉ (2026-08-19 au soir, diagnostic utilisateur) —
+> « remplir la colonne 17 en premier, ok, mais pas jusqu'en haut, sinon le personnage ne peut
+> plus se retourner pour pousser en colonne 15 ».** Lu à l'œil sur la géométrie, confirmé par
+> accessibilité pure (aucun solveur). Mesures à **`92f3ecd`** (+ modifs UI non commitées, qui ne
+> touchent pas le solveur).
+>
+> **LA GÉOMÉTRIE.** Le bloc de buts `{rangée 1 en x=15-17, col 15 y=2..8, col 16 y=2..9,
+> col 17 y=2..14}` ne communique avec le reste du plateau que par **UNE case : (15,2)**, depuis
+> (14,2) — `(14,1)` est un mur, la rangée 0 aussi. La rangée 1 (x=15,16,17, du sol libre, PAS des
+> buts) est la seule plate-forme d'où l'on peut pousser vers le BAS dans les trois colonnes, et
+> elle n'est atteignable qu'en traversant la rangée 2.
+>
+> **POURQUOI LA COLONNE 15 EST LE CAS PARTICULIER.** Pour livrer un but de la colonne 15 il faut
+> une caisse en (15,2) ET le joueur en (15,1), donc DEDANS. Or :
+> - poussée vers l'EST depuis (14,2) : la caisse arrive en (15,2), le joueur reste **dehors** — et
+>   la porte est désormais bouchée par sa propre caisse. Mesuré : `(15,1)` inatteignable.
+> - poussée vers l'OUEST depuis (17,2) : la caisse va de (16,2) à (15,2), le joueur atterrit en
+>   (16,2), **dedans**, et boucle (16,1) → (15,1). Mesuré : `(15,1)` atteignable.
+>
+> La seconde est la SEULE qui marche, et son appui est **(17,2)**. Les colonnes 16 et 17 se servent
+> par poussée est (le joueur y atterrit toujours dedans) : elles n'ont pas le problème.
+> ⚠️ **(17,2) n'est donc pas « le dernier but de la colonne 17 », c'est l'APPUI de l'unique
+> manœuvre de livraison vers la colonne 15.** L'ordre align le remplit au rang 17, avant les cinq
+> buts de la colonne 15 (rangs 18-22) : il condamne la colonne 15 dès le rang 18.
+>
+> **LA PREUVE PAR L'EXPÉRIENCE, trois runs, une seule variable (l'ordre) :**
+>
+> | run | états | poussées | verdict |
+> |---|---|---|---|
+> | `loi` + ordre align **calculé** | 8 423 358 vus **et ça continuait** | — | **mur à `max 22/32`**, tué |
+> | `loi` + ordre **corrigé, injecté** | **571 053** | **544** | ✅ **RÉSOLU** |
+> | défaut (`coupl-plongeon`) | **249 913** | 544 | ✅ résolu |
+>
+> Le témoin muré reproduit **exactement** le `max 22/32` consigné plus haut pour le run d'août : la
+> panne est la même, et elle survit à 5,5× le budget qui suffit à l'ordre corrigé. L'hypothèse
+> concurrente (« le run d'août avait juste été arrêté trop tôt ») est donc **réfutée**.
+> L'ordre corrigé (injecté) : `(3,10) (3,11) (2,11) (15,8) (16,9) (17,14)…(17,3) (15,7)…(15,3)
+> (16,8)…(16,3) (17,2) (16,2) (15,2) (2,10)` — (17,2) déplacé du rang 17 au rang 28, et il doit
+> rester AVANT (16,2)/(15,2) puisque la caisse qui le remplit transite par ces deux cases.
+>
+> ⚠️ **MAIS L'ORDRE CORRIGÉ NE BAT PAS LA LIGNE DE BASE** : 571 053 contre 249 913 états, à
+> poussées égales (544) et par le MÊME plongeon gagnant (record 13/32, 2 919 états de plongeon des
+> deux côtés — ils atteignent la même porte de sortie). Raison, visible en diffant les deux ordres
+> plutôt que les deux régimes : **l'ordre PAR DÉFAUT respecte déjà la contrainte** — il remplit la
+> colonne 15 en PREMIER, pendant que (17,2) et (16,2) sont encore libres, donc la manœuvre ouest
+> est disponible tout du long. La correction **guérit une blessure que `precedenceAlignement`
+> s'inflige** ; elle n'améliore rien par rapport au défaut.
+>
+> ❌ **ET LE RÉGIME `loi` CASSE LE 21 ET LE 32** (campagne du soir, `loi` contre `coupl-plongeon`,
+> même binaire, sur les résolus > 10 qui le sont PAR LE DÉFAUT — le 12/26/27 sont exclus, ils ne
+> tombent que par `ordre-look`, et le 26 ne tient pas sur une machine à 3 Go libres) :
+>
+> | niveau | `loi` | défaut | |
+> |---|---|---|---|
+> | 17 | 18 639 / 213 p. | 18 636 / 213 p. | neutre |
+> | **21** | **rien en 2 400 s**, mur `max 10/13` | **2 922 383 / 159 p. en 542 s** | ❌ |
+> | **32** | **rien en 2 400 s**, mur `max 10/15` | **6 591 366 / 153 p. en 687 s** | ❌ |
+> | 11 | 13 913 050 / 243 p. | 13 913 047 / 243 p. | neutre |
+>
+> Le 21 et le 32 sont **exactement deux des six niveaux** que le plan notait déjà comme muraillés
+> par la fusion INCONDITIONNELLE (« 2, 8, 9, 12, 21, 32 »). Scoper derrière `ordreAlignement` a
+> protégé l'ordre PAR DÉFAUT — **la casse est intacte À L'INTÉRIEUR du régime `loi`**, où elle
+> n'avait jamais été mesurée. ⚠️ 2 400 s est un BUDGET, pas une preuve : on peut dire « ne résout
+> pas en 4,4× le temps du défaut », pas « ne résout jamais » (§6.6, la progression à budget borné).
+>
+> ⚠️ **`PRUNES=0` PARTOUT** — 10, 11, 17, 21, 32, sur des dizaines de millions d'enfilages
+> (105 M sur le 32). `caseMorteLoi` n'a **jamais rien coupé** hors du niveau 6. Donc **tout ce que
+> le régime `loi` produit ici, en bien comme en mal, vient de l'ORDRE**, jamais de la loi. Et ça
+> réfute l'hypothèse consignée plus haut (« la loi ne coupe rien PARCE QUE l'ordre est muré ») :
+> le `PRUNES=0` survit intact à un ordre qui, lui, gagne.
+>
+> 🔴 **OUVERT — L'ANOMALIE DES +3, à tester EN PREMIER demain (deux secondes).** Le 11 réordonne
+> **8 buts sur 14** et rend **+3 états** ; le 17 en réordonne 2 sur 6 et rend **+3** aussi.
+> Exactement +3 sur deux niveaux sans rapport, ça ressemble à un artefact et non à un effet
+> d'ordre. **Si c'en est un, les lignes « neutre » du tableau ci-dessus ne valent rien** et il n'en
+> reste que deux exploitables. **Le test** : injecter l'ordre align par fichier sur le **17** et le
+> passer en régime **DÉFAUT** (1 s par run). S'il rend 18 639, le régime applique bien l'ordre et
+> le neutre est réel ; s'il rend autre chose, `setOrdreAlignement` ne fait pas ce qu'on croit dans
+> le solveur.
+>
+> 🔴 **OUVERT — l'ordre gagnant du 10 est INJECTÉ À LA MAIN.** `precedenceAlignement` continue de
+> produire celui qui condamne la colonne 15 ; le niveau ne passe que si `ordre_niveau_0010.txt`
+> est présent, ce qui est un outil de chantier, pas une résolution. La règle à dériver n'est PAS
+> l'alignement mais la précédence **caisse → but** de `porte` : *un but qui sert d'appui à
+> l'unique manœuvre de livraison d'un autre doit être rempli après lui*. C'est le cas DYNAMIQUE
+> (invisible au départ, il n'apparaît qu'une fois la colonne 17 posée), donc du ressort de
+> `porteGeneraliseeCoupe` — aujourd'hui câblée seulement comme *délai* dans `butActif()` sous
+> `ordreDynamique`. Voilà pourquoi l'outil `porte` rend 0 sur le 10 et ne pouvait pas le voir.
+>
+> ✅ **UI, commité à part** : case à cocher « Ordre par alignement (régime loi) » (déclarée dans le
+> `.ui`, comme `cbMortesLoi`) qui arme `setOrdreAlignement()` sur le Game de l'UI — sans elle
+> l'interface affichait toujours l'ordre par défaut, même solveur lancé en régime `loi`, puisqu'il
+> travaille sur sa propre copie. ⚠️ **Le drapeau est posé AU CHARGEMENT, et la bascule RECHARGE le
+> niveau** : `ordreParPrecedence` lit `playerPoint` (garde `LIVR_DURE=3`) et les buts déjà posés,
+> donc un recalcul en cours de partie rendrait un AUTRE ordre que celui du départ. Le journal
+> hybride annonce désormais `calcule ⚠ PAR ALIGNEMENT (regime loi)` (accesseur `getOrdreAlignement()`
+> ajouté exprès) — sans quoi les deux ordres produiraient des traces indiscernables, alors que 29
+> buts sur 32 changent de rang sur le 10. Et les aplats gris des cases mortes passent désormais
+> PAR-DESSUS le violet de la zone joueur (demande utilisateur) : la zone couvre presque tout le
+> plateau accessible, le gris s'y noyait — deux aplats translucides ne se départagent que par
+> l'ordre de peinture.
 >
 > **Objectif affirmé par l'utilisateur, à garder en tête pour la suite** : *« Je veux que les
 > niveaux se résolvent avec un même et seul solveur [...] je suis sûr que le 16 notamment ne
@@ -1280,6 +1578,34 @@ plateau × leviers disponibles.**
   `fpporte.py`) : 0 FP sur 1 650 livraisons. Même famille que le piège « compter G elle-même »
   de `stock.py cut` (§6.0, 2026-08-17) : le prédicat était juste, c'est la définition de
   « livrée » qui était trop large.
+- ⚠️ **LE FICHIER D'ORDRE INJECTÉ N'A PAS DE SYNTAXE DE COMMENTAIRE** (2026-08-19). Le parseur est
+  un `QRegularExpression` **global sur tout le contenu** (`game.cpp`, dans `calculDistancePoussee`) :
+  il ramasse `(x,y)` où qu'il soit, en-tête compris. Un fichier `ordre_niveau_XXXX.txt` documenté
+  par un en-tête `#` qui cite des coordonnées voit ces coordonnées lues comme des buts, puis la
+  vraie liste déclenche `cité DEUX FOIS` → `voulu.clear()` → **ordre calculé CONSERVÉ**. Pris en
+  écrivant l'en-tête de `mesures/ordres_humains/ordre_niveau_0010_appui-17-2.txt`, où expliquer le
+  rôle du but (17,2) suffisait à casser le fichier. Sauvé par le fait que le refus est BRUYANT — la
+  leçon vaut surtout pour ce qu'elle dit du reste : **écrire les coordonnées en toutes lettres
+  (`x=17 y=2`) dans tout commentaire de ces fichiers**, et vérifier par
+  `grep -oE '\([0-9]+,[0-9]+\)' fichier | wc -l` avant de s'en servir.
+- ⚠️ **COMPARER DEUX RÉGIMES QUAND L'ORDRE CHANGE AUSSI N'ISOLE RIEN** (2026-08-19, correction
+  utilisateur en direct). J'ai comparé `loi` + ordre injecté (571 053 états) au défaut + ordre par
+  défaut (249 913) et conclu « le régime `loi` est 2,3× pire ». **Faux : deux variables bougeaient**,
+  le régime ET l'ordre — et comme `PRUNES=0`, la loi ne faisait rien du tout, l'écart était
+  intégralement dû à l'ordre. Le témoin qui tranche existait dans la même campagne et disait
+  l'inverse : sur le 17, `loi` contre défaut rend **+3 états sur 18 636 (+0,016 %)**, donc le régime
+  en lui-même est gratuit. **Règle : nommer les variables AVANT de lire un écart** — un régime qui
+  recalcule l'ordre en change deux à la fois, et le sous-produit (l'ordre) peut peser cent fois plus
+  que l'objet mesuré (l'élagage). Même famille que le §6.6 sur les prédicteurs, appliquée à
+  l'attribution d'un coût plutôt qu'à celle d'un gain.
+- ⚠️ **UNE LIGNE DE `scores.md` PEUT ÊTRE PÉRIMÉE D'UN FACTEUR 8** (2026-08-19). Le niveau 10 y
+  porte **2 175 724 états** (`703f851`, 2026-07-29, confirmé sur Linux à l'unité) ; le même
+  `bench 10 coupl-plongeon` sur `92f3ecd` rend **249 913**. Le chiffre n'est pas faux, il est
+  VIEUX — les chantiers mémoire d'août et `ordre-look` sont passés entre les deux. J'ai annoncé un
+  « ÷3,81 » fondé dessus avant que le témoin ne le réduise en miettes. C'est la règle « jamais à un
+  chiffre écrit » (§1) prise en défaut sur le fichier qui fait justement foi : **`scores.md` fait foi
+  sur QUI est résolu, pas sur COMBIEN ça coûte aujourd'hui.** Tout écart chiffré se remesure binaire
+  contre binaire, y compris contre ce fichier-là.
 - ⚠️ **UN SCAN EXHAUSTIF SANS FILTRE MESURE LA GÉOMÉTRIE, PAS LE PROBLÈME** (2026-08-18, en
   mesurant l'ampleur du porte généralisé). Tester TOUTES les paires (caisse × but) à chaque
   jalon rend 71 % de coupes (`ampleurporte.py`) — un chiffre qui a l'air massif mais qui NE

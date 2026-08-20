@@ -1,6 +1,23 @@
 // image — UN .xsb EN .png, AVEC LES SPRITES DE L'UI.
 //
 //   image <niveau|fichier.xsb> [sortie.png] [taille]
+//         [--rejeu <poussees.txt>] [--stop <n>] [--loi] [--align]
+//
+// ── REJEU + LOI (2026-08-20) ─────────────────────────────────────────────────
+// `--loi` peint les cases mortes et cercle le but actif, avec les MÊMES couleurs
+// que `WGame::paintEvent` (gris #909090 α90 pour les mortes ordinaires, gris foncé
+// #303030 α150 pour le surplus de la loi de l'ordre).
+//
+// ⚠️ POURQUOI IL FAUT REJOUER, ET NON CHARGER UN .xsb DE MILIEU DE PARTIE. Charger
+// une position intermédiaire comme un niveau **recalcule tout le statique** pour ce
+// plateau-là (§7) : `ordreParPrecedence`, `casesMortes` et `mortesLoi` tournent dans
+// le ctor `Game(Level)` et ne connaissent que les caisses qu'on leur donne. Le but
+// actif affiché et les cases mortes seraient donc ceux d'un AUTRE problème que celui
+// que le solveur a réellement jugé. `--rejeu` charge le vrai niveau puis y applique
+// les poussées : les tables restent celles du niveau, comme dans le run.
+//
+// Le fichier de poussées est celui de `jugeloi` (une ligne "<case> <dir>"), produit
+// par `mesures/poussees_journal.py` — donc rejouable et déjà validé.
 //
 // Raison d'être : on exporte des plateaux tout le temps (records du mode `record`,
 // fixtures du mode hybride, positions de blocage) et on les lit en ASCII, ce qui
@@ -74,7 +91,26 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    const QString arg1 = argv[1];
+    // Les options nommées se lisent d'abord, pour que les positionnels ne les
+    // ramassent pas (`--loi` retomberait sinon dans `sortie.png`).
+    QString fichierRejeu;
+    int     stop = -1;
+    bool    montreLoi = false, align = false;
+    QVector<QString> positionnels;
+    for (int i = 1; i < argc; i++) {
+        const QString a = argv[i];
+        if      (a == "--loi")   montreLoi = true;
+        else if (a == "--align") align = true;
+        else if (a == "--rejeu" && i + 1 < argc) fichierRejeu = argv[++i];
+        else if (a == "--stop"  && i + 1 < argc) stop = QString(argv[++i]).toInt();
+        else positionnels.append(a);
+    }
+    if (positionnels.isEmpty()) {
+        fprintf(stderr, "image: aucun niveau ni fichier donne\n");
+        return 2;
+    }
+
+    const QString arg1 = positionnels[0];
     const bool parChemin = arg1.endsWith(".xsb");
     const int num = parChemin ? 0 : arg1.toInt();
 
@@ -85,15 +121,43 @@ int main(int argc, char** argv) {
         fprintf(stderr, "image: niveau introuvable (%s)\n", qPrintable(arg1));
         return 2;
     }
-    const Game g(level, num);
+    Game g(level, num);
+    // L'ordre décide du BUT ACTIF, donc de la tranche de `mortesLoi` qu'on affiche :
+    // dessiner la loi sous un autre ordre que celui du régime testé ne montrerait pas
+    // ce que ce régime a jugé.
+    if (align) g.setOrdreAlignement(true);
 
-    const QString sortie = (argc > 2) ? QString(argv[2])
-                                      : (parChemin ? QFileInfo(arg1).completeBaseName() + ".png"
-                                                   : QString("level%1.png").arg(num, 4, 10, QChar('0')));
+    // ── REJEU (cf. l'entête) ────────────────────────────────────────────────────
+    if (!fichierRejeu.isEmpty()) {
+        FILE* f = fopen(qPrintable(fichierRejeu), "r");
+        if (!f) { fprintf(stderr, "image: %s illisible\n", qPrintable(fichierRejeu)); return 2; }
+        char ligne[256];
+        int n = 0;
+        while (fgets(ligne, sizeof(ligne), f)) {
+            int cell = -1, dir = -1;
+            if (sscanf(ligne, "%d %d", &cell, &dir) != 2) continue;
+            if (stop >= 0 && n >= stop) break;
+            if (!g.pousse(cell, (Game::EDirection)dir)) {
+                // Refuser bruyamment : dessiner un plateau issu d'un rejeu divergent
+                // serait exactement l'erreur que cet outil existe pour éviter.
+                fprintf(stderr, "image: poussee %d ILLEGALE (case %d dir %d) — rejeu abandonne\n",
+                        n + 1, cell, dir);
+                fclose(f); return 3;
+            }
+            n++;
+        }
+        fclose(f);
+        fprintf(stderr, "[rejeu] %d poussees appliquees sur le niveau %d\n", n, num);
+    }
+
+    const QString sortie = (positionnels.size() > 1)
+                               ? positionnels[1]
+                               : (parChemin ? QFileInfo(arg1).completeBaseName() + ".png"
+                                            : QString("level%1.png").arg(num, 4, 10, QChar('0')));
     // La taille de case est un paramètre ici (contrairement à l'UI, où c'est une
     // constante) : un plateau de 34 cases fait 2 176 px à 64, illisible en vignette
     // et lourd à l'écran. 48 est un bon compromis pour un export qu'on regarde.
-    const int cote = (argc > 3) ? QString(argv[3]).toInt() : 48;
+    const int cote = (positionnels.size() > 2) ? positionnels[2].toInt() : 48;
 
     const int L = g.getLargeur(), H = g.getHauteur();
     QImage img(L * cote, H * cote, QImage::Format_ARGB32);
@@ -116,6 +180,37 @@ int main(int argc, char** argv) {
     Player     perso;
 
     const QVector<bool> dedans = calculeInterieur(g);
+
+    // ── LA LOI DE L'ORDRE, exactement comme l'UI la peint ───────────────────────
+    // Deux gris DISTINCTS, et c'est délibéré (cf. wgame.cpp) : les cases mortes
+    // ORDINAIRES sont un décor permanent qui n'apprend rien, le surplus de la LOI
+    // dépend du but actif et change à chaque but rempli — c'est lui qu'on vient lire.
+    // Les peindre du même gris rendrait la loi illisible.
+    const int butCourant = montreLoi ? g.butActif() : -1;
+    const QVector<bool> mortesLoi = montreLoi ? g.casesMortesLoi(butCourant) : QVector<bool>();
+
+    // Le verdict EN TOUTES LETTRES sur stderr, pas seulement en aplats. Lire des
+    // coordonnées à l'œil sur une image est précisément ce qui fait écrire des
+    // légendes fausses — j'ai désigné deux fois la mauvaise caisse avant d'ajouter
+    // ceci. L'image montre, le texte prouve.
+    if (montreLoi) {
+        fprintf(stderr, "[loi] but actif = (%d,%d)\n",
+                butCourant >= 0 ? g.getCaseBut(butCourant) % L : -1,
+                butCourant >= 0 ? g.getCaseBut(butCourant) / L : -1);
+        QString listeMortes, listeCaisses;
+        for (int c = 0; c < mortesLoi.size(); c++) {
+            if (!mortesLoi[c]) continue;
+            listeMortes += QString(" (%1,%2)").arg(c % L).arg(c / L);
+            const Level::ETypeCase t = g.getCase(c);
+            if (t == Level::tcCaisse || t == Level::tcGoalCaisse)
+                listeCaisses += QString(" (%1,%2)%3").arg(c % L).arg(c / L)
+                                    .arg(t == Level::tcGoalCaisse ? "[sur but]" : "");
+        }
+        fprintf(stderr, "[loi] cases mortes par la loi :%s\n",
+                listeMortes.isEmpty() ? " aucune" : qPrintable(listeMortes));
+        fprintf(stderr, "[loi] CAISSES posees sur une de ces cases :%s\n",
+                listeCaisses.isEmpty() ? " aucune (etat NON elague)" : qPrintable(listeCaisses));
+    }
 
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < L; x++) {
@@ -140,7 +235,28 @@ int main(int argc, char** argv) {
             } else if (c == Level::tcGoal || c == Level::tcGoalPlayer) {
                 but.dessine(p, coin);
             }
+
+            // Couche 2 bis — les cases mortes, PAR-DESSUS le sol et la caisse.
+            // ⚠️ Les mortes ordinaires sont restreintes à l'INTÉRIEUR : tout le
+            // remplissage hors contour est mort dans la table (il n'atteint aucun
+            // but), et le peindre passerait le pourtour au gris pour ne rien dire.
+            if (montreLoi && dedans.value(idx, false) && g.caseMorteOrdinaire(idx))
+                p.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
+                           QColor(0x90, 0x90, 0x90, 90));
+            if (idx < mortesLoi.size() && mortesLoi[idx])
+                p.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
+                           QColor(0x30, 0x30, 0x30, 150));
         }
+    }
+
+    // Couche 2 ter — LE BUT ACTIF, cerclé. C'est lui qui décide de toute la tranche
+    // grise ci-dessus : sans le voir, l'image montre un verdict sans son juge.
+    if (butCourant >= 0) {
+        const int cb = g.getCaseBut(butCourant);
+        const QPointF coin((cb % L) * SPRITE_WIDTH, (cb / L) * SPRITE_HEIGHT);
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(QColor(0xff, 0x98, 0x00), 6));          // ambre, épais
+        p.drawRect(QRectF(coin.x() + 4, coin.y() + 4, SPRITE_WIDTH - 8, SPRITE_HEIGHT - 8));
     }
 
     // Couche 3 — le perso, par-dessus la grille posée.

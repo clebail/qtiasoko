@@ -1,0 +1,2 @@
+ordre align du niveau 16, aucune coordonnee entre parentheses dans cet entete
+(12,7) (12,8) (12,9) (12,11) (12,10) (11,11) (10,11) (8,11) (9,11) (11,10) (10,10) (9,10) (8,10) (9,9) (8,9) 

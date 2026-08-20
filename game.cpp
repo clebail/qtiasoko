@@ -1824,6 +1824,58 @@ QVector<QVector<int>> Game::precedenceAlignement() const {
     return requis;
 }
 
+// MURAGE LOCAL — la « précédence par approches » du §6.2, en exemplaire unique.
+// Contrat, relaxations et raison d'être : cf. game.h.
+bool Game::butMureLocalement(int idxBut, const QVector<bool>& bloque,
+                             bool testeAccesJoueur) const {
+    const int G  = goals[idxBut];
+    const int gx = G % largeur, gy = G / largeur;
+
+    // Le joueur peut-il joindre 'appui' en marchant, les murs, les buts de 'bloque'
+    // et la caisse posée sur 'caisseCase' faisant obstacle ? Flood-fill 4-connexe
+    // depuis sa position de DÉPART (cf. game.h pour la justification du départ).
+    auto joignable = [&](int appui, int caisseCase) -> bool {
+        const int dep = playerPoint.x() + playerPoint.y() * largeur;
+        if (dep < 0 || dep >= size) return true;              // pas de joueur : on n'invente rien
+        if (cases[dep] == Level::tcMur || bloque[dep] || dep == caisseCase) return true;
+        if (dep == appui) return true;
+        QVector<bool> vu(size, false);
+        QVector<int>  pile;
+        vu[dep] = true; pile.append(dep);
+        while (!pile.isEmpty()) {
+            const int c = pile.takeLast();
+            const int cx = c % largeur, cy = c / largeur;
+            for (int d = 0; d < NB_DIRECTION; d++) {
+                const int nx = cx + directions[d].dx, ny = cy + directions[d].dy;
+                if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+                const int n = nx + ny * largeur;
+                if (vu[n] || cases[n] == Level::tcMur || bloque[n] || n == caisseCase) continue;
+                if (n == appui) return true;
+                vu[n] = true; pile.append(n);
+            }
+        }
+        return false;
+    };
+
+    int viables = 0, libres = 0;
+    for (int d = 0; d < NB_DIRECTION; d++) {
+        const int cx = gx -     directions[d].dx, cy = gy -     directions[d].dy;  // la caisse
+        const int ax = gx - 2 * directions[d].dx, ay = gy - 2 * directions[d].dy;  // l'appui
+        if (cx < 0 || cx >= largeur || cy < 0 || cy >= hauteur) continue;
+        if (ax < 0 || ax >= largeur || ay < 0 || ay >= hauteur) continue;
+        const int cc = cx + cy * largeur, aa = ax + ay * largeur;
+        if (cases[cc] == Level::tcMur || cases[aa] == Level::tcMur) continue;
+        viables++;
+        if (bloque[cc] || bloque[aa]) continue;
+        // Le flood-fill ne se paie QUE sur les approches qui ont passé les deux tests
+        // gratuits ci-dessus — c'est ce qui garde le coût du ctor Game(Level) à sa
+        // place (le §6.2 garde la trace d'un chargement passé à 64 s).
+        if (testeAccesJoueur && !joignable(aa, cc)) continue;
+        libres++;
+    }
+    return (viables > 0 && libres == 0);
+}
+
 // Ordre de remplissage par PRÉCÉDENCE DE LIVRAISON (§6.2, session du 2026-07-20).
 //
 // Le fait mesuré : sur la salle du 11, l'ordre décide de tout (28 états contre 1,3 M
@@ -1946,7 +1998,8 @@ QVector<int> Game::ordreParPrecedence() const {
     // LOCAL sur 6 niveaux auparavant propres (2, 8, 9, 12, 21, 32). L'ajout mord
     // bien plus large que le seul motif visé — d'où le drapeau, armé SEULEMENT par
     // le régime d'essai `loi` (solveur.cpp), jamais l'ordre par défaut.
-    QVector<QVector<int>> requis = precedenceGlobale();
+    const QVector<QVector<int>> precGlobale = precedenceGlobale();
+    QVector<QVector<int>> requis = precGlobale;
     if (ordreAlignement) {
         const QVector<QVector<int>> align = precedenceAlignement();
         for (int b = 0; b < nbButs; b++)
@@ -2088,6 +2141,20 @@ QVector<int> Game::ordreParPrecedence() const {
                 if (pose[h] || h == b) continue;
                 if (apres[goals[h]] == -1)               ok = false;   // rendu inaccessible
                 else if (apres[goals[h]] > dist[goals[h]]) pen++;      // livrable mais DÉTOURNÉ
+                // ⚠️ Test INDÉPENDANT des deux précédents, jamais chaîné en `else` :
+                // un but peut être à la fois détourné et muré, et c'est même le cas
+                // courant — le détour est le symptôme, le murage est la preuve.
+                // GARDE DE MURAGE LOCAL (2026-08-20). `distanceLivraison` est un
+                // modèle de REACHABILITY : il dit « une caisse peut encore arriver
+                // sur ce but », jamais « le joueur pourra encore la pousser dessus ».
+                // Les deux divergent dès qu'un but sert d'APPUI à la dernière
+                // manœuvre d'un autre — mesuré sur le 21 en régime `loi` : poser
+                // (13,10) au rang 5 laisse (11,10) parfaitement « livrable » et le
+                // condamne pourtant, ses deux dernières approches passant par
+                // (13,10) et (11,12). Le plateau exporté ce jour-là est mort à 7/13,
+                // avec deux buts qu'aucune poussée ne peut plus atteindre.
+                // C'est la même espèce que le verrou du 10 ((17,2), 2026-08-19).
+                if (butMureLocalement(h, bloque)) ok = false;
             }
 
             // LIVR_DURE=3 : reachability JOUEUR ancrée à sa vraie position (pas le
@@ -2256,6 +2323,7 @@ QVector<int> Game::ordreParPrecedence() const {
                 if (!pose[b] && dist[goals[b]] != -1) candidats.append(b);
             QVector<int> surs;
             QVector<int> penalite(nbButs, 0);
+            QVector<int> mures(nbButs, 0);
             for (int b : candidats) {
                 bloque[goals[b]] = true;
                 const QVector<int> apres = distanceLivraison(bloque);
@@ -2267,6 +2335,20 @@ QVector<int> Game::ordreParPrecedence() const {
                     else if (apres[goals[h]] > dist[goals[h]]) pen++;
                 }
                 penalite[b] = pen;
+                // MURAGES CAUSÉS PAR CE CHOIX (2026-08-20). Le repli tourne quand
+                // AUCUN ordre sain n'existe — il ne peut donc pas exiger zéro murage,
+                // mais rien ne l'oblige à les ignorer. On les COMPTE, et le tie-break
+                // ci-dessous préfère celui qui en cause le moins.
+                // ⚠️ Pourquoi ce n'est pas un filtre dur ici, contrairement à la
+                // recherche gardée au-dessus : un filtre dur ne rendrait rien du tout
+                // (mesuré sur le 18 — la pile se vide jusqu'au rang 0), et `butActif()`
+                // exige une permutation COMPLÈTE. Compter au lieu d'exclure, c'est la
+                // même dégradation gracieuse que `precedenceGlobale`, utilisée en clé
+                // de tie-break et jamais en filtre (cf. l'entête de cette fonction).
+                for (int h = 0; h < nbButs; h++) {
+                    if (pose[h] || h == b) continue;
+                    if (butMureLocalement(h, bloque)) mures[b]++;
+                }
                 bloque[goals[b]] = false;
                 if (ok) surs.append(b);
             }
@@ -2279,8 +2361,13 @@ QVector<int> Game::ordreParPrecedence() const {
                 const auto ca = contiguite(b), cc = contiguite(choisi);
                 const int pa = penalite[b],    pc = penalite[choisi];
                 const int wa = attente(b),     wc = attente(choisi);
+                const int ma = mures[b],       mc = mures[choisi];
                 bool mieux;
-                if (wa != wc)                       mieux = (wa < wc);   // précédence GLOBALE
+                // Le murage est une PREUVE d'impossibilité (le but perd sa dernière
+                // approche), là où `attente` n'est qu'une précédence de livraison :
+                // il prime donc, y compris sur la précédence globale.
+                if (ma != mc)                       mieux = (ma < mc);
+                else if (wa != wc)                  mieux = (wa < wc);   // précédence GLOBALE
                 else if ((livrDure == 1 || livrDure == 3) && pa != pc) mieux = (pa < pc);
                 else if (ca.first  != cc.first)     mieux = (ca.first  > cc.first);
                 else if (ca.second != cc.second)    mieux = (ca.second > cc.second);
@@ -2341,30 +2428,142 @@ QVector<int> Game::ordreParPrecedence() const {
             for (int g : requis[b]) if (!emis[g]) return false;
             return true;
         };
-        while (trie.size() < nbButs) {
-            int choisi = -1;
-            // 1) rester dans la salle en cours tant qu'elle a un but prêt. Sur un
-            //    niveau à salle unique cette passe est exactement la 2), donc
-            //    l'ordre ressort INCHANGÉ — 30 niveaux sur 35, canari compris.
-            for (int b : ordre) {
-                if (emis[b] || salle[b] != salleCourante) continue;
-                if (pret(b)) { choisi = b; break; }
+        // `requis` mêle DEUX choses de statut inégal, et la distinction ne comptait
+        // pas tant que rien ne les opposait : `precedenceGlobale` est une PREUVE
+        // (sans ces buts, plus aucune caisse n'atteint celui-ci), `precedenceAlignement`
+        // se décrit elle-même comme « un indice fort, pas une preuve » (game.h).
+        // Quand les deux se contredisent — sur le 21 en `loi`, respecter l'indice
+        // MURE un but, ce qui est une preuve d'impossibilité — c'est la preuve qui
+        // doit gagner. D'où cette seconde lecture, qui ne retient que le global.
+        auto pretPreuve = [&](int b) {
+            for (int g : precGlobale[b]) if (!emis[g]) return false;
+            return true;
+        };
+        // GARDE DE MURAGE LOCAL, SECONDE MOITIÉ (2026-08-20). La même garde existe
+        // dans le glouton ci-dessus — et elle y est INERTE : mesuré le jour même,
+        // cartes de rangs identiques sur les 35 niveaux, dans les deux modes. C'est
+        // ICI que l'ordre se décide vraiment dès qu'il y a des arêtes de précédence,
+        // parce que ce tri REORDONNE ce que le glouton avait choisi. Sur le 21 en
+        // régime `loi`, le glouton rendait déjà l'ordre sain — le tri le défaisait
+        // pour satisfaire les arêtes d'alignement, et remettait (13,10) au rang 5.
+        // ⚠️ C'est un tri STABLE : il ne peut que CHOISIR PARMI LES PRÊTS, jamais
+        // violer une arête. On ne fait donc que départager les prêts, exactement
+        // comme le groupement par salle juste au-dessus.
+        QVector<bool> bloqueTri(size, false);
+        auto mureraitQuelquun = [&](int b) {
+            bloqueTri[goals[b]] = true;
+            bool m = false;
+            for (int h = 0; h < nbButs && !m; h++)
+                if (!emis[h] && h != b && butMureLocalement(h, bloqueTri)) m = true;
+            bloqueTri[goals[b]] = false;
+            return m;
+        };
+        // RECHERCHE AVEC RETOUR ARRIÈRE (2026-08-20), et non plus un glouton.
+        // Le glouton myope se peint dans un coin, exactement comme celui du tri par
+        // précédence avant le 2026-07-29 : mesuré sur le 21 en régime `loi`, éviter le
+        // murage à chaque pas déplace simplement le murage — (11,10) sauvé au rang 8
+        // condamne (13,10) au rang 9, parce qu'au rang 5 on avait déjà pris (13,9)
+        // alors que rien ne murait ENCORE. Un ordre sain existait pourtant.
+        // C'est la même correction qu'ailleurs dans ce fichier (`macroVersButBacktrack`,
+        // la pile de `ordreParPrecedence`) : mémoriser les forks au lieu de les oublier.
+        //
+        // ⚠️ PROPRIÉTÉ QUI REND L'AJOUT SÛR — la pile ne recule JAMAIS sur un niveau
+        // dont l'ordre était déjà sain : le premier candidat de chaque étage y est
+        // exactement celui que l'ancien glouton élisait (mêmes passes, même parcours
+        // de `ordre`), et il mène au bout sans échec. Ordre identique PAR CONSTRUCTION,
+        // canari compris. On ne recule que sur un échec avéré.
+        struct EtageTri { QVector<int> choix; int essai = 0; int salleAvant = -1; };
+        QVector<EtageTri> pileTri;
+        // Budget : le tri est O(nbButs) de profondeur et chaque étage coûte
+        // O(nbButs² × 4). Ce code tourne dans le ctor Game(Level), donc à CHAQUE
+        // ouverture de niveau dans l'app — le §6.2 garde la trace d'une escalade de
+        // budget qui avait porté un chargement à 64 s. 500 tient largement les 35
+        // niveaux (mesuré : aucun ne recule plus de quelques dizaines de fois).
+        int budgetTri = 500;
+        bool triSain = false;
+
+        while (true) {
+            if (trie.size() == nbButs) { triSain = true; break; }
+
+            if (pileTri.size() == trie.size() + 1) {
+                EtageTri& e = pileTri[pileTri.size() - 1];
+                if (e.essai < e.choix.size() && budgetTri > 0) {
+                    budgetTri--;
+                    const int b = e.choix[e.essai];
+                    emis[b] = true;
+                    bloqueTri[goals[b]] = true;
+                    salleCourante = salle[b];
+                    trie.append(b);
+                } else {
+                    pileTri.removeLast();                            // cet étage est épuisé
+                    if (trie.isEmpty() || pileTri.isEmpty()) break;  // espace épuisé
+                    const int d = trie.takeLast();                   // on défait le choix d'avant
+                    emis[d] = false;
+                    bloqueTri[goals[d]] = false;
+                    // ⚠️ La salle courante se restaure depuis l'étage OÙ L'ON REVIENT,
+                    // pas depuis celui qu'on vient de jeter : `salleAvant` d'un étage
+                    // est la salle d'AVANT sa propre pose. Prendre celle de l'étage
+                    // jeté rendrait la salle de la pose qu'on est en train de défaire,
+                    // et la passe « rester dans la salle en cours » classerait les
+                    // candidats suivants sur une salle qui n'est plus la bonne.
+                    salleCourante = pileTri[pileTri.size() - 1].salleAvant;
+                    pileTri[pileTri.size() - 1].essai++;             // …et on essaie le suivant
+                }
+                continue;
             }
-            // 2) sinon le premier but prêt de l'ordre courant : on change de salle,
-            //    et c'est lui qui fixe laquelle vient ensuite (stabilité).
-            if (choisi < 0)
+
+            // LES CANDIDATS D'UN ÉTAGE, par ordre de préférence — aucun ne mure qui que
+            // ce soit, c'est la condition d'entrée dans cette recherche.
+            QVector<int> choix;
+            auto ajoute = [&](int b) { if (!choix.contains(b)) choix.append(b); };
+            // 1) rester dans la salle en cours (le groupement du §6.2 : sauter de salle
+            //    en salle rend la macro indisponible — 886 états sans macro sur le 10).
+            for (int b : ordre)
+                if (!emis[b] && salle[b] == salleCourante && pret(b) && !mureraitQuelquun(b)) ajoute(b);
+            // 2) sinon changer de salle, la stabilité fixant laquelle.
+            for (int b : ordre)
+                if (!emis[b] && pret(b) && !mureraitQuelquun(b)) ajoute(b);
+            // 3) RELÂCHER L'INDICE POUR SAUVER LA PREUVE. `precedenceAlignement` se
+            //    décrit elle-même comme « un indice fort, pas une preuve » (game.h) ;
+            //    un murage, lui, est une preuve d'impossibilité. Quand les deux se
+            //    contredisent, on sacrifie l'indice. Inerte hors régime `loi` :
+            //    `requis` et `precGlobale` y sont le même objet, donc cette passe ne
+            //    peut rien trouver que 2) n'ait déjà vu.
+            for (int b : ordre)
+                if (!emis[b] && pretPreuve(b) && !mureraitQuelquun(b)) ajoute(b);
+
+            pileTri.append(EtageTri{choix, 0, salleCourante});
+        }
+
+        // REPLI : aucun ordre sans murage trouvé (ou budget épuisé). On refait alors
+        // EXACTEMENT l'ancien glouton, murages compris — la garde est un BONUS, elle
+        // ne doit jamais rendre un ordre PIRE que celui d'avant. C'est la même
+        // dégradation gracieuse que le repli du glouton par précédence ci-dessus.
+        if (!triSain) {
+            trie.clear();
+            emis.fill(false);
+            bloqueTri.fill(false);
+            salleCourante = -1;
+            while (trie.size() < nbButs) {
+                int choisi = -1;
                 for (int b : ordre) {
-                    if (emis[b]) continue;
+                    if (emis[b] || salle[b] != salleCourante) continue;
                     if (pret(b)) { choisi = b; break; }
                 }
-            // CYCLE (aucun but prêt) : le modèle optimiste se contredit — on émet le
-            // premier restant plutôt que de boucler. Dégradation gracieuse, jamais un
-            // blocage : `butActif()` exige une permutation complète.
-            if (choisi < 0)
-                for (int b : ordre) if (!emis[b]) { choisi = b; break; }
-            emis[choisi] = true;
-            salleCourante = salle[choisi];
-            trie.append(choisi);
+                if (choisi < 0)
+                    for (int b : ordre) {
+                        if (emis[b]) continue;
+                        if (pret(b)) { choisi = b; break; }
+                    }
+                // CYCLE (aucun but prêt) : le modèle optimiste se contredit — on émet
+                // le premier restant plutôt que de boucler. `butActif()` exige une
+                // permutation complète.
+                if (choisi < 0)
+                    for (int b : ordre) if (!emis[b]) { choisi = b; break; }
+                emis[choisi] = true;
+                salleCourante = salle[choisi];
+                trie.append(choisi);
+            }
         }
         ordre = trie;
     }

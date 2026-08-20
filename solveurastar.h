@@ -90,9 +90,39 @@ public:
     // Le gel, testé seul le 2026-08-19, casse LUI AUSSI le niveau 6 — donc « gel=0
     // sur le 6 » dans la mesure combinée de 2026-08-04 ne disculpait rien : cette
     // table-ci n'a jamais non plus été mesurée seule. À faire AVANT toute promotion.
+    // ── RELÉGATION DES POUSSÉES SIMPLES ('relegueSimples' > 0, 2026-08-20).
+    //
+    // LE FAIT MESURÉ, et il est brutal : sur le niveau 16, le régime d'engagement
+    // rend **AUCUNE** — espace ÉPUISÉ, pas un budget — alors qu'une partie humaine
+    // GAGNANTE existe SOUS LE MÊME ORDRE (journal hybride du 2026-08-20). Les deux
+    // ne peuvent pas être vrais : le solveur ne peut pas atteindre cette ligne.
+    // Le journal dit pourquoi, sur 55 poussées vraiment choisies à la main, **23
+    // (42 %)** portent la mention `HORS REGIME MACRO : 1 macro engagee, le solveur
+    // ne genere aucune poussee simple`. Le coup humain n'est pas dans son arbre.
+    //
+    // Le §6.3 notait l'engagement comme une perte d'OPTIMALITÉ (« il ne génère que
+    // les macros vers le but actif et abandonne le reste »). C'est en réalité une
+    // perte de COMPLÉTUDE, et elle rend un niveau insoluble.
+    //
+    // LE CORRECTIF, dans la forme sûre du §6.4 : **dé-prioriser, jamais élaguer**.
+    // Quand une macro est engagée on enfile AUSSI les poussées simples, mais avec
+    // 'relegueSimples' ajouté à leur f — elles ne sont donc développées qu'une fois
+    // épuisé ce qui est meilleur. La complétude revient, le guidage reste.
+    //
+    // ⚠️ RÉGIME SÉPARÉ, JAMAIS LE DÉFAUT. Gonfler f est un weighted-A* local : ça
+    // change l'ordre de dépilement, donc le nombre d'états, donc le canari — sur
+    // les canaris (1, 2, 17) les poussées macro coïncident avec C\*, il n'y a rien
+    // à y gagner et tout à y perdre. L'optimalité était déjà abandonnée par
+    // l'engagement lui-même (§6.3) ; on ne la dégrade pas davantage, on récupère
+    // des solutions qui n'existaient pas.
+    //
+    // ⚠️ La valeur de 'relegueSimples' est un BUDGET À BALAYER, pas une constante à
+    // figer (méthode CORRAL_BUDGET du §6.2). Le mou étant toujours PAIR (§3), les
+    // paliers naturels sont 2, 4, 6 : +2 = « un recul de retard ».
     explicit SolveurAStar(const Game& etatDepart, int poids = 1, bool macro = false,
                           QObject* parent = nullptr, bool macroCouplage = false,
-                          bool plongeon = false, bool loi = false);
+                          bool plongeon = false, bool loi = false,
+                          int relegueSimples = 0);
 
 protected:
     void run() override;
@@ -152,8 +182,11 @@ private:
     // Repli : une poussée simple par direction légale, pour chaque caisse. Appelé
     // uniquement si tenteMacro() n'a rien produit (caisse coincée par la
     // congestion — la recherche doit d'abord démêler).
+    // 'bonusF' relègue les enfants produits en gonflant leur f (régime 'relegue',
+    // cf. le constructeur) ; 0 = enfilage normal, le comportement historique.
     template<typename Enfiler>
-    void poussesSimples(Game& etat, const QVector<quint8>& caisses, int gCur, Enfiler&& enfiler);
+    void poussesSimples(Game& etat, const QVector<quint8>& caisses, int gCur,
+                        Enfiler&& enfiler, int bonusF = 0);
 
     // LOI DE L'ORDRE (régime 'loi', cf. constructeur et game.h) : vrai si une caisse
     // se tient sur une case morte vue du but actif. Appelée aux DEUX points
@@ -168,6 +201,10 @@ private:
     const bool macroCouplage;
     const bool plongeon;
     const bool loi;
+    // RELÉGATION DES POUSSÉES SIMPLES (2026-08-20). 0 = régime d'engagement
+    // historique. > 0 = quand une macro est engagée, on enfile AUSSI les poussées
+    // simples, avec 'relegueSimples' ajouté à leur f. Cf. le constructeur.
+    const int relegueSimples;
 };
 
 #endif // SOLVEURASTAR_H

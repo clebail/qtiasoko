@@ -66,6 +66,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         wGame->showCasesMortesLoi(on);
     });
 
+    // Ordre par alignement : RECHARGER le niveau, ne pas rebasculer sur place. Le
+    // drapeau doit être posé sur le plateau de DÉPART (cf. onNiveauChange), et un
+    // rechargement remet en plus l'historique, le journal et l'état-max d'aplomb —
+    // tout ce qui décrit une partie jouée sous l'ANCIEN ordre et n'aurait plus de
+    // sens sous le nouveau. Une bascule en cours de partie laisserait ces états
+    // survivre à ce qui les justifiait, la forme habituelle du piège (§7).
+    connect(cbOrdreAlign, &QCheckBox::toggled, this, [this](bool) {
+        if (cbNiveau->currentIndex() >= 0) onNiveauChange(cbNiveau->currentIndex());
+    });
+
     for (const Solveur::SType& t : Solveur::types()) {
         cbSolveur->addItem(t.libelle, static_cast<int>(t.type));
     }
@@ -248,6 +258,19 @@ void MainWindow::onNiveauChange(int index) {
     Level lvl;
     lvl.load(cbNiveau->itemData(index).toString());
     game = Game(lvl, cbNiveau->itemData(index, RoleNumero).toInt());
+
+    // ORDRE PAR ALIGNEMENT (2026-08-19) — ce que le régime solveur `loi` arme dans
+    // Solveur::creer, armé ici sur le Game de l'UI pour pouvoir JOUER cet ordre en
+    // mode hybride. Sans ça l'interface affiche toujours l'ordre par défaut, même
+    // quand on lance le solveur en régime `loi` : il travaille sur sa propre copie.
+    // ⚠️ ICI, et pas au moment de la bascule : `ordreParPrecedence` lit `playerPoint`
+    // (garde LIVR_DURE=3, game.cpp) et les buts déjà posés, donc l'ordre dépend de la
+    // POSITION COURANTE. Recalculé en cours de partie il rendrait un autre ordre que
+    // celui du départ — c'est le piège §7 « charger une position de milieu de partie
+    // recalcule tout le statique », ici par la bande. D'où le rechargement complet à
+    // chaque bascule (connect ci-dessous) plutôt qu'un appel sur le plateau en cours.
+    if (cbOrdreAlign->isChecked()) game.setOrdreAlignement(true);
+
     gameDepart = game;               // origine de tout rejeu de journal (touche L)
 
     historique.clear();   // nouvel état de départ : l'undo ne doit pas franchir le chargement
@@ -455,10 +478,18 @@ void MainWindow::majRangsButs(const Game& g) {
     // ⚠️ Dire la SOURCE, pas seulement l'ordre : un `ordre_niveau_XXXX.txt` oublié
     // dans le répertoire ferait dépouiller la partie comme si l'ordre était celui du
     // solveur. Le journal se relit des jours plus tard, hors de tout contexte.
+    // Et dire de MÊME que l'ordre par alignement est armé : c'est un ordre calculé,
+    // donc indiscernable du défaut dans la trace, alors que ce n'est pas le même
+    // (sur le 10, 29 buts sur 32 changent de rang). Un interrupteur qui AJOUTE un
+    // comportement doit s'annoncer — §7, « un défaut coupé se voit tout de suite, un
+    // défaut manquant ne se voit jamais ».
     const QString injecte = Game::cheminOrdreInjecte(g.getNumNiveau());
+    const QString source = !injecte.isEmpty()
+                               ? QString("⚠ INJECTE depuis %1").arg(QFileInfo(injecte).fileName())
+                               : (g.getOrdreAlignement() ? QString("calcule ⚠ PAR ALIGNEMENT (regime loi)")
+                                                         : QString("calcule"));
     journal(QString("[hybride] ordre de remplissage %1 : %2")
-                .arg(injecte.isEmpty() ? QString("calcule")
-                                       : QString("⚠ INJECTE depuis %1").arg(QFileInfo(injecte).fileName()))
+                .arg(source)
                 .arg(lisible.join(" ")));
 }
 

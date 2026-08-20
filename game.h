@@ -192,6 +192,11 @@ public:
     // propres (2, 8, 9, 12, 21, 32). Recalcule `ordreButs` sur place, comme
     // `setOrdreLookahead` — donc à poser sur l'état de DÉPART. Jamais le défaut.
     void setOrdreAlignement(bool actif);
+    // Le drapeau en LECTURE, pour que l'UI dise dans le journal hybride SOUS QUEL
+    // ordre la partie a été jouée. Même raison d'être que `getOrdreButs()` : un
+    // journal se relit des jours plus tard, hors de tout contexte, et deux ordres
+    // différents y produiraient des traces indiscernables.
+    bool getOrdreAlignement() const { return ordreAlignement; }
     // Case (index plat) du but d'indice 'indexBut' — même indexation que
     // butActif()/ordreButs. Pour l'UI, qui a besoin d'une position à surligner.
     int getCaseBut(int indexBut) const { return goals[indexBut]; }
@@ -759,6 +764,53 @@ QVector<QVector<int>> precedenceGlobale() const;
 // `precedenceGlobale` — mais elle prévient exactement ce que la loi punira plus
 // tard, ce qui est le seul but de cette fonction.
 QVector<QVector<int>> precedenceAlignement() const;
+
+// MURAGE LOCAL (§6.2, la « précédence par approches ») : le but `idxBut` a-t-il
+// perdu sa DERNIÈRE approche, sachant que les cases marquées dans `bloque` sont
+// déjà occupées par des buts remplis ? Une approche du but G dans la direction d,
+// c'est { la caisse en G−d, le joueur en G−2d } — l'unique façon de poser une
+// caisse sur G par cette direction. Elle est VIABLE si les deux cases existent et
+// ne sont pas des murs, LIBRE si en plus aucune des deux n'est occupée.
+//
+// Rend vrai seulement si le but avait des approches viables et qu'il n'en reste
+// AUCUNE de libre. Un but sans aucune approche viable (inatteignable dès le
+// plateau nu) n'est PAS muré : rien à préserver, et le compter murerait tous les
+// ordres du niveau.
+//
+// ⚠️ EXEMPLAIRE UNIQUE (§7 : une règle écrite à deux endroits diverge). Ce test
+// vivait dans `mesures/ordre.cpp`, qui ne pouvait que CONSTATER le murage après
+// coup ; il est ici pour que `ordreParPrecedence` le prévienne, et l'outil
+// l'appelle désormais au lieu d'en garder une copie.
+//
+// ── ACCÈS DU JOUEUR (2026-08-20, contre-exemple utilisateur sur le niveau 18) ──
+// Le premier jet ne testait que l'OCCUPATION des deux cases, et c'était insuffisant :
+// une approche peut avoir ses deux cases libres et rester injouable si le joueur ne
+// peut pas ATTEINDRE l'appui. Cas prouvé — la poche haute du 18,
+// `{(8,2),(9,2),(9,1),(10,1),(9,3),(10,3)}`, n'a que deux portes, (8,1) et (10,2).
+// Remplir (10,3) exige une caisse en (10,2) — ce qui bouche la porte droite — et le
+// joueur en (10,1), donc DEDANS. Il ne peut y être entré que par (8,1). L'ordre
+// calculé plaçait (8,1) au rang 8 et (10,3) au rang 9 : mort à partir du rang 9,
+// et le test d'occupation seul n'y voyait rien, les deux cases (10,2)/(10,1) n'étant
+// même pas des buts.
+//
+// D'où le troisième temps : l'appui doit être JOIGNABLE par le joueur, dans le graphe
+// de marche où les obstacles sont les murs, les buts déjà remplis, ET LA CAISSE
+// elle-même posée sur la case d'approche — c'est elle qui referme la porte.
+//
+// ⚠️ TOUJOURS OPTIMISTE, donc toujours SOUND : le vrai jeu a davantage de caisses en
+// transit, donc une zone joueur PLUS PETITE que celle calculée ici. Une approche
+// déclarée injouable l'est réellement ; l'inverse n'est pas garanti (§6.2, la limite
+// « acheminement » demeure). Le joueur est pris à sa position de DÉPART : il ne peut
+// jamais quitter la composante d'où il part, donc sa zone réelle en est un sous-ensemble.
+//
+// ⚠️ Même famille que `porteGeneraliseeCoupe` (game.cpp, 2026-08-18) — « occuper un but
+// coupe l'accès du joueur » — mais applicable ICI, au calcul de l'ordre : `porteGeneralisee`
+// est DYNAMIQUE (elle interroge un état réel) alors que `ordreParPrecedence` raisonne
+// sur un modèle statique de buts posés. C'est le même théorème dans le modèle du dessus.
+public:
+bool butMureLocalement(int idxBut, const QVector<bool>& bloque,
+                       bool testeAccesJoueur = true) const;
+private:
 
 public:
 // Le fichier `ordre_niveau_XXXX.txt` du répertoire courant s'il existe, sinon "".

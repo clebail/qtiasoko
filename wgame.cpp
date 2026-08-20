@@ -308,12 +308,29 @@ void WGame::paintEvent(QPaintEvent *event) {
                             (montreOrdreButs && idx != caseButActif) ? 1 : 0);
             }
 
-            // CASES MORTES — aplat gris, peint EN PREMIER de toutes les surcouches.
+            // Zone du joueur : aplat VIOLET. ⚠️ Deux réglages payés d'un
+            // aller-retour : l'alpha était à 55 (invisible à l'écran, alors qu'il
+            // semblait suffisant en lisant le code) et la teinte était verte, donc
+            // à un cheveu du vert des macros jouables. Le violet n'est utilisé
+            // nulle part ailleurs, et 100 d'alpha se voit sans masquer le sprite.
+            // Ce qu'on vient y lire, c'est la DIFFÉRENCE entre deux instants :
+            // quelles cases s'ouvrent quand une caisse bouge (compte « Zj »).
+            if (idx < zoneJoueur.size() && zoneJoueur[idx]) {
+                painter.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
+                                  QColor(0x9c, 0x27, 0xb0, 100));
+            }
+
+            // CASES MORTES — aplat gris, peint APRÈS la zone du joueur et AVANT les
+            // trajets de macro (ordre changé le 2026-08-19, demande utilisateur).
             // C'est une propriété du décor (« ici une caisse serait perdue »), pas un
-            // événement : elle doit passer SOUS le trajet d'une macro ou la zone du
-            // joueur, qui eux se lisent par-dessus. Gris neutre, seule teinte encore
-            // libre — bleu = macro, violet = zone, vert = caisse amorçable, rouge =
-            // case signalée.
+            // événement : elle doit passer SOUS le trajet d'une macro, qui se lit
+            // par-dessus. Mais elle passe DESSUS la zone du joueur : celle-ci couvre
+            // presque tout le plateau accessible, donc en dessous le gris — surtout
+            // les 90 d'alpha du pâle — se noyait dans le violet là où les deux se
+            // superposent, c'est-à-dire à peu près partout. Deux aplats translucides
+            // ne se départagent pas par la teinte, seulement par l'ordre. Gris neutre,
+            // seule teinte encore libre — bleu = macro, violet = zone, vert = caisse
+            // amorçable, rouge = case signalée.
             //
             // DEUX GRIS, et la distinction est le fond de l'affaire (constat
             // utilisateur, 2026-08-04 : « c'était bien de voir TOUTES les cases mortes
@@ -336,18 +353,6 @@ void WGame::paintEvent(QPaintEvent *event) {
             if (idx < mortesLoi.size() && mortesLoi[idx]) {
                 painter.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
                                   QColor(0x30, 0x30, 0x30, 150));
-            }
-
-            // Zone du joueur : aplat VIOLET. ⚠️ Deux réglages payés d'un
-            // aller-retour : l'alpha était à 55 (invisible à l'écran, alors qu'il
-            // semblait suffisant en lisant le code) et la teinte était verte, donc
-            // à un cheveu du vert des macros jouables. Le violet n'est utilisé
-            // nulle part ailleurs, et 100 d'alpha se voit sans masquer le sprite.
-            // Ce qu'on vient y lire, c'est la DIFFÉRENCE entre deux instants :
-            // quelles cases s'ouvrent quand une caisse bouge (compte « Zj »).
-            if (idx < zoneJoueur.size() && zoneJoueur[idx]) {
-                painter.fillRect(QRectF(coin, QSizeF(SPRITE_WIDTH, SPRITE_HEIGHT)),
-                                  QColor(0x9c, 0x27, 0xb0, 100));
             }
 
             // Arbre de macro (Game::arbreMacro) : toutes les cases visitées

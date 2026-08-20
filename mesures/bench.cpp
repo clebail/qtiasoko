@@ -71,8 +71,19 @@ int main(int argc, char** argv) {
         (md == "ordre-look")? Solveur::AstarMacroCouplagePlongeonLook :
         (md == "ordre-dyn")? Solveur::AstarMacroCouplagePlongeonOrdre :
         (md == "loi")     ? Solveur::AstarMacroCouplagePlongeonLoi :
+        (md == "relegue") ? Solveur::AstarMacroCouplagePlongeonRelegue :
+        (md == "loi-relegue") ? Solveur::AstarMacroCouplagePlongeonLoiRelegue :
         (md == "pondere" || md == "2") ? Solveur::AstarPondere :
         (md == "bfs")     ? Solveur::Bfs          : Solveur::Astar;
+
+    // RELEG_F : la pénalité de relégation, à BALAYER (§6.2, méthode CORRAL_BUDGET).
+    // Lue dans le HARNAIS et poussée dans le solveur, jamais lue par le solveur —
+    // sinon l'app, lancée par un launcher, tournerait avec une autre valeur que le
+    // bench sans que rien ne le signale (§7).
+    if (qEnvironmentVariableIsSet("RELEG_F")) {
+        Solveur::penaliteRelegation = qEnvironmentVariableIntValue("RELEG_F");
+        fprintf(stderr, "[RELEG] penalite de relegation = %d\n", Solveur::penaliteRelegation);
+    }
 
     Level level;
     level.load(parChemin ? arg1

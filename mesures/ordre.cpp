@@ -106,6 +106,7 @@ int main(int argc, char** argv) {
     // --- DÉROULÉ : à son tour, ce but a-t-il encore une approche libre ? ----------
     printf("\nDéroulé de l'ordre (une approche = caisse en G−d, joueur en G−2d) :\n");
     QSet<int> remplis;                       // cases des buts déjà posés
+    QVector<bool> bloque(L * H, false);      // le même, sous la forme qu'attend Game
     int premierMurage = -1;
     for (int k = 0; k < ordre.size(); k++) {
         const int b = ordre[k], G = game.getCaseBut(b);
@@ -132,13 +133,32 @@ int main(int argc, char** argv) {
             }
         }
 
-        const bool mure = (viables > 0 && libres == 0);
+        // LE VERDICT VIENT DÉSORMAIS DU MOTEUR (§7 : une règle écrite à deux endroits
+        // diverge). La boucle ci-dessus ne sert plus qu'au DÉTAIL lisible (quelles
+        // directions, bouchées par qui) — que `Game::butMureLocalement` ne rend pas.
+        // Les deux sont confrontés à chaque rang : c'est exactement la confrontation
+        // réplique/original qui avait localisé le bug du demi-tour (§7, 2026-08-07),
+        // et elle ne coûte rien ici.
+        const bool mure = game.butMureLocalement(b, bloque);
+        // La boucle ci-dessus ne teste que l'OCCUPATION des deux cases ; le moteur
+        // teste EN PLUS l'accès du joueur à l'appui (game.h). Le moteur est donc
+        // strictement plus sévère, et l'invariant à vérifier est cette ASYMÉTRIE :
+        // tout murage vu par l'outil doit l'être par le moteur, jamais l'inverse.
+        // L'inverse, lui, est le cas normal — c'est le murage par accès, que l'outil
+        // ne sait pas nommer et que le moteur signale ci-dessous.
+        const bool mureOccupation = (viables > 0 && libres == 0);
+        if (mureOccupation && !mure)
+            printf("  ⚠️ DIVERGENCE outil/moteur sur %s au rang %d : l'outil voit un murage "
+                   "que le moteur ne voit pas — l'un des deux est faux\n", qPrintable(xy(G)), k);
+        if (mure && !mureOccupation)
+            coupables = " (aucune case occupée : c'est l'ACCÈS DU JOUEUR à l'appui qui est coupé)";
         if (mure && premierMurage < 0) premierMurage = k;
         printf("  %2d. but %-8s  approches viables=%d  libres=%d  %s%s\n",
                k, qPrintable(xy(G)), viables, libres,
                mure ? "  <<< MURÉ, bouché par :" : (libres ? qPrintable(detail) : "  (aucune approche viable — but INATTEIGNABLE dès le départ)"),
                mure ? qPrintable(coupables) : "");
         remplis.insert(G);
+        bloque[G] = true;
     }
 
     // --- PRÉCÉDENCE GLOBALE : le TRAJET DE TIRAGE, pas seulement le dernier pas ---

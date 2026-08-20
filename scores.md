@@ -521,3 +521,45 @@ trois restrictions dans `journal-ordre.md`, 2026-08-08.
 non plus que les solves obtenus avec un `ordre_niveau_XXXX.txt` injecté — non reproductibles avec le
 binaire par défaut. Le **27 sortait de cette catégorie jusqu'à aujourd'hui** ; il en sort par le
 régime, pas par l'injection.
+
+---
+
+## 🔄 Re-mesure de référence, 2026-08-19 — `92f3ecd` (aucun niveau neuf)
+
+**Pourquoi ce tableau existe** : les chiffres de juillet ont vieilli d'un facteur qui rend toute
+comparaison à eux trompeuse. Le **10** portait `2 175 724` états (`703f851`, confirmé sur Linux à
+l'unité le 2026-07-31) ; le même run rend **249 913** aujourd'hui — **×8,7**. Les chantiers mémoire
+d'août et `ordre-look` sont passés entre les deux. Un `÷3,81` a été annoncé sur la base de la ligne
+écrite avant qu'un témoin ne le réduise à néant (cf. `plan.md` §7, piège neuf du jour).
+Conformément à la règle du §1, **rien n'est corrigé au-dessus** : on ajoute.
+
+Toutes les lignes : `mesures/bench <niv> <mode>`, Linux, binaire reconstruit à `92f3ecd`
+(les modifs UI en cours ne touchent pas le solveur).
+
+| Niveau | Mode | Nb État | Nb Poussé | Nb Coups |
+|---|---|---|---|---|
+| 10 | `coupl-plongeon` | **249 913** | 544 | 1 573 |
+| 11 | `coupl-plongeon` | 13 913 047 | 243 | 947 |
+| 17 | `coupl-plongeon` | 18 636 | 213 | 561 |
+| 21 | `coupl-plongeon` | 2 922 383 | 159 | 592 |
+| 32 | `coupl-plongeon` | 6 591 366 | 153 | 577 |
+
+**Le régime `loi` sur les mêmes niveaux** — ⚠️ **il en CASSE deux**, et ces lignes ne sont donc
+pas des scores mais un relevé de régression :
+
+| Niveau | `loi` | contre défaut |
+|---|---|---|
+| 11 | 13 913 050 / 243 p. | +3 états — neutre (⚠️ à confirmer, cf. l'anomalie des +3 dans `plan.md` §6.0) |
+| 17 | 18 639 / 213 p. | +3 états — neutre (même réserve) |
+| **21** | **rien en 2 400 s**, mur `max 10/13` | ❌ le défaut le fait en **542 s** |
+| **32** | **rien en 2 400 s**, mur `max 10/15` | ❌ le défaut le fait en **687 s** |
+
+⚠️ **2 400 s est un BUDGET, pas une preuve** : « ne résout pas en 4,4× le temps du défaut » ≠
+« ne résout jamais » (§6.6). Et `PRUNES=0` sur les quatre : la loi n'y coupe rien, ces régressions
+viennent de l'**ordre** (`precedenceAlignement`), pas de l'élagage.
+
+**Le 10 en régime `loi` + ordre corrigé injecté : `OK etats=571053 poussees=544 coups=1563`** —
+✅ il RÉSOUT, ce qui ferme le point 🔴 du `plan.md` (« le 10 en régime `loi` ne converge pas »),
+mais ⚠️ **NON ÉLIGIBLE comme score** au titre de la règle ci-dessus : ordre injecté par
+`ordre_niveau_0010.txt`, donc non reproductible avec le binaire seul. Et il reste **2,3× au-dessus
+du défaut** (571 053 contre 249 913), à poussées égales et par le même plongeon gagnant.
