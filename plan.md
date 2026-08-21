@@ -95,6 +95,7 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `portegen <niv\|plateau.xsb>` | **(neuf, 2026-08-18) LE PORTE GÉNÉRALISÉ** — `Game::porteGeneraliseeCoupe(idxCaisse, idxBut)` (game.cpp). Généralise `porteBloquee` : au lieu des seuls appuis de LA caisse, teste si occuper un but coupe l'accès du joueur à N'IMPORTE QUELLE AUTRE caisse non livrée ou but non rempli — un point d'articulation du graphe de marche COURANT (toutes les caisses réellement posées comme obstacles), pas la géométrie du départ seule. ⚠️ **DYNAMIQUE** contrairement à `porteBloquee` : deux flood-fills par appel, à interroger sur un état (`.xsb` de milieu de partie, comme `bench`/`ordre`/`pas0`), pas seulement un départ. Validé bit-à-bit contre le mineur `stock.py cut` sur les 10 tenues du niveau 27 (2 positifs, 8 négatifs, 10/10 identiques) |
 | `fpporte.py [niv…]` | **(neuf, 2026-08-18) LE JUGE FP DU PORTE GÉNÉRALISÉ** — même protocole que `fp`/`juge_loi.py` : rejoue la dernière partie GAGNÉE de chaque niveau, teste le prédicat sur chaque livraison réelle, toute détection est un faux positif prouvé. **0 FP sur 1 650 livraisons, 28 niveaux.** ⚠️ Ne teste QUE la DERNIÈRE poussée de chaque caisse (sa position finale) — les poses de PASSAGE (une caisse qui transite par plusieurs buts d'un couloir aligné avant sa destination réelle) ne sont pas des livraisons ; les confondre a produit ~100 faux positifs bidons au premier jet (cf. §7) |
 | `ampleurporte.py` / `ampleurporte2.py [niv…]` | **(neuf, 2026-08-18) L'AMPLEUR DU MOTIF** — `ampleurporte.py` (premier jet, RÉFUTÉ comme signal) scanne TOUTES les paires (caisse × but) à chaque jalon : 71 % coupées, mais **ne discrimine rien** — résolus et non-résolus touchés aux mêmes taux (67-81 % partout), signal trivial de géométrie (coins disjoints). `ampleurporte2.py` restreint au SEUL but que `butActif()` choisirait réellement (rang minimal de `getOrdreButs()`, lu via l'outil `ordre` — jamais recalculé en Python, trop de règles) : **17/435 jalons (3,9 %)**, 9 niveaux sur 28 touchés, dont plusieurs non-résolus (13, 14, 15, 22, 25) avec des coupures parfois massives (10 caisses/7 buts sur le 25) |
+| `ordredp <niv\|fichier.xsb> [--avant x,y,… --apres x,y,…]` | **(neuf, 2026-08-21, non commité) LE GOAL-ORDERING PROUVÉ, PAS DEVINÉ.** DP par sous-ensembles (schéma Held-Karp) sur `Game::butMureLocalement`, qui ne dépend que du SOUS-ENSEMBLE de buts posés, jamais de l'ordre — donc « un ordre sans murage existe-t-il » est une pure accessibilité dans le treillis des 2^n parties, mémoïsable. Contrainte dure = la seule précédence PROUVÉE (`precedenceGlobale`, via `PrecedencePaires::atteintUneCaisse`) ; l'alignement (indice) est exclu exprès. Rend un ordre témoin (**SAT**) ou une preuve d'impossibilité (**UNSAT**, tout le treillis atteignable épuisé — jamais un budget ambigu). Remplace directement le retour arrière à budget fixe de `ordreParPrecedence`, dont le budget de 500 s'est révélé insuffisant même sur l'ordre PAR DÉFAUT (13, 23 — §6.0, 2026-08-21). ⚠️ Coût O(2^n) : praticable jusqu'à ~24-27 buts (niveau 22 : 610 270 états, 196 s) ; hors de portée pour le niveau 10 (32 buts) sans décomposition par composantes connexes. ⚠️ **PROUVE UNE CONDITION NÉCESSAIRE, PAS SUFFISANTE** — un ordre SAT peut rester injouable, `butMureLocalement` ignorant les caisses non livrées comme obstacles (réfuté en direct sur le 22, cf. §6.0) |
 
 **Règles de mesure, non négociables :**
 - **Comparer un binaire à un AUTRE binaire** (ancien reconstruit depuis `HEAD` via
@@ -391,6 +392,131 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 ## 6. Pistes à explorer
 
 ### 6.0 Feuille de route — ordre de reprise (décidé le 2026-07-17)
+
+> 🎯 **SESSION DU 2026-08-21 — LE GOAL-ORDERING N'EST PLUS LE FACTEUR LIMITANT ; DEUX
+> CHANTIERS NOUVEAUX, DISTINCTS DE LA LOI DE L'ORDRE.** Partie de la conviction
+> utilisateur *« la loi de l'ordre aidera, mais il faut d'abord un goal-ordering le
+> plus parfait possible »* — la session finit par la déplacer : on sait aujourd'hui
+> produire un ordre quasi-parfait, et ça ne suffit toujours pas à faire avancer le
+> solveur. **Rien n'est commité** ; fichiers neufs listés au point 7.
+>
+> **1. LE BUDGET DE 500 DU RETOUR ARRIÈRE (`Game::ordreParPrecedence`, game.cpp) EST UN
+> BUG, PAS UN COMPROMIS.** La recherche protégée (§ session du 2026-08-20, `pileTri`)
+> sature son budget sur le niveau 10 en régime `loi` et retombe sur l'ancien glouton
+> murant — mais en instrumentant (`TRACE_ORDRE`, compteur `budgetTri` restant), monter
+> le budget à ~4000 la fait **converger vers EXACTEMENT l'ordre injecté à la main la
+> veille** ((17,2) au rang 28). **Pur manque de budget, zéro nouvelle règle.**
+> ⚠️ **Plus grave : le MÊME bug touche l'ordre PAR DÉFAUT** (pas seulement `loi`) sur
+> les niveaux **13 et 23** — `ordre 13`/`ordre 23` sans rien activer rendent un ordre
+> **MURÉ** (13 au rang 11, 23 au rang 17), parce que la recherche sature à 500 même en
+> régime par défaut et retombe sur le glouton non protégé. Monté à 50 000, toujours pas
+> de convergence sur ces deux-là (cf. point 3). Ces deux niveaux ne sont dans aucun
+> canari (non résolus), donc rien ne l'avait signalé.
+>
+> **2. OUTIL NEUF (non commité) `mesures/ordredp.cpp`/`.pro` — DP PAR SOUS-ENSEMBLES,
+> REMPLACE LE « BUDGET ÉPUISÉ » AMBIGU PAR UNE PREUVE.** Constat qui le permet :
+> `Game::butMureLocalement(h, bloque)` ne dépend QUE de l'ensemble des buts déjà posés
+> (`bloque`), JAMAIS de l'ORDRE dans lequel on les a posés (position de départ du
+> joueur fixe, géométrie fixe). Donc « existe-t-il un ordre total sans murage » est une
+> pure question d'ACCESSIBILITÉ dans le graphe des 2^n sous-ensembles — le schéma de
+> calcul de Held-Karp (DP du TSP/chemin hamiltonien), simplifié : pas besoin de retenir
+> « le dernier visité », seulement « quels buts sont posés ». BFS mémoïsé sur le
+> bitmask, contrainte dure = la seule précédence PROUVÉE (`precedenceGlobale`, rejouée
+> via l'exemplaire unique `PrecedencePaires::atteintUneCaisse` déjà partagé avec
+> `ordre.cpp` — la précédence par ALIGNEMENT, indice et non preuve, est exclue exprès :
+> elle biaiserait vers un ordre, elle ne prouverait rien sur l'EXISTENCE d'un ordre
+> sûr). Rend soit un ordre témoin (SAT), soit **UNSAT PROUVÉ** (tout le treillis
+> atteignable épuisé, pas un budget). ⚠️ Coût O(2^n) : praticable jusqu'à ~24-27 buts
+> (niveau 22, 27 buts, 610 270 états explorés sur 134 M au plafond, ~196 s ; accepte des
+> contraintes manuelles `--avant x,y,... --apres x,y,...` pour tester une hypothèse
+> humaine sans relancer tout l'outil). **Hors de portée tel quel pour le niveau 10** (32
+> buts) — décomposition par composantes connexes non tentée.
+>
+> **3. RÉSULTAT DU DP SUR LES 13 NON-RÉSOLUS TESTABLES (≤27 buts) : 11 SAT, 2 UNSAT
+> PROUVÉ.** SAT (un ordre sans murage existe, souvent en quelques centaines à quelques
+> milliers d'états) : **13, 14, 15, 16, 19, 20, 22, 24, 25, 28, 29, 30, 31** — 21 et 32
+> revérifiés SAT en contrôle. **UNSAT PROUVÉ** (tout le treillis atteignable épuisé,
+> aucune permutation ne marche) : **18** (confirme le diagnostic déjà écrit au point 8
+> de la session du 2026-08-20 — sa solution RESSORT des caisses de buts déjà remplis,
+> aucune permutation ne peut l'écrire) et **23** (même famille, non documenté avant
+> aujourd'hui). Conséquence : sur 13 niveaux, **le goal-ordering n'est le facteur
+> bloquant que pour 2 d'entre eux** — pour les 11 autres, un ordre sûr existe déjà.
+>
+> **4. MAIS MURAGE-FREE ≠ JOUABLE — RÉFUTÉ EN DIRECT SUR LE 22, DEUX FOIS DE SUITE**
+> (diagnostic utilisateur, jeu à la main). Le premier ordre SAT du DP bute : l'utilisateur
+> ne peut plus poser (13,9) ni (12,9). Un second ordre, sous contrainte manuelle
+> (« 10,9 12,9 13,9 avant 7,8 8,8 9,8 10,8 »), bute à nouveau : **« le joueur ne peut
+> plus atteindre la case d'appui »**. Cause identifiée : `butMureLocalement` ne bloque,
+> dans son flood-fill d'accessibilité, QUE les murs et les buts déjà remplis — **jamais
+> les autres caisses non livrées qui traînent sur le plateau**, alors que dans le vrai
+> jeu chacune est un obstacle. C'est déjà écrit dans le commentaire de `game.h` (« le
+> vrai jeu a davantage de caisses en transit, donc une zone joueur PLUS PETITE que
+> celle calculée ici ») — deux ordres de suite viennent de le vérifier en pratique. Le
+> DP prouve une condition NÉCESSAIRE, jamais SUFFISANTE.
+>
+> **5. LE 22 A UNE VICTOIRE HUMAINE DÉJÀ ENREGISTRÉE, JAMAIS EXPLOITÉE.**
+> `hybride_niveau_0022.txt` contient une partie gagnée (1592 coups, ligne 3770 : `[hybride]
+> aucun but actif (etat gagne)`), jamais mentionnée dans les tableaux du plan (le 22 est
+> classé non-résolu au sens `scores.md`, une victoire humaine ne compte pas). Rejouée et
+> validée par `taches.rejoue` (script Python ad hoc, à rapatrier si ça resert — cf. §7 sur
+> les scratchpads perdus), l'ORDRE DE LIVRAISON FINALE réel :
+> `(7,9)(8,9)(9,9)(13,9)(12,9)(7,6)(8,6)(9,6)(13,6)(12,6)(11,6)(8,7)(9,7)(13,7)(12,7)(11,7)
+> (9,8)(8,8)(7,8)(11,8)(12,8)(13,8)(14,8)(10,6)(10,7)(10,8)(10,9)`.
+> Confirme la moitié de l'hypothèse utilisateur ((13,9)/(12,9) tôt) et la corrige sur
+> l'autre : **(10,9) sort en TOUT DERNIER**, avec toute la colonne x=10 réservée à la fin
+> et remplie de haut en bas — vraisemblablement le vrai corridor d'accès du joueur,
+> gardé ouvert jusqu'au bout. Confirmé sans murage par `ordre 22` (contrôle de
+> cohérence : un ordre réellement joué ne peut pas violer une preuve).
+>
+> **6. INJECTÉ DANS LE VRAI SOLVEUR : ÉCHEC INSTRUCTIF, PAS UNE IMPASSE DE NIVEAU.**
+> `ordre_niveau_0022.txt` (non commité, l'ordre du point 5) + `bench 22 coupl-plongeon` :
+> **zéro progression en 40 000 états** (`max` reste à 0/27) — même symptôme que le 16 en
+> juillet, la même cause probable (§6.0 du 2026-08-20, point 6 : le régime d'engagement
+> ne génère AUCUNE poussée simple tant qu'une macro est jouable ailleurs, donc les
+> poussées de préparation d'une partie humaine longue n'existent pas dans son arbre).
+> `bench 22 relegue` (le correctif du 16) démarre (`max` 0→2 en 3000 dépilements) puis
+> **plafonne à 2/27 pendant tout le budget de 25 min** (10,2 M dépilements, 18,9 M états
+> vus, 1,25 Go). **Diagnostic par export + `pas0` (pas une déduction) :** l'état à
+> `max=2` n'a PAS livré (7,9)/(8,9) (les rangs 0-1 de l'ordre injecté) mais **(13,8) et
+> (14,8)** (rangs 22-23, presque la fin) — la relégation n'IMPOSE rien, elle
+> dé-priorise juste, donc les poussées simples reléguées partent n'importe où. Résultat
+> visible sur l'image exportée : le joueur s'isole tout en haut du plateau, le corridor
+> d'alimentation du bas se reconfigure en amas, et `pas0` confirme qu'**aucun but n'est
+> plus amorçable** depuis cet état. **Ce n'est donc pas la congestion irréductible du
+> §3/§4** qui plafonne ici — c'est la relégation qui laisse le solveur diverger du plan
+> avant même d'avoir essayé de le suivre.
+> ⚠️ **Piège retrouvé en le refaisant** : charger un `.xsb` exporté PAR CHEMIN met
+> `numNiveau=0`, donc `cheminOrdreInjecte` cherche `ordre_niveau_0000.txt`, pas
+> `_0022.txt` — sans copier le fichier sous ce nom, `pas0`/`ordre` recalculent un ordre
+> par défaut sans rapport (§7, « charger une position de milieu de partie recalcule
+> tout le statique », variante inédite : ça vaut aussi pour l'injection).
+>
+> **7. FICHIERS NEUFS, NON COMMITÉS** : `mesures/ordredp.cpp` + `.pro` (le DP, avec son
+> option `--avant/--apres` de contrainte manuelle et son log de progression chronométré
+> `QElapsedTimer`), `mesures/ordre_niveau_0022.txt` (l'ordre miné du point 5, prêt à
+> être rejoué ou archivé dans `mesures/ordres_humains/`).
+>
+> **CE QUI RESTE À FAIRE — DEUX CHANTIERS, DISTINCTS ET NI L'UN NI L'AUTRE N'EST LA LOI
+> DE L'ORDRE :**
+> - **CHANTIER A (sûr, petit)** — corriger le budget de `ordreParPrecedence` : soit le
+>   monter (combien ? le 10 convergeait à ~4000, le 13/23 pas même à 50 000 — donc une
+>   constante plus haute ne suffit pas partout), soit brancher le DP du point 2 en
+>   remplacement pour les niveaux où 2^n reste praticable (≤ ~24 buts), avec repli sur
+>   la recherche à budget seulement au-delà. Gain immédiat attendu : 10 réparé sans
+>   injection manuelle ; 13/23 à revérifier une fois la vraie précédence calculée (ils
+>   pourraient rester murés pour une AUTRE raison, cf. UNSAT du point 3 — non, 13 est
+>   SAT, seul 23 est UNSAT parmi les deux ; donc 13 devrait se réparer, 23 restera muré
+>   quoi qu'il arrive).
+> - **CHANTIER B (gros, ouvert, condition réelle pour juger la loi de l'ordre)** — un
+>   régime qui **respecte** un ordre donné, pas seulement qui le calcule puis regarde
+>   ailleurs dès qu'une poussée simple est nécessaire. Le point 6 prouve que ni le
+>   régime par défaut (aucune poussée simple hors macro) ni `relegue` (poussées simples
+>   libres, juste dé-priorisées) ne suffisent : il faudrait quelque chose comme
+>   « dé-prioriser une poussée simple proportionnellement à son écart à l'ordre demandé »
+>   plutôt qu'un `bonusF` fixe indifférent à la cible. Tant que ce chantier n'est pas
+>   fait, on ne peut pas dire si un bon ordre (prouvé, ou miné d'une partie humaine)
+>   AIDERAIT le solveur — on sait seulement qu'aujourd'hui, il ne peut même pas essayer
+>   de le suivre.
 
 > 🔴 **SESSION DU 2026-08-20 — LA LOI DE L'ORDRE EST RÉFUTÉE, ET LE RÉGIME D'ENGAGEMENT
 > EST INCOMPLET.** Rien n'est commité ; l'arbre de travail porte tout ce qui suit.
