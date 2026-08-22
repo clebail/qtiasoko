@@ -695,7 +695,10 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 > **12. LE 16, MINÉ (partie gagnée à la main par l'utilisateur, 196 poussées).**
 > L'ordre joué **est l'ordre align**, donc sa jouabilité est PROUVÉE (§6.6 :
 > 0 inversion prouve, un grand nombre ne prouve rien) — première preuve de ce genre
-> pour `precedenceAlignement`. Profil macro : aucune macro des poussées 0→19, trous
+> pour `precedenceAlignement`. ⚠️ **Jouable n'est pas solvable** : un ordre prouvé bon ne
+> garantit pas que le solveur ira au bout, un ordre prouvé mauvais garantit qu'il n'ira
+> pas (§6.6, asymétrie du 2026-08-22) — et `bench 16 loi` sous cet ordre prouvé rend
+> bien AUCUNE. Profil macro : aucune macro des poussées 0→19, trous
 > jusqu'à 60, puis **120 poussées d'affilée** avec macro, un nœud de 5 poussées à
 > 180-184. **Fixtures exportées** : `p19` → `bench … macro` rend **AUCUNE** (0,05 s) ;
 > `p60` → **OK en 106 états** ; `p180` → OK en 8 états. **Toute la difficulté du 16 est
@@ -1474,6 +1477,26 @@ vrai partout.
 > restants (22, 13, 27, 15, 18, 14, 26) sont **non vérifiés**, pas réfutés. Corollaire : le verrou du
 > 12 n'est PAS son ordre — `pas0` montre que les deux ordres échouent au démarrage **à l'identique**
 > (même caisse, même case de blocage). Détail en [journal-ordre.md](journal-ordre.md), 2026-08-07 suite.
+
+> ⚠️ **ET L'ASYMÉTRIE SE RETOURNE UNE FOIS L'ORDRE INSTALLÉ DANS LE SOLVEUR** (idée utilisateur,
+> 2026-08-22). Sur la JOUABILITÉ, c'est 0 inversion qui prouve (ci-dessus). Sur le SOLVE, c'est
+> l'inverse : **un ordre prouvé BON ne garantit pas que le solveur ira au bout — un ordre prouvé
+> MAUVAIS garantit qu'il n'ira pas.** Un bon ordre n'est qu'une condition parmi d'autres (il reste
+> tout le régime : macro, couplage, mémoire, budget) ; un ordre qui MURE un but ferme la seule
+> porte de sortie, quoi que fasse le reste.
+> - Côté « bon, et pourtant rien » : le **16** (§6.0, 2026-08-20) — son ordre align est prouvé
+>   jouable par une partie humaine gagnante de 196 poussées qui le suit, et `bench 16 loi` rend
+>   pourtant **AUCUNE**, espace **ÉPUISÉ** (pas un budget), à cause du régime d'engagement.
+> - Côté « mauvais, donc mort » : le **murage local** (§6.0, points 1 et 7) — le plateau du 21
+>   mort à 7/13 avec deux buts qu'aucune poussée ne peut plus atteindre, le verrou (17,2) du 10,
+>   la poche haute du 18. Là, le verdict tombe **sans lancer le solveur**.
+>
+> **Conséquence sur le plan d'expérience, et c'est la raison d'être de cette note** : chercher le
+> MURAGE est le seul test d'ordre qui rende un verdict DÉFINITIF pour un coût quasi nul — il se
+> décide statiquement. Vouloir au contraire valider un ordre par un run qui aboutit, c'est faire
+> porter à l'ordre le succès de tout le solveur, et un budget épuisé ne réfute rien (§6.0 point 4 :
+> 1 800 s sur le 32 avec l'ordre align injecté, « un budget, pas une preuve »). Donc : **trier les
+> ordres par élimination** (murage, murage par accès du joueur), jamais par sélection.
 
 > ⚠️ **LA LOI DE L'ORDRE EST LE CONTRE-EXEMPLE VIVANT DE CE TABLEAU** (2026-08-07). Mesurée pour la
 > première fois en GAIN — et non plus seulement en justesse — elle rend **÷2,98 en états et ÷2,06 en
