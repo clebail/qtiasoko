@@ -52,34 +52,10 @@
 // Même teinte que le fond de l'UI (wgame.cpp).
 static const QColor fondSable(222, 205, 180);
 
-// Flood-fill 4-connexe depuis le joueur, à travers tout ce qui n'est pas un mur.
-// Copié du contrat de WGame::calculeInterieur : les caisses ne bloquent pas, elles
-// bougent — le contour du plateau, lui, ne bouge pas.
-static QVector<bool> calculeInterieur(const Game& g) {
-    const int L = g.getLargeur(), H = g.getHauteur();
-    QVector<bool> dedans(L * H, false);
-    const QPoint p = g.getPlayerPoint();
-    if (p.x() < 0 || p.x() >= L || p.y() < 0 || p.y() >= H) return dedans;
-
-    static const int dx[] = {0, 1, 0, -1}, dy[] = {-1, 0, 1, 0};
-    QVector<int> pile;
-    const int depart = p.x() + p.y() * L;
-    dedans[depart] = true;
-    pile.append(depart);
-    while (!pile.isEmpty()) {
-        const int c = pile.takeLast();
-        const int cx = c % L, cy = c / L;
-        for (int d = 0; d < 4; d++) {
-            const int nx = cx + dx[d], ny = cy + dy[d];
-            if (nx < 0 || nx >= L || ny < 0 || ny >= H) continue;
-            const int n = nx + ny * L;
-            if (dedans[n] || g.getCase(n) == Level::tcMur) continue;
-            dedans[n] = true;
-            pile.append(n);
-        }
-    }
-    return dedans;
-}
+// L'INTÉRIEUR vient du MOTEUR (`Game::interieur()`, game.cpp) depuis le
+// 2026-08-22 : cet outil en portait une copie, et le moteur en a désormais
+// l'exemplaire unique (§7) — avec le repli sur un but quand le plateau n'a pas de
+// joueur, que la copie locale n'avait pas.
 
 int main(int argc, char** argv) {
     // QGuiApplication et non QCoreApplication : QPixmap exige une couche graphique.
@@ -179,7 +155,7 @@ int main(int argc, char** argv) {
     Goal       but;
     Player     perso;
 
-    const QVector<bool> dedans = calculeInterieur(g);
+    const QVector<bool> dedans = g.interieur();
 
     // ── LA LOI DE L'ORDRE, exactement comme l'UI la peint ───────────────────────
     // Deux gris DISTINCTS, et c'est délibéré (cf. wgame.cpp) : les cases mortes
@@ -260,8 +236,16 @@ int main(int argc, char** argv) {
     }
 
     // Couche 3 — le perso, par-dessus la grille posée.
+    // ⚠️ SEULEMENT S'IL Y EN A UN. Sans joueur, `playerPoint` vaut (0,0) et le
+    // perso se faisait dessiner dans le coin, sur un mur — un plateau de ZONE
+    // (mesures/zonembut) n'a pas de joueur, et l'image mentait. On relit la case
+    // plutôt que de croire le point.
     const QPoint pj = g.getPlayerPoint();
-    perso.dessine(p, QPointF(pj.x() * SPRITE_WIDTH, pj.y() * SPRITE_HEIGHT));
+    const int idxJoueur = pj.x() + pj.y() * L;
+    if (pj.x() >= 0 && pj.x() < L && pj.y() >= 0 && pj.y() < H
+        && (g.getCase(idxJoueur) == Level::tcPlayer
+            || g.getCase(idxJoueur) == Level::tcGoalPlayer))
+        perso.dessine(p, QPointF(pj.x() * SPRITE_WIDTH, pj.y() * SPRITE_HEIGHT));
     p.end();
 
     if (!img.save(sortie)) {

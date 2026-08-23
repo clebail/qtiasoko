@@ -1731,6 +1731,441 @@ QVector<int> Game::sallesDeButs() const {
     return salle;
 }
 
+// L'INTÉRIEUR DU PLATEAU (cf. game.h). Le dehors d'un `.xsb` est fait d'espaces :
+// sans ce flood, « non-mur » désigne aussi le remplissage hors contour, et toute
+// mesure de géométrie déborde du plateau.
+QVector<bool> Game::interieur() const {
+    QVector<bool> dedans(size, false);
+    if (!cases) return dedans;
+    // ⚠️ SANS JOUEUR, `playerPoint` vaut (0,0) — le coin, donc un MUR sur tout
+    // plateau normal — et le flood partirait d'une case qui n'existe pas, en la
+    // déclarant intérieure au passage. Ça arrive pour de vrai : un `.xsb` de zone
+    // produit par `mesures/zonembut` n'a pas de joueur. Repli sur un but, qui est
+    // intérieur par construction.
+    int depart = playerPoint.x() + playerPoint.y() * largeur;
+    if (playerPoint.x() < 0 || playerPoint.x() >= largeur
+        || playerPoint.y() < 0 || playerPoint.y() >= hauteur
+        || cases[depart] == Level::tcMur)
+        depart = goals.isEmpty() ? -1 : goals.first();
+    if (depart < 0 || cases[depart] == Level::tcMur) return dedans;
+
+    static const int dx[4] = {1, -1, 0, 0}, dy[4] = {0, 0, 1, -1};
+    QVector<int> pile;
+    dedans[depart] = true;
+    pile.append(depart);
+    while (!pile.isEmpty()) {
+        const int c = pile.takeLast();
+        const int cx = c % largeur, cy = c / largeur;
+        for (int d = 0; d < 4; d++) {
+            const int nx = cx + dx[d], ny = cy + dy[d];
+            if (nx < 0 || nx >= largeur || ny < 0 || ny >= hauteur) continue;
+            const int n = nx + ny * largeur;
+            if (dedans[n] || cases[n] == Level::tcMur) continue;
+            dedans[n] = true;
+            pile.append(n);
+        }
+    }
+    return dedans;
+}
+
+// LES ZONES D'EMBUT (cf. game.h pour les trois étages et ce que ça ne prouve pas).
+// Statique, O(size × buts), appelé hors du chemin chaud : aucun réglage à faire
+// entrer dans le solveur, aucune table à maintenir.
+QVector<Game::ZoneEmbut> Game::zonesEmbut(int seuilCulDeSac) const {
+    QVector<ZoneEmbut> zones;
+    if (!cases || nbButs == 0) return zones;
+
+    const QVector<bool> dedans = interieur();
+    static const int dx[4] = {1, -1, 0, 0}, dy[4] = {0, 0, 1, -1};
+    auto voisin = [&](int c, int d) -> int {
+        const int x = c % largeur + dx[d], y = c / largeur + dy[d];
+        if (x < 0 || x >= largeur || y < 0 || y >= hauteur) return -1;
+        return x + y * largeur;
+    };
+    auto estBut = [&](int c) {
+        return cases[c] == Level::tcGoal || cases[c] == Level::tcGoalCaisse
+            || cases[c] == Level::tcGoalPlayer;
+    };
+
+    // ÉTAGE 2 — LES GOULOTS. Au plus deux voisins libres : couloir, coude ou
+    // cul-de-sac. ⚠️ Un BUT n'est jamais un goulot, sans quoi la queue de buts
+    // d'une case de large du niveau 10 (x=17, y=10..14) se ferait trancher de sa
+    // propre salle.
+    QVector<bool> goulot(size, false);
+    for (int c = 0; c < size; c++) {
+        if (!dedans[c] || estBut(c)) continue;
+        int n = 0;
+        for (int d = 0; d < 4; d++) { const int v = voisin(c, d); if (v >= 0 && dedans[v]) n++; }
+        if (n <= 2) goulot[c] = true;
+    }
+
+    // LES PORTES DOUBLES (calé sur le découpage à la main du niveau 10, et sur
+    // le débordement mesuré du niveau 8 : 54 % du plateau avalé par une entrée
+    // large de DEUX cases, que le test de goulot ne voit pas — chacune des deux
+    // a trois voisins libres). Une paire de cases libres voisines est une porte
+    // double si :
+    //   (a) des MURS la ferment aux deux bouts de son axe — c'est une brèche dans
+    //       une ligne de mur, pas le milieu d'une salle ;
+    //   (b) la retirer COUPE le plateau en deux.
+    // ⚠️ (b) n'est pas décoratif : sans elle, le couloir large de deux du niveau
+    // 20 (colonnes x=14/15, douze rangées) se ferait trancher à chaque rangée —
+    // il est bien fermé par des murs des deux côtés, mais on le contourne par la
+    // colonne de buts, donc il ne coupe rien.
+    QVector<bool> porteDouble(size, false);
+    for (int c = 0; c < size; c++) {
+        if (!dedans[c] || estBut(c)) continue;
+        for (int axe = 0; axe < 2; axe++) {            // 0 = horizontal, 1 = vertical
+            const int d = axe ? 2 : 0;                 // droite / bas
+            const int b = voisin(c, d);
+            if (b < 0 || !dedans[b] || estBut(b)) continue;
+            const int avant = voisin(c, d ^ 1), apres = voisin(b, d);
+            if (avant >= 0 && dedans[avant]) continue;  // (a) pas fermé en amont
+            if (apres >= 0 && dedans[apres]) continue;  // (a) pas fermé en aval
+            // (b) la paire coupe-t-elle ? Un flood depuis n'importe quelle case
+            // libre restante doit atteindre TOUTES les autres.
+            int depart = -1, reste = 0;
+            for (int q = 0; q < size; q++)
+                if (dedans[q] && q != c && q != b) { if (depart < 0) depart = q; reste++; }
+            if (depart < 0) continue;
+            QVector<bool> vu(size, false); QVector<int> pile;
+            vu[depart] = true; pile.append(depart); int atteints = 1;
+            while (!pile.isEmpty()) {
+                const int q = pile.takeLast();
+                for (int e = 0; e < 4; e++) {
+                    const int v = voisin(q, e);
+                    if (v < 0 || !dedans[v] || v == c || v == b || vu[v]) continue;
+                    vu[v] = true; atteints++; pile.append(v);
+                }
+            }
+            if (atteints < reste) { porteDouble[c] = true; porteDouble[b] = true; }
+        }
+    }
+    for (int c = 0; c < size; c++) if (porteDouble[c]) goulot[c] = true;
+
+    // LES FRAGMENTS : composantes connexes de l'intérieur PRIVÉ de ses goulots.
+    // C'est le « corps » des salles, débarrassé de ce qui les relie.
+    QVector<int> frag(size, -1);
+    int nbFrag = 0;
+    for (int c = 0; c < size; c++) {
+        if (!dedans[c] || goulot[c] || frag[c] >= 0) continue;
+        QVector<int> pile; pile.append(c); frag[c] = nbFrag;
+        while (!pile.isEmpty()) {
+            const int q = pile.takeLast();
+            for (int d = 0; d < 4; d++) {
+                const int v = voisin(q, d);
+                if (v >= 0 && dedans[v] && !goulot[v] && frag[v] < 0) { frag[v] = nbFrag; pile.append(v); }
+            }
+        }
+        nbFrag++;
+    }
+    // ÉTAGE 1 — UNE ZONE PAR SALLE DE BUTS, ÉTAGÈRES COMPRISES.
+    //
+    // `sallesDeButs()` regroupe les buts 4-ADJACENTS. Ça ne suffit pas : le niveau
+    // 24 porte deux paquets — (1,1)..(10,1)/(1,2)..(10,2) et (13,1)/(13,2) — posés
+    // sur la MÊME rangée, adossés au MÊME mur continu (la ligne y=0), séparés par
+    // deux cases vides. C'est une seule étagère, donc une seule zone (constat
+    // utilisateur, 2026-08-22).
+    //
+    // D'où une seconde règle de regroupement, purement statique : deux buts sont de
+    // la même salle s'ils sont alignés (même ligne ou même colonne), que tout est
+    // LIBRE entre eux, et qu'un mur CONTINU les longe du même côté sur toute la
+    // longueur du segment. C'est « aligné sur le même côté d'un même mur, sans
+    // détour ».
+    //
+    // ⚠️ LA FUSION SE FAIT ICI, PAS DANS `sallesDeButs()`, et ce n'est pas un détail
+    // de style : le SOLVEUR utilise `sallesDeButs()` dans `ordreParPrecedence`
+    // (lookahead de rang 0 confiné à la salle de tête, §6.2 — le correctif
+    // multi-salles qui vaut ×7,5 sur le niveau 10). Changer ce regroupement
+    // décalerait l'ordre de remplissage de tout le corpus. Les zones lisent la
+    // géométrie ; elles ne touchent pas au moteur.
+    const QVector<int> salleBrute = sallesDeButs();
+    QVector<int> racine(nbButs);
+    for (int b = 0; b < nbButs; b++) racine[b] = b;
+    std::function<int(int)> trouve = [&](int b) { return racine[b] == b ? b : racine[b] = trouve(racine[b]); };
+    for (int a2 = 0; a2 < nbButs; a2++)
+        for (int b = 0; b < nbButs; b++)
+            if (salleBrute[a2] == salleBrute[b]) racine[trouve(a2)] = trouve(b);
+
+    auto etagere = [&](int ca, int cb) {
+        const int ax = ca % largeur, ay = ca / largeur;
+        const int bx = cb % largeur, by = cb / largeur;
+        if (ax != bx && ay != by) return false;
+        const int pas = (ay == by) ? 1 : largeur;
+        const int d1 = qMin(ca, cb), d2 = qMax(ca, cb);
+        if (d2 - d1 <= (int)pas) return false;                 // voisins : déjà traités
+        for (int q = d1 + pas; q < d2; q += pas)
+            if (!dedans[q]) return false;                      // un mur coupe le segment
+        // un mur continu longe-t-il le segment, d'un côté ou de l'autre ?
+        const int cote = (ay == by) ? largeur : 1;
+        for (int signe = -1; signe <= 1; signe += 2) {
+            bool plein = true;
+            for (int q = d1; q <= d2 && plein; q += pas) {
+                const int v = q + signe * cote;
+                const int vx = v % largeur, vy = v / largeur;
+                if (v < 0 || v >= size) { plein = false; break; }
+                if (ay == by && vy != (q / largeur) + signe) { plein = false; break; }
+                if (ax == bx && vx != q % largeur)           { plein = false; break; }
+                if (cases[v] != Level::tcMur) plein = false;
+            }
+            if (plein) return true;
+        }
+        return false;
+    };
+    for (int a2 = 0; a2 < nbButs; a2++)
+        for (int b = a2 + 1; b < nbButs; b++)
+            if (etagere(goals[a2], goals[b])) racine[trouve(a2)] = trouve(b);
+
+    QVector<int> salle(nbButs, -1);
+    int nbSalles = 0;
+    for (int b = 0; b < nbButs; b++) {
+        const int r = trouve(b);
+        if (salle[r] < 0) salle[r] = nbSalles++;
+        salle[b] = salle[r];
+    }
+    for (int b = 0; b < nbButs; b++) salle[b] = salle[trouve(b)];
+
+    for (int s = 0; s < nbSalles; s++) {
+        QVector<bool> zone(size, false);
+        for (int b = 0; b < nbButs; b++) {
+            if (salle[b] != s) continue;
+            zone[goals[b]] = true;
+            const int f = frag[goals[b]];
+            if (f >= 0) for (int c = 0; c < size; c++) if (frag[c] == f) zone[c] = true;
+        }
+
+        // ÉTAGE 3 — L'ABSORPTION. Un goulot qui borde la zone : on regarde ce
+        // qu'il y a DERRIÈRE, sans repasser par la zone. « Ce qui est BOUCHÉ
+        // appartient à la zone, ce qui DÉBOUCHE n'y appartient pas » (règle
+        // choisie par l'utilisateur le 2026-08-22) : une poche est avalée —
+        // c'est une alcôve de la salle, pas une sortie —, un débouché est une
+        // PORTE et la croissance s'arrête là.
+        //
+        // ⚠️ LE TEST EST RELATIF, PAS UN SEUIL EN DUR : est avalée la poche plus
+        // PETITE que la salle à laquelle elle s'accroche. C'est ce qui distingue
+        // les deux cas, et ils sont franchement séparés — la poche du niveau 20
+        // fait 4 cases contre 36 de zone, quand le débouché du niveau 1 en fait
+        // 44 contre 10. Un seuil absolu marchait aussi (4, balayé sur 1-8) mais
+        // ne disait rien : il fallait le régler par niveau plutôt que le déduire.
+        // `seuilCulDeSac` ne sert plus que de PLANCHER, pour les salles minuscules
+        // (le niveau 25 n'a que 3 cases de corps).
+        // RESSERRAGE PAR COUPE (option (i), choisie par l'utilisateur le 2026-08-22).
+        // La zone peut être ÉNORME quand rien ne sépare la salle de buts du
+        // reste — niveau 21 : la salle et tout le milieu du plateau ne forment
+        // qu'un seul fragment, faute du moindre rétrécissement entre les deux.
+        // On cherche alors une COUPE de 1 ou 2 cases DANS la zone qui isole les
+        // buts, et on ne garde que le côté des buts.
+        //
+        // ⚠️ Trois garde-fous, et chacun répare un cas vu à la mesure :
+        //   · la coupe ne porte JAMAIS sur un but ;
+        //   · tous les buts de la salle doivent rester du même côté (sinon la
+        //     coupe ne sépare pas la salle, elle la casse) ;
+        //   · l'autre côté doit être SUBSTANTIEL (> seuil). Sans ça, la paire
+        //     {(14,7),(15,6)} du niveau 1 « coupe » — elle isole le seul coin
+        //     (14,6) — et la salle se ferait charcuter par ses propres angles.
+        // À taille de coupe égale on prend celle qui laisse le PLUS PETIT côté
+        // buts : c'est la bouche de la salle, pas un rétrécissement lointain.
+        // ⚠️ Une coupe à 2 cases n'a pas à être faite de cases VOISINES — c'est
+        // tout l'intérêt ici. La bouche du 21 est {(9,9),(10,8)}, deux cases en
+        // diagonale ayant chacune trois voisins libres : ni le goulot ni la porte
+        // double ne pouvaient la voir.
+        {
+            QVector<int> dansZone;
+            for (int q = 0; q < size; q++) if (zone[q]) dansZone.append(q);
+            QVector<int> butsSalle;
+            for (int b = 0; b < nbButs; b++) if (salle[b] == s) butsSalle.append(goals[b]);
+
+            // Le côté des buts après retrait de la coupe, ou vide si la coupe est
+            // invalide (buts séparés, ou autre côté insignifiant).
+            // ⚠️ Tampons hoistés : la recherche teste O(cases²) paires, et deux
+            // QVector<bool>(size) par paire coûtaient 16 s sur les 32 niveaux
+            // contre moins de 2 ici. Statique et hors chemin chaud, mais un outil
+            // qu'on relance à chaque idée doit rendre la main tout de suite.
+            QVector<bool> vu(size, false);
+            QVector<int> pile;
+            auto coteButs = [&](int c1, int c2) {
+                vu.fill(false);
+                pile.clear();
+                pile.append(butsSalle.first()); vu[butsSalle.first()] = true;
+                int n = 1;
+                while (!pile.isEmpty()) {
+                    const int q = pile.takeLast();
+                    for (int d = 0; d < 4; d++) {
+                        const int v = voisin(q, d);
+                        if (v < 0 || !zone[v] || v == c1 || v == c2 || vu[v]) continue;
+                        vu[v] = true; n++; pile.append(v);
+                    }
+                }
+                for (int b : butsSalle) if (!vu[b]) return QVector<bool>();   // buts séparés
+                const int autre = dansZone.size() - n - (c1 >= 0) - (c2 >= 0);
+                // ⚠️ TROIS, et c'est balayé, pas choisi. À 4 (l'ancien seuil), la
+                // coupe (4,6) du niveau 18 était rejetée d'UNE case — son côté
+                // gauche en fait exactement 4 — et la zone gardait un ENCLOS SANS
+                // AUCUN EMBUT, repéré à l'œil par l'utilisateur sur la planche
+                // contact. À 1 ou 2, la salle du 18 se fait au contraire réduire à
+                // 3 cases. Mesuré sur les 8 zones de vérité terrain : 1, 2, 3 et 4
+                // les laissent toutes identiques, seul le 18 bouge.
+                if (autre <= 3) return QVector<bool>();                        // côté insignifiant
+                return vu;
+            };
+
+            QVector<bool> meilleur; int meilleurTaille = -1;
+            for (int taille = 1; taille <= 2 && meilleur.isEmpty(); taille++) {
+                for (int i = 0; i < dansZone.size(); i++) {
+                    const int c1 = dansZone[i];
+                    if (estBut(c1)) continue;
+                    for (int j = (taille == 1 ? i : i + 1);
+                         j < (taille == 1 ? i + 1 : dansZone.size()); j++) {
+                        const int c2 = (taille == 1) ? -1 : dansZone[j];
+                        if (c2 >= 0 && estBut(c2)) continue;
+                        const QVector<bool> cote = coteButs(c1, c2);
+                        if (cote.isEmpty()) continue;
+                        int n = 0;
+                        for (int q = 0; q < size; q++) if (cote[q]) n++;
+                        if (meilleurTaille < 0 || n < meilleurTaille) { meilleur = cote; meilleurTaille = n; }
+                    }
+                }
+            }
+            if (!meilleur.isEmpty()) zone = meilleur;
+        }
+
+        // Le CŒUR : la zone avant toute absorption. Sert au ménage final.
+        const QVector<bool> coeur = zone;
+
+        // ⚠️ LE PLAFOND EST UNE CONSTANTE, ET C'EST UNE RÉFUTATION MESURÉE, pas
+        // une paresse. La version « scale-free » — avaler la poche si elle est
+        // plus PETITE que la salle à laquelle elle s'accroche — est séduisante
+        // (elle supprime la constante) et FAUSSE des deux façons possibles :
+        //   · plafond suivant la zone en croissance : ça s'emballe (la zone
+        //     grandit → le plafond grandit → elle avale plus gros). Niveau 21 :
+        //     les 94 cases du plateau, zéro porte.
+        //   · plafond figé sur le cœur de la salle : le cœur est DÉJÀ trop gros
+        //     quand la salle de buts n'est séparée de rien (niveau 21 encore :
+        //     94 cases), et les deux zones du niveau 25 fusionnent — ce que le
+        //     découpage à la main interdit.
+        // Une poche est petite dans l'ABSOLU (4 cases au niveau 20) ; un débouché
+        // est le reste du plateau (44 cases au niveau 1). Les deux modes sont
+        // franchement séparés, et le seuil balayé (4/5/6 donnent le même résultat)
+        // tombe entre les deux.
+        const int plafond = seuilCulDeSac;
+
+        QVector<bool> porte(size, false);
+        for (bool encore = true; encore; ) {
+            encore = false;
+            QVector<int> bord;
+            for (int c = 0; c < size; c++) {
+                if (!dedans[c] || zone[c] || porte[c]) continue;
+                for (int d = 0; d < 4; d++) {
+                    const int v = voisin(c, d);
+                    if (v >= 0 && zone[v]) { bord.append(c); break; }
+                }
+            }
+            for (int c : bord) {
+                if (zone[c] || porte[c]) continue;
+                QVector<int> derriere; QVector<bool> vu(size, false);
+                derriere.append(c); vu[c] = true;
+                for (int i = 0; i < derriere.size() && derriere.size() <= plafond; i++) {
+                    const int q = derriere[i];
+                    for (int d = 0; d < 4; d++) {
+                        const int v = voisin(q, d);
+                        if (v >= 0 && dedans[v] && !zone[v] && !vu[v]) { vu[v] = true; derriere.append(v); }
+                    }
+                }
+                if (derriere.size() <= plafond) {
+                    for (int q : derriere) zone[q] = true;
+                    encore = true;
+                    continue;
+                }
+                // ⚠️ PLUS DE PROLONGEMENT COLLINÉAIRE ICI — RETIRÉ le 2026-08-22,
+                // le jour même où il avait été ajouté. Il courait tout droit
+                // jusqu'au mur suivant pour reproduire une zone du niveau 25 ;
+                // relu en images par l'utilisateur, il embarquait le COULOIR DE
+                // SORTIE de cinq autres niveaux (2 à droite, 9 à gauche, 14 en
+                // haut et en bas, 15 à droite, 25 lui-même à gauche) et faisait
+                // FUSIONNER les deux zones du niveau 18. Bilan mesuré sur les 8
+                // zones de la vérité terrain : il en gagnait UNE et en perdait
+                // cinq ailleurs. Un mécanisme calé sur un seul cas ne survit pas
+                // à son deuxième.
+                porte[c] = true;
+            }
+        }
+
+        // ⚠️ MÉNAGE — L'ABSORPTION RAMPE, et c'est un défaut mesuré (niveau 18,
+        // repéré à l'œil par l'utilisateur sur la planche contact). Elle avale une
+        // poche de 4 cases, puis 4 de plus depuis la zone agrandie, et finit par
+        // s'annexer une PIÈCE ENTIÈRE SANS AUCUN EMBUT — 5 cases sur le 18. Le
+        // plafond borne chaque bouchée, pas le repas.
+        // On retire donc, à la fin, tout bloc ABSORBÉ (hors du cœur) qui ne
+        // contient aucun embut et dépasse le plafond à lui seul. Une vraie alcôve
+        // reste : elle est petite par définition.
+        {
+            QVector<bool> vu(size, false);
+            for (int c = 0; c < size; c++) {
+                if (!zone[c] || coeur[c] || vu[c]) continue;
+                QVector<int> bloc, pile; pile.append(c); vu[c] = true;
+                bool aUnBut = false;
+                while (!pile.isEmpty()) {
+                    const int q = pile.takeLast();
+                    bloc.append(q);
+                    if (estBut(q)) aUnBut = true;
+                    for (int d = 0; d < 4; d++) {
+                        const int v = voisin(q, d);
+                        if (v >= 0 && zone[v] && !coeur[v] && !vu[v]) { vu[v] = true; pile.append(v); }
+                    }
+                }
+                if (!aUnBut && bloc.size() > seuilCulDeSac)
+                    for (int q : bloc) zone[q] = false;
+            }
+        }
+
+        // Les PORTES se relisent sur la zone FINALE : toute case libre qui la
+        // borde sans lui appartenir. Les recalculer ici plutôt que de traîner
+        // celles de l'absorption évite qu'un resserrage postérieur laisse des
+        // portes fantômes, pointant vers des cases désormais hors zone.
+        for (int c = 0; c < size; c++) porte[c] = false;
+        for (int c = 0; c < size; c++) {
+            if (!dedans[c] || zone[c]) continue;
+            for (int d = 0; d < 4; d++) {
+                const int v = voisin(c, d);
+                if (v >= 0 && zone[v]) { porte[c] = true; break; }
+            }
+        }
+
+        ZoneEmbut z;
+        for (int c = 0; c < size; c++) {
+            if (zone[c]) z.cases.append(c);
+            // ⚠️ Une porte avalée par une absorption plus tardive n'est plus une
+            // porte : la zone l'a rejointe par un autre côté.
+            else if (porte[c]) z.portes.append(c);
+        }
+        for (int b = 0; b < nbButs; b++) if (salle[b] == s) z.buts.append(b);
+
+        // FUSION — deux salles de buts peuvent partager le MÊME enclos, et c'est
+        // alors une seule zone qui porte les deux. Mesuré : 18, 24 et 26 rendaient
+        // la même zone deux fois (le 26 : la salle de 12 buts et le but isolé sont
+        // dans la même pièce). ⚠️ Le 25 est le contre-exemple à ne pas casser —
+        // ses deux salles ont des enclos DISTINCTS, et l'utilisateur les compte
+        // bien pour deux.
+        int fusion = -1;
+        for (int i = 0; i < zones.size() && fusion < 0; i++)
+            for (int c : zones[i].cases) if (zone[c]) { fusion = i; break; }
+        if (fusion >= 0) {
+            QVector<bool> deja(size, false);
+            for (int c : zones[fusion].cases) deja[c] = true;
+            for (int c : z.cases) if (!deja[c]) { zones[fusion].cases.append(c); deja[c] = true; }
+            std::sort(zones[fusion].cases.begin(), zones[fusion].cases.end());
+            zones[fusion].buts += z.buts;
+            QVector<int> portes;
+            for (int c : zones[fusion].portes + z.portes)
+                if (!deja[c] && !portes.contains(c)) portes.append(c);
+            std::sort(portes.begin(), portes.end());
+            zones[fusion].portes = portes;
+        } else {
+            zones.append(z);
+        }
+    }
+    return zones;
+}
+
 QVector<QVector<int>> Game::precedenceGlobale() const {
     QVector<QVector<int>> requis(nbButs);
 
@@ -2479,8 +2914,47 @@ QVector<int> Game::ordreParPrecedence() const {
         // ouverture de niveau dans l'app — le §6.2 garde la trace d'une escalade de
         // budget qui avait porté un chargement à 64 s. 500 tient largement les 35
         // niveaux (mesuré : aucun ne recule plus de quelques dizaines de fois).
-        int budgetTri = 500;
+        int budgetTri = 5000;
         bool triSain = false;
+
+        // ── MÉMOÏSATION DES SOUS-ENSEMBLES ÉCHOUÉS (2026-08-23) ──────────────
+        // LE BUDGET CI-DESSUS N'ÉTAIT PAS TROP PETIT : la recherche était
+        // exponentielle pour rien. Tout ce dont dépend la suite — `pret`,
+        // `pretPreuve`, `mureraitQuelquun`, donc `butMureLocalement` — est
+        // fonction du seul ENSEMBLE des buts déjà émis, jamais de l'ORDRE dans
+        // lequel on les a posés (position de départ du joueur fixe, géométrie
+        // fixe). C'est le constat qui fonde `mesures/ordredp` (plan.md §6.0,
+        // 2026-08-21) ; appliqué ICI, il ne demande pas un solveur séparé mais
+        // une table : un sous-ensemble dont on a PROUVÉ qu'aucune suite ne mène
+        // au bout ne se ré-explore pas, quel que soit le chemin qui y ramène.
+        // Sans elle, un même sous-ensemble était redescendu k! fois et le budget
+        // partait là-dedans — le niveau 200 (15 buts) saturait 4 000 reculs et
+        // rendait un ordre MURÉ sur ses deux derniers buts.
+        //
+        // ⚠️ LA CLÉ PORTE AUSSI `salleCourante`, et l'oublier serait un vrai bug.
+        // Deux chemins menant au même sous-ensemble peuvent laisser le joueur
+        // dans des salles différentes, et les passes 1/2 ci-dessus classent les
+        // candidats d'après elle : les deux états ne sont donc PAS équivalents.
+        // Avec la salle, ils le sont rigoureusement.
+        //
+        // ⚠️ ON NE MÉMOÏSE QUE L'ÉPUISEMENT RÉEL des candidats d'un étage, jamais
+        // un abandon par budget : marquer « échoué » un sous-ensemble qu'on a
+        // seulement cessé d'explorer ferait rater un ordre sain, et le murage
+        // reviendrait sans que rien ne le signale. C'est la différence entre
+        // UNSAT et « budget épuisé » que le §6.0 réclame déjà de l'outil `ordredp`.
+        //
+        // Le budget reste, en garde-fou dur : ce code tourne dans le ctor
+        // Game(Level), donc à chaque ouverture de niveau dans l'app (§6.2 garde la
+        // trace d'une escalade qui avait porté un chargement à 64 s).
+        QSet<quint64> echecsTri;
+        quint64 masqueTri = 0;
+        // 48 bits de masque + la salle au-dessus. Le corpus plafonne à 32 buts
+        // (niveau 10) ; au-delà de 48 on retombe sur le budget seul, sans mémoire —
+        // dégradation gracieuse, jamais un résultat faux.
+        const bool memoTri = (nbButs <= 48);
+        auto cleTri = [](quint64 masque, int s) {
+            return masque | ((quint64)(s + 1) << 48);
+        };
 
         while (true) {
             if (trie.size() == nbButs) { triSain = true; break; }
@@ -2488,18 +2962,31 @@ QVector<int> Game::ordreParPrecedence() const {
             if (pileTri.size() == trie.size() + 1) {
                 EtageTri& e = pileTri[pileTri.size() - 1];
                 if (e.essai < e.choix.size() && budgetTri > 0) {
-                    budgetTri--;
                     const int b = e.choix[e.essai];
+                    // Déjà prouvé stérile par un autre chemin : on n'y redescend
+                    // pas, et surtout on ne paie pas de budget pour ça.
+                    if (memoTri && echecsTri.contains(cleTri(masqueTri | (1ULL << b), salle[b]))) {
+                        e.essai++;
+                        continue;
+                    }
+                    budgetTri--;
                     emis[b] = true;
                     bloqueTri[goals[b]] = true;
                     salleCourante = salle[b];
                     trie.append(b);
+                    masqueTri |= (1ULL << b);
                 } else {
+                    // ÉPUISEMENT RÉEL (tous les candidats essayés, aucun n'aboutit)
+                    // = ce sous-ensemble est stérile, définitivement. Un abandon par
+                    // BUDGET, lui, ne prouve rien et ne s'inscrit pas.
+                    if (memoTri && e.essai >= e.choix.size())
+                        echecsTri.insert(cleTri(masqueTri, e.salleAvant));
                     pileTri.removeLast();                            // cet étage est épuisé
                     if (trie.isEmpty() || pileTri.isEmpty()) break;  // espace épuisé
                     const int d = trie.takeLast();                   // on défait le choix d'avant
                     emis[d] = false;
                     bloqueTri[goals[d]] = false;
+                    masqueTri &= ~(1ULL << d);
                     // ⚠️ La salle courante se restaure depuis l'étage OÙ L'ON REVIENT,
                     // pas depuis celui qu'on vient de jeter : `salleAvant` d'un étage
                     // est la salle d'AVANT sa propre pose. Prendre celle de l'étage
@@ -2544,6 +3031,7 @@ QVector<int> Game::ordreParPrecedence() const {
             emis.fill(false);
             bloqueTri.fill(false);
             salleCourante = -1;
+            masqueTri = 0;
             while (trie.size() < nbButs) {
                 int choisi = -1;
                 for (int b : ordre) {

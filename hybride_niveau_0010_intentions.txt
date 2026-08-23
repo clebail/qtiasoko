@@ -18,3 +18,6 @@
 [intention] coup 167/1619 | ECARTER (du chemin d'une autre caisse) | posees 3/32 | joueur (4,2)
 
 === niveau 10 — annotation du 2026-08-02 20:30:26 — 1619 coups (1529 par macro) ===
+
+=== niveau 10 — annotation du 2026-08-22 09:06:36 — 1619 coups (1529 par macro) ===
+[intention] coup 0/1619 | ECARTER (du chemin d'une autre caisse) | posees 0/32 | joueur (2,1)

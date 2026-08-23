@@ -17,6 +17,7 @@
 #include <QTextStream>
 #include "astar.h"
 #include "mainwindow.h"
+#include "jugemacro.h"      // jugeMacro() : le verdict, en exemplaire unique (mesures/rejeu le partage)
 #include "solveurastar.h"   // corralActif() / CORRAL_BUDGET : le mode hybride rejoue l'enfilage
 #include "ui_mainwindow.h"
 
@@ -614,6 +615,64 @@ void MainWindow::mesureRangCoup(const Game& avant, int idxCaisse, Game::EDirecti
                .arg(nomDirection((Game::EDirection)best.dir))
                .arg(best.h).arg(g + best.h)
                .arg(df >= 0 ? QString("+%1").arg(df) : QString::number(df)));
+}
+
+// Le rang de la MACRO humaine dans le classement du solveur (cf. mainwindow.h pour
+// le pourquoi et les limites). Le verdict lui-même vit dans jugemacro.h, en
+// exemplaire unique partagé avec mesures/rejeu ; ici on ne fait que l'écrire.
+void MainWindow::mesureRangMacro(const Game& avant, int idxCaisse) {
+    if (!cbHybride->isChecked()) return;
+    // Même garde que mesureRangCoup : l'état-max est un instantané du solveur, on
+    // ne juge que le plateau réellement joué.
+    if (cbEtatMax->isChecked()) return;
+
+    const int L   = avant.getLargeur();
+    const int but = avant.butActif();
+    if (but < 0) return;                       // état gagné : rien à engager
+
+    const int caseBut = avant.getCaseBut(but);
+    const QString quoi = QString("(%1,%2) -> but (%3,%4)")
+                             .arg(idxCaisse % L).arg(idxCaisse / L)
+                             .arg(caseBut % L).arg(caseBut / L);
+
+    const VerdictMacro v = jugeMacro(avant, idxCaisse, but);
+
+    switch (v.type) {
+    case VerdictMacro::HorsPasseCouplage:
+        journal(QString("[macro-rang] %1 | ⚠ HORS PASSE COUPLAGE : le couplage assigne "
+                        "(%2,%3) a ce but et sa macro aboutit — le solveur s'y engage et ne "
+                        "genere JAMAIS celle-ci")
+                   .arg(quoi).arg(v.voulue % L).arg(v.voulue / L));
+        return;
+
+    case VerdictMacro::Ecarte:
+        // Sur une partie qu'on finit par gagner, l'état traversé est soluble par
+        // construction : faux positif PROUVE. Le journal porte aussi les [undo] et
+        // la victoire — c'est au dépouillement de conclure, pas à cette ligne.
+        journal(QString("[macro-rang] %1 | ⚠ ECARTE par le solveur : %2 | %3 autre%4 "
+                        "macro%4 enfilee%4")
+                   .arg(quoi).arg(v.cause).arg(v.nbEnfilees)
+                   .arg(v.nbEnfilees > 1 ? "s" : ""));
+        return;
+
+    case VerdictMacro::Introuvable:
+        // Le clic ne part que de macroCaissesJouables : y arriver signale que
+        // l'overlay et le juge ont divergé, ce qui est un défaut à corriger.
+        journal(QString("[macro-rang] %1 | ⚠ INTROUVABLE parmi les %2 macros enfilees "
+                        "— MIROIR EN DEFAUT").arg(quoi).arg(v.nbEnfilees));
+        return;
+
+    case VerdictMacro::Retenue:
+        journal(QString("[macro-rang] %1 | rang %2/%3%4%5 | %6 poussees g %7 h %8 f %9 | "
+                        "meilleure (%10,%11) %12 poussees f %13 | df %14")
+                   .arg(quoi).arg(v.rang).arg(v.nbEnfilees)
+                   .arg(v.exAequo > 0 ? QString(" (%1 ex aequo)").arg(v.exAequo) : QString())
+                   .arg(v.estCouplage ? QString(" [caisse du COUPLAGE]") : QString())
+                   .arg(v.poussees).arg(v.g).arg(v.h).arg(v.f)
+                   .arg(v.bestCaisse % L).arg(v.bestCaisse / L).arg(v.bestPoussees).arg(v.bestF)
+                   .arg(v.df >= 0 ? QString("+%1").arg(v.df) : QString::number(v.df)));
+        return;
+    }
 }
 
 void MainWindow::onJoueurDeplace(QPoint centre) {
@@ -1803,6 +1862,12 @@ void MainWindow::joueMacro(int idxCaisse) {
                .arg(idxCaisse % game.getLargeur()).arg(idxCaisse / game.getLargeur())
                .arg(caseBut % game.getLargeur()).arg(caseBut / game.getLargeur())
                .arg(poussees.size()).arg(essais).arg(essais > 1 ? "s" : ""));
+
+    // LE JUGE, sur l'état d'AVANT (cf. mainwindow.h). Ici et pas dans joue() :
+    // mesureRangCoup s'y tait pendant timerMacro, parce qu'une poussée de macro
+    // n'est pas choisie coup par coup — c'est la macro ENTIÈRE qui est le choix,
+    // et c'est elle qu'on confronte au solveur, une fois.
+    mesureRangMacro(game, idxCaisse);
 
     // Descente poussées -> coups, même recette que Solveur::reconstruire : on
     // marche jusqu'à l'appui, puis on pousse. 'g' rejoue la séquence en parallèle

@@ -79,6 +79,7 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `bench <niv> <mode> record` | **(neuf, 2026-07-28)** écrit en `.xsb` **chaque état qui bat le record de caisses posées**, daté en dépilements (stderr, entrelacé avec la jauge). Vérifie que le chemin reconstruit mène bien à l'état exporté. C'est ce qui a chiffré le plongeon AVANT de le coder. `bench` accepte aussi un **chemin `.xsb`** au lieu d'un numéro |
 | `ordre <niv>` | **(neuf, 2026-07-29) POURQUOI LA MACRO SE MURE** : imprime `ordreButs` (carte des rangs en base 36 + déroulé), et vérifie **deux** précédences — la **locale** du §6.2 (approches du dernier pas) et une **globale** neuve (trajet de tirage complet : *G doit précéder B si, B traité comme occupé, plus aucune caisse n'atteint G*). Statique, O(buts²×plateau), aucune recherche. À sa création : **0 violation sur les 14 résolus + 190/191, 1 à 29 sur 11 non-résolus** — depuis que la précédence globale est CODÉE (2026-07-30, §6.2), **0 violation partout**, l'outil ne sert donc plus qu'à surveiller les régressions et le murage LOCAL |
 | **mode HYBRIDE** (dans l'app) | **(neuf, 2026-08-01) LE SOLVEUR LOGUE UNE PARTIE HUMAINE.** ⚠️ **Il LOGUE, il n'ANNOTE pas** — le mot compte : annoter suppose un jugement, et s'il savait juger un coup il saurait résoudre le niveau. C'est mesuré des deux côtés — le §3 pour `h` (« toute borne qui capturerait le mou devrait résoudre un ordonnancement optimal ») et la session 2/7 du 2026-08-01 pour le classement (ton coup est 1ᵉʳ dans 47 % des cas, jamais au-delà du 18ᵉ, `df = 0` deux fois sur trois : il ne peut pas départager). Le solveur enregistre son état ; **c'est l'humain qui juge**, et seulement par la touche `C` (critique du chemin du solveur). Case à cocher : l'ordre de remplissage s'affiche en chiffres sur les buts, et à CHAQUE coup joué à la main l'UI rejoue le **régime d'engagement du solveur** (`solveurastar.cpp:331-343` — `getCaissesDeplacable` → `macroPeutDemarrer` → `macroVersButBacktrack` + `!isPerdu`) et surligne les macros jouables. Clic sur une caisse cerclée = la macro se joue ; clic sur une case libre = le perso y marche ; **clic DROIT = « il aurait dû y avoir une macro ici »**, qui consigne la CAUSE (poussable dans aucune direction / échec au pas 0 / descente bloquée en (x,y) avec N restants / aboutit mais `perdu`) + le plateau. Tout part dans `hybride_niveau_XXXX.txt` (un par niveau, en AJOUT, flush par ligne). C'est le seul outil qui répond à « l'ordre est-il BIEN JOUÉ ? », là où `ordre` ne répond qu'à « est-il FAISABLE ? »<br>**(2026-08-01, suite) LE RANG DU COUP HUMAIN** — à chaque poussée vraiment choisie (hors macro, hors rejeu), l'UI rejoue l'**enfilage** du solveur sur l'état d'avant (mêmes enfants, mêmes élagages dans le même ordre, même clé de tri que le comparateur) et journalise `[rang] (x,y) Dir \| rang R/N \| h .. f .. \| meilleur (x,y) Dir \| df ±k`. Trois variantes : `HORS REGIME MACRO` (le solveur ne générerait aucune poussée simple — c'est la mesure du désaccord), `⚠ ECARTE par le solveur` (**faux positif d'élagage PROUVÉ** si la partie est gagnée : c'est le juge `fp` étendu aux niveaux NON RÉSOLUS), `⚠ INTROUVABLE` (le miroir a divergé du solveur). ⚠️ Rang **parmi les frères**, pas dans la file globale : ce qui s'y transporte, c'est `df` |
+| **LE RANG DE LA MACRO HUMAINE** (dans l'app + `rejeu`) | **(neuf, 2026-08-23)** `jugeMacro` (**`jugemacro.h`**, racine, **exemplaire unique** §7) rejoue les deux passes de `tenteMacro` PUIS l'enfilage — régime du couplage, corral unitaire, corral-N, et la clé du comparateur (f croissant, **g décroissant**, guidage). Quatre verdicts : **HORS PASSE COUPLAGE** (le couplage assigne le but à une autre caisse dont la macro aboutit ⇒ celle-ci n'est générée dans AUCUN état), **ECARTE** (faux positif prouvé sur une partie gagnée), **INTROUVABLE** (miroir en défaut), **rang R/N + df**. Comble le trou de `⚠ ECARTE`, qui ne jugeait que les poussées manuelles — 133 coups sur 140 y échappaient sur la partie du 200. Ligne `[macro-rang]` dans le journal hybride. ⚠️ Ne rejoue NI `loiTropTot` NI la dédup `meilleurG` : un rang dit « il enfilerait ceci ici », pas « il le développerait » |
 | `pas0 <niv>` | **(neuf, 2026-08-01) POURQUOI AUCUNE MACRO N'EST DISPONIBLE**, sur le plateau de DÉPART. Pour chaque couple (caisse, but), rejoue le contrat EXACT de l'UI — `macroPeutDemarrer`, descente `macroVersButBacktrack` menée au bout, `!isPerdu` — et classe les échecs : *amorce puis bloque en (x,y)*, *détour non-monotone requis*, *joueur du mauvais côté*. Répond en une seconde à « le premier but choisi change-t-il quelque chose au démarrage ? » (sur le 12 : non, aucun des 15 n'est atteignable). ⚠️ **Le premier jet ne testait que `macroPeutDemarrer` et annonçait l'inverse** — amorcer n'est PAS aboutir. Outil de chantier<br>**(2026-08-07)** accepte un **chemin `.xsb`** (comme `bench`/`loi`/`ordre`) et deux modes. `champ` imprime **les deux champs de distance côte à côte** — le **BRUT** (`Game::champDistanceBrut`, la table précalculée telle quelle = ce que la macro croit devoir suivre) et le **JOUABLE** (ce que la descente monotone accepte) : les lire ensemble est le seul moyen de séparer « la table se trompe » de « la table a raison mais la descente ne sait pas l'exécuter ». `trace` rejoue la descente pas à pas avec, pour CHAQUE direction, la raison du refus (`MUR` / `caisse` / `appui HORS ZONE` / `NON MONOTONE`), puis se confronte à la vraie fonction. C'est ce couple qui a trouvé le bug du demi-tour (§6.3, 2026-08-07). Deux autres modes : `multi` (combien de macros DISTINCTES une caisse peut produire — mesuré : jusqu'à 4 chemins, **toujours 1 seul état**) et `detour` (l'écart au trajet solo, par recherche bornée à une seule caisse mobile ; ⚠️ **itinéraire, PAS une borne** — les autres caisses y sont des murs, donc surestimation, §4) |
 | **injection d'ordre par FICHIER** | **(neuf, 2026-08-01)** `ordre_niveau_XXXX.txt` dans le répertoire courant écrase l'ordre calculé de ce niveau. Complète `ORDRE_HUMAIN`, qui est une variable d'environnement et **n'atteint donc pas l'app** lancée par un launcher (§7) : c'est le seul moyen de JOUER un ordre à la main en mode hybride et de voir où il coince. Même parseur, exemplaire unique. **Bruyant des deux côtés** (`[ORDRE_FICHIER]` sur stderr, et le journal hybride écrit `ordre de remplissage ⚠ INJECTE depuis …` au lieu de `calcule`) — un fichier oublié changerait sinon le comportement en silence, le pire cas du §7. Absent = rien ne change |
 | **rejeu de journal + INTENTIONS** (dans l'app) | **(neuf, 2026-08-01) CAPTURER LE PLAN, PAS LE COUP.** Touche `L` : relit `hybride_niveau_XXXX.txt`, en extrait la **dernière partie GAGNÉE** (les `[undo]` retirent le dernier coup) et l'installe dans le rejeu pas à pas existant — aucune mécanique de navigation en double. `N` saute à la prochaine **poussée choisie** (macros et marche franchies d'un coup). Six touches d'intention en vocabulaire **FERMÉ** : `E` écarter du chemin d'une autre caisse · `O` ouvrir un passage joueur · `G` garer pour plus tard · `A` préparer un appui · `T` **sortir pour reprendre dans l'autre sens** (= le RECUL du §3) · `R` rapprocher · `?` je ne sais pas. **Une frappe par PLAN**, valable jusqu'à la suivante — c'est l'objet même : le rang d'un coup isolé ne peut pas voir un plan sur plusieurs coups. Sortie : `hybride_niveau_XXXX_intentions.txt`, avec le **numéro de coup** (sans lui les annotations seraient orphelines). ⚠️ Flèches et Retour arrière **neutralisés** pendant une session : ils modifient le plateau sans toucher à `posPas`, et le numéro de coup écrit devient faux |
@@ -95,6 +96,9 @@ l'extérieur. Rien n'entre dans `qtiasoko.pro`. Détail dans [mesures/mesure.md]
 | `portegen <niv\|plateau.xsb>` | **(neuf, 2026-08-18) LE PORTE GÉNÉRALISÉ** — `Game::porteGeneraliseeCoupe(idxCaisse, idxBut)` (game.cpp). Généralise `porteBloquee` : au lieu des seuls appuis de LA caisse, teste si occuper un but coupe l'accès du joueur à N'IMPORTE QUELLE AUTRE caisse non livrée ou but non rempli — un point d'articulation du graphe de marche COURANT (toutes les caisses réellement posées comme obstacles), pas la géométrie du départ seule. ⚠️ **DYNAMIQUE** contrairement à `porteBloquee` : deux flood-fills par appel, à interroger sur un état (`.xsb` de milieu de partie, comme `bench`/`ordre`/`pas0`), pas seulement un départ. Validé bit-à-bit contre le mineur `stock.py cut` sur les 10 tenues du niveau 27 (2 positifs, 8 négatifs, 10/10 identiques) |
 | `fpporte.py [niv…]` | **(neuf, 2026-08-18) LE JUGE FP DU PORTE GÉNÉRALISÉ** — même protocole que `fp`/`juge_loi.py` : rejoue la dernière partie GAGNÉE de chaque niveau, teste le prédicat sur chaque livraison réelle, toute détection est un faux positif prouvé. **0 FP sur 1 650 livraisons, 28 niveaux.** ⚠️ Ne teste QUE la DERNIÈRE poussée de chaque caisse (sa position finale) — les poses de PASSAGE (une caisse qui transite par plusieurs buts d'un couloir aligné avant sa destination réelle) ne sont pas des livraisons ; les confondre a produit ~100 faux positifs bidons au premier jet (cf. §7) |
 | `ampleurporte.py` / `ampleurporte2.py [niv…]` | **(neuf, 2026-08-18) L'AMPLEUR DU MOTIF** — `ampleurporte.py` (premier jet, RÉFUTÉ comme signal) scanne TOUTES les paires (caisse × but) à chaque jalon : 71 % coupées, mais **ne discrimine rien** — résolus et non-résolus touchés aux mêmes taux (67-81 % partout), signal trivial de géométrie (coins disjoints). `ampleurporte2.py` restreint au SEUL but que `butActif()` choisirait réellement (rang minimal de `getOrdreButs()`, lu via l'outil `ordre` — jamais recalculé en Python, trop de règles) : **17/435 jalons (3,9 %)**, 9 niveaux sur 28 touchés, dont plusieurs non-résolus (13, 14, 15, 22, 25) avec des coupures parfois massives (10 caisses/7 buts sur le 25) |
+| `rejeu <niveau.xsb> <journal.txt>` | **(neuf, 2026-08-22 ; ÉTENDU AUX MACROS le 2026-08-23)** LE JUGE D'UNE PARTIE HUMAINE, DE BOUT EN BOUT. Rejoue la dernière partie d'un journal hybride et interroge le moteur à chaque état : `isPerdu()` (toute détection = faux positif prouvé) et `remplissageOrdonne()`. **Depuis le 2026-08-23, il juge aussi chaque `[macro] LANCEE`** via `jugeMacro` (`jugemacro.h`, exemplaire unique partagé avec l'UI) et classe la macro humaine en **HORS PASSE COUPLAGE** / **ECARTE** / **rang**. Il couvre donc enfin les coups de macro, qui étaient 95 % de la partie du 200. ⚠️ **Il relit l'ORDRE dans l'en-tête du journal** (`PAR ALIGNEMENT` → `setOrdreAlignement`, `⚠ INJECTE` → avertissement) : une macro vise `butActif()`, donc rejouer sous un autre ordre rendrait tous les verdicts faux **sans bruit**, le rejeu des coups marchant très bien par ailleurs. Le garde a servi le jour même — la partie du 200 avait été jouée en align, et 11 macros sur 15 étaient jugées à côté |
+| `zonembut [<niv\|fichier.xsb>]` | **(neuf, 2026-08-22, idée utilisateur) LES ZONES D'EMBUT, EN `.xsb`.** Une zone d'embut est l'ENCLOS qui enferme un bloc de buts adjacents : son sol, ses murs, ses PORTES. Sans argument, balaie les 32 niveaux ; écrit `zone_nivNN_zK.xsb` (convention de caractères de l'app, donc rechargeable par `image`/`bench`/l'app) et imprime les coordonnées des portes. **L'outil ne calcule rien** : tout est dans `Game::zonesEmbut()` (§7, exemplaire unique), il ne fait que dessiner. Quatre étages : `sallesDeButs` (déjà là) → GOULOTS (≤ 2 voisins libres, jamais un but) + PORTES DOUBLES (paire fermée par des murs aux deux bouts **et qui coupe le plateau** — sans ce second test, le couloir large de 2 du niveau 20 se ferait trancher à chaque rangée) → ABSORPTION des culs-de-sac (seuil balayé : 4/5/6 identiques) → **RESSERRAGE PAR COUPE** de 1 ou 2 cases **pas forcément voisines** (la bouche du 21 est {(9,9),(10,8)}, deux cases en diagonale), quand rien ne sépare la salle du reste. **CALÉ SUR UNE VÉRITÉ TERRAIN** — découpage à la main par l'utilisateur, puis **relecture des 35 zones en PNG**, qui a réfuté un mécanisme de plus (cf. §6.0). Résultat : **35 zones sur 32 niveaux**, les 508 buts couverts, 3 niveaux en portent plusieurs (10, 18, 25) ; la plus étalée fait **30 %** de l'intérieur, médiane **19 %** |
+
 | `ordredp <niv\|fichier.xsb> [--avant x,y,… --apres x,y,…]` | **(neuf, 2026-08-21, non commité) LE GOAL-ORDERING PROUVÉ, PAS DEVINÉ.** DP par sous-ensembles (schéma Held-Karp) sur `Game::butMureLocalement`, qui ne dépend que du SOUS-ENSEMBLE de buts posés, jamais de l'ordre — donc « un ordre sans murage existe-t-il » est une pure accessibilité dans le treillis des 2^n parties, mémoïsable. Contrainte dure = la seule précédence PROUVÉE (`precedenceGlobale`, via `PrecedencePaires::atteintUneCaisse`) ; l'alignement (indice) est exclu exprès. Rend un ordre témoin (**SAT**) ou une preuve d'impossibilité (**UNSAT**, tout le treillis atteignable épuisé — jamais un budget ambigu). Remplace directement le retour arrière à budget fixe de `ordreParPrecedence`, dont le budget de 500 s'est révélé insuffisant même sur l'ordre PAR DÉFAUT (13, 23 — §6.0, 2026-08-21). ⚠️ Coût O(2^n) : praticable jusqu'à ~24-27 buts (niveau 22 : 610 270 états, 196 s) ; hors de portée pour le niveau 10 (32 buts) sans décomposition par composantes connexes. ⚠️ **PROUVE UNE CONDITION NÉCESSAIRE, PAS SUFFISANTE** — un ordre SAT peut rester injouable, `butMureLocalement` ignorant les caisses non livrées comme obstacles (réfuté en direct sur le 22, cf. §6.0) |
 
 **Règles de mesure, non négociables :**
@@ -498,7 +502,8 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 >
 > **CE QUI RESTE À FAIRE — DEUX CHANTIERS, DISTINCTS ET NI L'UN NI L'AUTRE N'EST LA LOI
 > DE L'ORDRE :**
-> - **CHANTIER A (sûr, petit)** — corriger le budget de `ordreParPrecedence` : soit le
+> - ✅ **CHANTIER A — FAIT le 2026-08-23** (mémoïsation par sous-ensembles ; ni un
+>   budget plus haut ni le DP branché, cf. le bloc du 2026-08-23). ~~**CHANTIER A (sûr, petit)** — corriger le budget de `ordreParPrecedence` : soit le
 >   monter (combien ? le 10 convergeait à ~4000, le 13/23 pas même à 50 000 — donc une
 >   constante plus haute ne suffit pas partout), soit brancher le DP du point 2 en
 >   remplacement pour les niveaux où 2^n reste praticable (≤ ~24 buts), avec repli sur
@@ -518,6 +523,606 @@ réel, abandonné à tort.** Couper un état mort supprime aussi sa descendance 
 >   AIDERAIT le solveur — on sait seulement qu'aujourd'hui, il ne peut même pas essayer
 >   de le suivre.
 
+> 🆕 **2026-08-22 — LES ZONES D'EMBUT SONT CODÉES, ET CALÉES SUR UNE VÉRITÉ TERRAIN.**
+> Demande utilisateur : un algo qui sorte, pour chaque niveau, un `.xsb` par ZONE
+> D'EMBUT — l'enclos qui enferme un bloc de buts adjacents, avec ses murs, ses portes,
+> et **les caisses seulement si elles sont déjà posées sur un embut**. Codé dans le
+> moteur (`Game::zonesEmbut()`, game.cpp) + outil `mesures/zonembut` (§1).
+> - **LA MÉTHODE EST L'ACQUIS PRINCIPAL** : plutôt que de faire arbitrer trois
+>   définitions d'« enclos » dans le vide, l'utilisateur a **découpé 7 zones à la main
+>   sur 5 niveaux** (1, 10, 16, 20, 25, choisis pour leurs géométries opposées). C'est
+>   un jeu de validation, au même titre que les juges FP du §1 — et il a réfuté deux
+>   règles avant qu'elles soient écrites.
+> - **RÉSULTAT : 5/7 identiques AU CARACTÈRE PRÈS**, et les 2 restants ne diffèrent que
+>   par des `#` contre des espaces — **jamais un embut ni une caisse déplacés**. Les 7
+>   enclos sont donc justes ; seul le choix des murs à DESSINER autour diffère (l'outil
+>   garde les murs qui touchent la zone, diagonales comprises ; le tracé à la main en
+>   garde parfois d'autres).
+> - **`sallesDeButs` (2026-08-01) suffisait déjà pour le découpage en zones** : il rend
+>   le bon compte sur les 5 niveaux. ⚠️ Y compris le piège du **20**, où les dents de
+>   mur (16,5)/(16,7)/(16,9)/(16,11) donnent l'illusion de six paquets alors que la
+>   colonne x=17 est continue — une seule salle, une seule zone.
+> - **DEUX RÈGLES RÉFUTÉES PAR LA VÉRITÉ TERRAIN, chacune par un niveau précis** :
+>   *couper aux points d'articulation seuls* (le 25 sépare ses deux zones par une paire
+>   de cases, aucune n'étant un point d'articulation) et *couper à tout goulot* (le 25
+>   prolonge au contraire sa zone le long d'un couloir jusqu'au mur qui le bouche).
+>   D'où les deux mécanismes du code : le **prolongement collinéaire** et la **porte
+>   double** (paire fermée par des murs aux deux bouts ET qui COUPE le plateau — sans
+>   ce second test, le couloir large de 2 du niveau 20 se ferait trancher à chaque
+>   rangée).
+> - **Le seuil de cul-de-sac est BALAYÉ, pas choisi** (méthode CORRAL_BUDGET, §6.2) :
+>   1-2-3 → 4/7, **4-5-6 → 5/7**, 8 → **les deux zones du 25 fusionnent**, ce que la
+>   vérité terrain interdit. Défaut 4, au milieu du plateau 4-5-6.
+> - **AMPLEUR : 34 zones sur les 32 niveaux.** Deux niveaux seulement en portent
+>   plusieurs (10 : 28+4 buts ; 25 : 17+2), et **18/24/26 en portaient deux à tort** —
+>   deux salles de buts qui partagent un seul enclos sont une seule zone, d'où la
+>   fusion. **Le niveau 8 est le cas d'école de la porte double** : il fuyait sur 54 %
+>   du plateau par une entrée large de deux cases, il rend sa salle de buts seule
+>   depuis.
+> - **LA RÈGLE D'ABSORPTION EST CHOISIE PAR L'UTILISATEUR** (2026-08-22) : *« ce qui est
+>   BOUCHÉ appartient à la zone, ce qui DÉBOUCHE n'y appartient pas »*. C'est ce que le
+>   code fait déjà — une poche est avalée, un débouché est une porte. **Quatre variantes
+>   ont été essayées pour la rendre scale-free, et les quatre sont RÉFUTÉES par mesure**,
+>   toutes sur le jeu des 8 zones :
+>   1. poche avalée si plus petite que la zone COURANTE → s'emballe (la zone grandit, le
+>      plafond grandit) : le 21 prend les **94 cases** du plateau, zéro porte ;
+>   2. même test figé sur le CŒUR de la salle → même 94 cases (le cœur est déjà trop gros
+>      quand rien ne sépare la salle), **et les deux zones du 25 fusionnent** ;
+>   3. graine = les BUTS seuls, sans l'étage des fragments → **0/8** (les salles perdent
+>      le sol qui les entoure) ;
+>   4. goulot compté en IGNORANT les buts voisins → **4/8**, casse le 16, et ne répare
+>      même pas le 21.
+>   **Le seuil absolu reste donc, et il porte un fait** : une poche est petite dans
+>   l'absolu (4 cases au 20), un débouché est le reste du plateau (44 au 1). Les deux
+>   modes sont franchement séparés ; le seuil tombe entre les deux.
+> - ✅ **LE 21 EST TRANCHÉ — RESSERRAGE PAR COUPE (règle (i), choisie par l'utilisateur).**
+>   Sa salle de buts n'a **aucun rétrécissement** vers le milieu du plateau — le découpage
+>   à la main y traçait une frontière en plein sol libre ((8,4) à (8,8) sont libres,
+>   vérifié case par case). Le seul point de coupe est la paire **{(9,9),(10,8)}**, deux
+>   cases **NON adjacentes** ayant chacune trois voisins libres : invisible pour le goulot
+>   comme pour la porte double. D'où un quatrième étage : quand la zone est trop large,
+>   chercher une coupe de 1 ou 2 cases (voisines ou non) qui isole les buts, et ne garder
+>   que leur côté. L'utilisateur a préféré ce résultat (**16 cases**) à son propre croquis.
+>   ⚠️ **Trois garde-fous, chacun réparant un cas mesuré** : la coupe ne porte jamais sur
+>   un but ; tous les buts de la salle restent du même côté ; **l'autre côté doit être
+>   substantiel** — sans quoi la paire {(14,7),(15,6)} du niveau 1 « coupe » en isolant le
+>   seul coin (14,6), et les salles se font charcuter par leurs propres angles.
+> - ❌ **LE PROLONGEMENT COLLINÉAIRE EST RETIRÉ — le jour même où il avait été ajouté.**
+>   Il courait tout droit jusqu'au mur suivant pour reproduire une zone du niveau 25.
+>   **C'est la RELECTURE EN IMAGES qui l'a tué** : l'utilisateur a regardé la planche
+>   contact et a signalé six anomalies d'un coup — le 2 à droite, le 9 à gauche, le 14 en
+>   haut et en bas, le 15 à droite, le 25 à gauche, et le **18 rendu en une zone au lieu
+>   de deux**. Toutes le même mécanisme : il embarquait le COULOIR DE SORTIE des salles.
+>   Bilan mesuré sur les 8 zones de vérité terrain : **il en gagnait UNE et en perdait
+>   cinq ailleurs**. Retiré sans interrupteur — un `qgetenv` planqué dans le moteur est le
+>   piège §7. Seul reliquat assumé : la petite zone du 25 rend 3 cases au lieu des 5 du
+>   croquis, ce que l'utilisateur a validé en images.
+>   🎯 **LA LEÇON, et elle vaut au-delà de ce chantier** : le découpage à la main avait
+>   validé ce mécanisme, la relecture en IMAGES l'a réfuté. Un jeu de validation de 8 cas
+>   ne voit pas ce que 35 vignettes montrent d'un coup d'œil. **L'ASCII cachait ce que le
+>   dessin a rendu évident** — même leçon que `mesures/image` en 2026-08-14 (« la
+>   géométrie du 12 a été mal lue trois fois de suite »).
+> - **AMPLEUR, ÉTAT FINAL : 35 zones sur les 32 niveaux, les 508 buts couverts**, trois
+>   niveaux en portant plusieurs (10 : 28+4 · 18 : 4+7 · 25 : 17+2). Le resserrage avait
+>   touché 5 zones (12, 13, 19, 21, 22), le retrait du prolongement en a resserré six
+>   autres et **rendu au 18 ses deux zones**. L'étalement maximal est descendu de **55 %
+>   → 38 % → 30 %** de l'intérieur (médiane 19 %) : les 35 zones sont enfin de la même
+>   famille, ce qui était le critère de l'utilisateur (« le plus logique par rapport aux
+>   autres »).
+> 🎯 **2026-08-22 (suite 3) — L'ORDRE PROUVÉ, LA PORTE DE CHAQUE EMBUT, ET LE QUOTA
+> PAR PORTE.** Objectif posé par l'utilisateur : *« trouver enfin un ordre solvable, et
+> déterminer par quelle porte quel embut doit être rempli »*, avant de s'attaquer au
+> démêlage. `zonembut <niv> ordre` (ou `ordre` seul pour les 32) **résout le niveau
+> simple de chaque zone et LIT sa solution** — rien n'est déduit :
+> - **l'ORDRE est PROUVÉ JOUABLE** puisqu'il vient d'une partie gagnée. C'est l'autre
+>   moitié de l'asymétrie du §6.6 : `precedenceGlobale`/`butMureLocalement` disent ce qui
+>   est INTERDIT (condition nécessaire), une solution dit ce qui MARCHE ;
+> - **la PORTE de chaque embut**, et donc **le QUOTA par porte** — combien de caisses le
+>   démêlage devra livrer de quel côté. C'est le cahier des charges de l'étape suivante.
+> **RÉSULTAT : 25 zones sur 35**, sortie en `ordre_nivNN_zK.txt`. Les 10 restantes sont
+> toutes en BUDGET dépassé, aucune insoluble.
+> - ⚠️ **LES ZONES D'UN MÊME NIVEAU SONT INDÉPENDANTES** (constat utilisateur) : jamais
+>   d'ordre global, un jeu de données par zone.
+> - **La mesure valide la lecture humaine** : sur la zone 0 du 18, l'utilisateur avait dit
+>   à la main « la porte du haut-gauche ne sert qu'au personnage, 3 caisses sur 4 passent
+>   par celle de droite ». Le quota extrait est **(11,2)x3 (7,1)x1**.
+> - Deux quotas instructifs : le **16** compte 14 pour 15 embuts (la 15ᵉ caisse est posée
+>   au départ) ; le **10 zone 1** a deux portes et n'en utilise qu'UNE.
+>
+> 🧱 **LES 10 ZONES SANS ORDRE — CE QUI A ÉTÉ ESSAYÉ, ET CE QUI RESTE OUVERT.**
+> - **Budget ×10 (30 s → 300 s par zone) : AUCUN gain.** 12, 13, 15, 20, 22, 25.1, 26,
+>   28, 29, 32 rendent toujours rien. Cohérent avec le balayage A\* pur, où passer de
+>   60 s à 240 s n'avait débloqué aucun niveau non plus. **On n'est pas au bord du mur,
+>   on est loin derrière** — inutile d'allonger.
+> - 🎯 **LES CAISSES DÉJÀ POSÉES SONT UN POINT DUR, ET LA MESURE EST NETTE** (question
+>   utilisateur : *« il faut déplacer les caisses déjà en place, est-ce que le solveur
+>   sait faire ça ? »*). Expérience : la zone du **15** privée de ses deux caisses posées
+>   — mêmes embuts, même nombre de caisses, deux d'entre elles remises dans le couloir —
+>   se résout en **171 états** ; avec elles, `coupl-plongeon` **ÉPUISE son espace**.
+>   Trois zones du corpus en contiennent : 15 (2), 16 (1), 29 (5). **Le 15 et le 29 sont
+>   sans ordre ; le 16 en a un.**
+> - ⚠️ **MAIS L'EXPLICATION SIMPLE EST RÉFUTÉE** (scepticisme de l'utilisateur, vérifié
+>   sur pièces). J'avais conclu « le régime macro ne ressort jamais une caisse d'un but,
+>   §6.0 point 8 ». **Faux** : l'ordre extrait du 16 montre que sa caisse posée (9,10)
+>   finit en (12,7) — donc elle bouge, et le régime a su le faire. Ce que le plan
+>   documente est plus fin et CONDITIONNEL : « une macro engagée, le solveur ne génère
+>   aucune poussée simple ». Le 16 tombe du bon côté, le 15 du mauvais.
+> - ⚠️ **Un fait qui affaiblit encore l'explication** : sur le 15, `coupl-plongeon`
+>   ÉPUISE l'espace là où `macro` SEUL ne l'épuise pas (il manque juste de temps). Les
+>   deux portent pourtant le même moteur macro — c'est donc le **couplage ou le plongeon**
+>   qui referme l'espace, pas seulement l'engagement. À creuser indépendamment.
+> - **`relegue` essayé** (le correctif du §6.0 point 6, qui dé-priorise au lieu de
+>   supprimer) : rien en 300 s. Non concluant, ni confirmation ni réfutation.
+> ❌ **L'ORDRE PROUVÉ N'APPORTE RIEN — ET C'EST LE RÉSULTAT LE PLUS UTILE DU JOUR.**
+> Les 25 ordres extraits ont été convertis au format d'injection (`ordre_niveau_XXXX.txt`,
+> §1 — le parseur lit des paires `(x,y)`, il a fallu ne garder que le but et jeter la
+> porte) et injectés dans les VRAIS niveaux. 22 niveaux avaient un ordre complet (toutes
+> zones couvertes). Même binaire, même régime `coupl-plongeon`, budget 90 s, une seule
+> variable.
+> **Sur les 10 comparaisons concluantes : 9 IDENTIQUES À L'UNITÉ** (1, 2, 3, 4, 5, 7, 8,
+> 9, 17 — mêmes états, mêmes poussées) **et la dixième diffère de 2 états** (le 6 :
+> 570 → 568). Aucun niveau gagné.
+> 🎯 **L'ordre extrait d'une PARTIE GAGNÉE coïncide avec celui que `ordreParPrecedence`
+> CALCULE.** C'est une validation croisée par une voie totalement indépendante — une
+> solution d'un côté, une précédence déduite de l'autre — de tout le travail sur l'ordre
+> depuis juillet. Et surtout : **sur ces niveaux, l'ordre n'était pas le problème.** Le
+> goulot est ailleurs (démêlage, ou génération des macros — cf. ci-dessous).
+> - ⚠️ **La régression du 10 est un ARTEFACT DU PROTOCOLE, pas de l'ordre.** Le 10 a deux
+>   zones et le format d'injection est un ordre TOTAL : la concaténation impose « remplir
+>   entièrement la grande salle, PUIS la petite », alors que les zones sont INDÉPENDANTES
+>   (constat utilisateur) et que leur entrelacement est libre. J'ai ajouté une contrainte
+>   que la donnée ne porte pas — sur le niveau même où le §6.2 documente un correctif
+>   multi-salles valant ×7,5. **Le mécanisme d'injection ne sait pas exprimer des ordres
+>   indépendants ;** c'est sa limite, à corriger avant tout usage sur un multi-zones.
+> - ⚠️ **11 niveaux sur 22 ne concluent d'aucun côté à 90 s** : la mesure ne dit RIEN sur
+>   eux, et ne doit pas être lue comme si elle disait quelque chose.
+>
+> 🔬 **LA PARTIE HUMAINE DU 200, PASSÉE AU JUGE — TROIS SUSPECTS ÉLIMINÉS.**
+> L'utilisateur a rejoué `level0200.xsb` en mode HYBRIDE et l'a GAGNÉ : 363 coups,
+> 94 poussées, 15/15, dont **133 macros et seulement 7 poussées choisies à la main**.
+> Outil neuf **`mesures/rejeu`** (+`.pro`) : rejoue la dernière partie d'un journal
+> hybride et interroge le moteur à chaque état — protocole du juge FP (§1), sur une
+> partie gagnée toute détection est un faux positif prouvé.
+> - **0 faux positif de défaite** sur les 363 états. L'élagage des deadlocks est hors de
+>   cause.
+> - **0 `HORS REGIME MACRO`, 0 `⚠ ECARTE`** sur les 7 poussées manuelles : elles sont
+>   toutes générables par le solveur et aucune n'est élaguée.
+> - ❌ **`remplissageOrdonne` est DU CODE MORT** — déclarée dans `game.h:155`, appelée
+>   NULLE PART dans `solveurastar.cpp`. Elle rejetterait pourtant ce chemin gagnant dès
+>   le coup 1 (362 états sur 363 en violation), parce que les deux caisses PRÉ-POSÉES ne
+>   sont pas sur les buts les plus profonds. À savoir si quelqu'un la réactive.
+> - ❌ **LE COUPLAGE EST DISCULPÉ**, après l'avoir accusé à tort. L'isolation montrait
+>   `couplage` et `coupl-plongeon` qui ÉPUISENT quand `macro` et `plongeon` ne concluent
+>   pas — mais la lecture du code interdit qu'il coupe : `getHeuristique` ne sert qu'à
+>   `f = g + poids·h` (aucun test sur `INF_COUPLAGE`), et le score de guidage n'est
+>   qu'un DÉPARTAGE à `f` et `g` égaux (solveurastar.cpp:23). Un minorant ne retire pas
+>   d'état, il réordonne. `couplage` épuise plus vite, voilà tout — une meilleure `h`
+>   réexpanse moins. ⚠️ **Non vérifié empiriquement** : `macro` seul n'a pas épuisé en
+>   600 s, la confirmation manque.
+> ~~🎯 **CE QUI RESTE, ET C'EST LE VRAI RÉSULTAT** : l'espace engendré par le RÉGIME
+> MACRO ne contient pas de solution pour cette zone [...] il est dans la **GÉNÉRATION DES
+> MACROS elles-mêmes**.~~
+> ❌ **RÉFUTÉ le 2026-08-23 — LE TROU ÉTAIT DANS L'ORDRE, et c'est une leçon de méthode
+> coûteuse.** Trois suspects avaient été éliminés un par un (élagage, relégation,
+> couplage) et la conclusion est tombée sur le quatrième **par élimination, sans jamais
+> le tester**. Or l'ordre par défaut du 200 est MURÉ au rang 13 — `ordre level0200.xsb`
+> le dit en une seconde, et cet outil existait depuis le 2026-07-29. **Le suspect qui
+> reste après élimination n'est pas prouvé coupable** : il faut encore l'interroger, et
+> c'était ici le moins cher des quatre. Même famille que le §7 (« nommer les variables
+> AVANT de lire un écart ») : ici c'est un mécanisme non mesuré qui a hérité de la
+> charge, faute d'avoir vérifié qu'on avait bien épuisé la liste.
+> ⚠️ **Et l'instrumentation ne le voit pas** : le journal hybride confronte le solveur
+> aux poussées choisies À LA MAIN (`⚠ ECARTE`), jamais aux MACROS jouées. Sur cette
+> partie, 133 coups sur 140 échappent donc au juge. **Étendre `⚠ ECARTE` aux macros est
+> le prochain pas**, et il est petit.
+>
+> 🎯 **2026-08-23 — LE CHANTIER A EST FAIT, ET LE 200 TOMBE EN 54 ÉTATS. LE BUDGET DE
+> 500 N'ÉTAIT PAS TROP PETIT : LA RECHERCHE ÉTAIT EXPONENTIELLE POUR RIEN.**
+> Parti d'un constat utilisateur — *« l'ordre qu'il utilise n'est pas bon ; celui du
+> régime align est bon, mais ça ne résout pas non plus »* — et confirmé statiquement
+> en une seconde par un outil qui existait depuis juillet :
+>
+> ```
+> ❌ ORDRE MURÉ au rang 13, sur le but (7,7).
+>    13. but (7,7)  approches viables=2  libres=0  <<< MURÉ
+>    14. but (8,7)  approches viables=2  libres=0  <<< MURÉ
+> ```
+>
+> **LA CAUSE, et elle n'est pas celle que le §6.0 du 2026-08-21 avait retenue.** Ce
+> paragraphe proposait de « monter le budget » ou de « brancher le DP », après avoir
+> mesuré que 50 000 ne suffisait toujours pas sur les 13 et 23. Le vrai défaut est
+> ailleurs : tout ce dont dépend la suite de la recherche — `pret`, `pretPreuve`,
+> `mureraitQuelquun`, donc `butMureLocalement` — est fonction du seul **ENSEMBLE** des
+> buts déjà émis, jamais de l'ORDRE dans lequel on les a posés. C'est **exactement le
+> constat qui fonde `mesures/ordredp`** (§6.0, point 2), mais il n'avait été exploité
+> que pour bâtir un outil SÉPARÉ. Appliqué à la recherche existante, il ne demande pas
+> un DP : il demande **une table**. Sans elle, un même sous-ensemble était redescendu
+> `k!` fois et le budget partait là-dedans.
+> - **Le correctif tient en trois lignes de logique** (`game.cpp`,
+>   `ordreParPrecedence`) : un `QSet<quint64>` des sous-ensembles prouvés stériles ; on
+>   n'y redescend plus, et surtout **on ne paie plus de budget pour eux**.
+> - ⚠️ **La clé porte AUSSI `salleCourante`**, et l'oublier serait un vrai bug : deux
+>   chemins menant au même sous-ensemble peuvent laisser le joueur dans des salles
+>   différentes, et les passes 1/2 classent les candidats d'après elle. Avec la salle,
+>   les deux états sont rigoureusement équivalents ; sans elle, on couperait des
+>   branches valides.
+> - ⚠️ **On ne mémoïse que l'ÉPUISEMENT RÉEL des candidats d'un étage, jamais un abandon
+>   par budget.** Marquer « échoué » un sous-ensemble qu'on a seulement cessé d'explorer
+>   ferait rater un ordre sain, et le murage reviendrait **sans que rien ne le signale**.
+>   C'est la distinction UNSAT / budget que le §6.0 exigeait déjà de `ordredp`.
+> - Le budget passe de 500 à **5 000**, en garde-fou dur. ⚠️ **La constante n'est PAS ce
+>   qui répare** : à 500 la mémoïsation suffit déjà pour le 200 ; le 13, lui, demande les
+>   deux — et **sans mémoïsation, 100 000 ne le répare pas** (mesuré). C'est la preuve
+>   séparée que le levier est la table, pas le chiffre.
+>
+> **RÉSULTAT, canari d'ordre sur les 35 plateaux (binaire contre binaire) :**
+>
+> | | |
+> |---|---|
+> | ordres qui changent | **2 — le 13 et le 200**, tous deux **MURÉ → sain** |
+> | les 34 autres | **identiques au caractère près** |
+> | murages restants | **18 et 23 seulement** — soit **exactement les deux UNSAT PROUVÉS** du DP (§6.0 point 3) |
+> | temps CPU de chargement (10, 13, 22, 23, 24, 200) | **inchangé**, dans le bruit (le 22 reste le pire à 4,6 s) |
+>
+> 🎯 **ET LE MURAGE PAR DÉFAUT DU CORPUS EST DÉSORMAIS EXACTEMENT L'ENSEMBLE DES UNSAT
+> PROUVÉS.** Il ne reste plus un seul niveau muré par défaut de `ordreParPrecedence` : le
+> 18 et le 23 le sont parce qu'aucune permutation ne marche, ce qui n'est plus un défaut
+> d'algorithme mais une propriété du plateau. C'est la première fois que les deux
+> lectures — la recherche du moteur et le DP de `mesures/ordredp` — **coïncident sur tout
+> le corpus**.
+>
+> ✅ **`level0200.xsb` EST RÉSOLU : `etats=54 poussees=76 coups=335`**, ordre CALCULÉ
+> (aucune injection), régime `coupl-plongeon`. Le banc d'essai que le plan tenait pour
+> « hors de portée du solveur » depuis le 2026-08-22 tombe en 54 états dès que son ordre
+> n'est plus muré. **Tout ce que ce document a écrit sur le 200 comme angle mort de la
+> GÉNÉRATION DES MACROS est réfuté** (corrections apposées plus bas, sur les trois
+> paragraphes concernés).
+> - ⚠️ **Le 13 n'est PAS résolu pour autant** : ordre réparé, il rend `max 9/16` sans
+>   conclure — la même valeur qu'au profilage de juillet. Un ordre sain est nécessaire,
+>   il n'est pas suffisant (§6.6, l'asymétrie). Ne pas lire « 2 ordres réparés » comme
+>   « 2 niveaux gagnés » : c'est **1 gagné, 1 débloqué à mi-chemin**.
+> - ⚠️ **Ce que ça dit du juge de macros écrit le même jour** : ses 19 HORS PASSE
+>   COUPLAGE restent un fait mesuré, mais **le 200 ne les portait pas comme cause**.
+>   Le juge a bien fait son travail (0 ECARTE, 0 INTROUVABLE, il a disculpé l'élagage) ;
+>   c'est l'interprétation qui allait trop vite, deux fois de suite, avant que le test
+>   statique ne tranche.
+> - ⚠️ **Et l'ordre align, lui, ne résout toujours pas** (constat utilisateur, vérifié) :
+>   injecté par fichier, `coupl-plongeon` et `plongeon` rendent tous deux `max 11/15` en
+>   600 s sans conclure — moins loin que l'ordre par défaut réparé, qui gagne. Un ordre
+>   prouvé jouable par une partie humaine n'est donc pas le meilleur ordre pour le
+>   solveur : deuxième illustration de l'asymétrie du §6.6, et la plus nette.
+>
+> **PÉRIMÈTRE** : `game.cpp` seul (`ordreParPrecedence` — mémoïsation + budget 5 000).
+>
+> 🔬 **LA RELANCE, CIBLÉE — ET SON BILAN EST MAIGRE, IL FAUT LE DIRE.** Le réflexe
+> « relancer les 15 non-résolus » a été ÉCARTÉ par l'utilisateur, et il avait raison :
+> pour 14 d'entre eux l'ordre est identique au caractère près et le code aussi, donc le
+> run rejoue une trajectoire déterministe déjà mesurée. Un non-résolu n'a même pas de
+> ligne dans `scores.md` — il n'y a pas de chiffre à rafraîchir. **Ce qui a rendu la
+> relance utile, c'est de chercher D'ABORD où l'ordre change**, et pas seulement dans le
+> régime par défaut :
+>
+> | régime | ordres qui changent |
+> |---|---|
+> | défaut | 13, 200 |
+> | **align** | **10, 13, 20** |
+> | look | 13, 200 |
+>
+> Trois runs, pas quinze. ⚠️ L'ordre align est **injecté par fichier** et le régime reste
+> `coupl-plongeon` : armer `loi` armerait AUSSI `caseMorteLoi` (réfutée), soit deux
+> variables — le piège du 2026-08-19.
+> - ✅ **10 : `etats=571053 poussees=544 coups=1563`** — le chiffre du 2026-08-19 **à
+>   l'unité près**, mais sans injection manuelle. **Le point 🔴 « l'ordre gagnant du 10
+>   est INJECTÉ À LA MAIN » est CLOS** ; `mesures/ordres_humains/ordre_niveau_0010_appui-17-2.txt`
+>   devient une archive, plus un outil de chantier. ⚠️ Toujours **2,3× au-dessus du
+>   défaut** (249 913) : une injection automatisée, pas un gain.
+> - ❌ **20 : `max 1/18` en 900 s**, ordre align réparé — exactement la valeur du
+>   profilage de juillet. Murage levé, le niveau ne démarre toujours pas.
+> - ❌ **13 : `max 9/16`**, dans les TROIS régimes (défaut, look à 20,8 M états/900 s) —
+>   là aussi la valeur de juillet, inchangée.
+>
+> 🎯 **CONCLUSION, et elle vaut mieux que le gain** : la correction fait tomber **un banc
+> d'essai (200) et zéro niveau du corpus**. Les deux non-résolus dont l'ordre était muré
+> — 13 et 20 — ne bougent pas d'un but une fois réparés. C'est la **troisième et la plus
+> nette illustration de l'asymétrie du §6.6** : un ordre sain est nécessaire, il n'est
+> jamais suffisant. Et ça confirme par l'expérience ce que le DP annonçait au §6.0
+> (point 3) : *« sur 13 niveaux, le goal-ordering n'est le facteur bloquant que pour 2
+> d'entre eux »* — on sait maintenant que même pour ces 2, le réparer ne suffit pas.
+> **Le goal-ordering est donc CLOS comme piste de déblocage** : il ne reste plus un seul
+> niveau muré par défaut hors des deux UNSAT prouvés, et aucun des murages levés n'a
+> rendu un niveau.
+
+> ✅ **2026-08-23 — LE JUGE EST ÉTENDU AUX MACROS, ET IL NOMME LE DÉSACCORD DE
+> GÉNÉRATION.** Le point 1 de « OÙ REPRENDRE » ci-dessous est FAIT. Le journal
+> hybride ne confrontait le solveur qu'aux poussées choisies à la main ; sur la
+> partie du 200, 133 coups sur 140 y échappaient. `jugeMacro` (**`jugemacro.h`**,
+> racine — en **exemplaire unique** §7, appelé par l'UI *et* par `mesures/rejeu`)
+> rejoue les deux passes de `tenteMacro` puis l'enfilage, à l'identique : régime du
+> couplage, corral unitaire, corral-N au même `CORRAL_BUDGET`, et la clé du
+> comparateur (f croissant, **g décroissant**, guidage).
+> - **Ce que l'écran ne disait pas, et qui est tout le sujet.** `majMacrosJouables`
+>   cercle une caisse dès que sa descente aboutit. Le solveur en fait DAVANTAGE, et
+>   d'abord par le **RÉGIME DU COUPLAGE** : la passe 0 ne tente que
+>   `caisseAssignee(but)` et, si SA descente aboutit, `break` — les autres caisses ne
+>   sont **jamais tentées**. Une macro cerclée en vert peut donc n'exister dans aucun
+>   état de l'arbre du solveur. Le commentaire de `solveurastar.cpp` dit « ce régime
+>   ne RETIRE aucune branche, il en PRÉFÈRE une » : c'est vrai de l'espace ATTEIGNABLE,
+>   c'est faux **à un état donné**, et c'est cette distinction que le juge mesure.
+> - ⚠️ **Nuance de fidélité reproduite telle quelle** : `macrosOk` compte, dans le
+>   solveur, les descentes qui ABOUTISSENT et non les enfants réellement enfilés
+>   (l'incrément suit `enfiler()`, qui a pu élaguer). Une passe 0 dont l'unique enfant
+>   meurt au corral coupe donc quand même la passe de repli.
+> - ⚠️ **Le `g` n'est PAS commun aux frères** ici, contrairement aux poussées simples :
+>   une macro enfile à `g + (nombre de poussées)`. C'est bien Δf, jamais Δh, qui se
+>   transporte à la file — et les trois clés du comparateur mordent, là où le juge des
+>   poussées simples n'en avait que deux.
+>
+> **LA MESURE, sur les 16 parties GAGNÉES en banque — 216 macros, aucun rejeu à la
+> main** (les journaux étaient déjà là ; c'est l'outil qui manquait) :
+>
+> | verdict | compte | |
+> |---|---|---|
+> | **HORS PASSE COUPLAGE** (jamais générée à cet état) | **19 / 216 (8,8 %)** | sur **8 niveaux sur 16** |
+> | **ECARTE** (faux positif d'élagage prouvé) | **0** | le corral est hors de cause |
+> | **INTROUVABLE** (miroir en défaut) | **0** | l'overlay et le juge concordent partout |
+> | retenues | 196 | **rang 1 dans 158 cas (81 %)**, rang moyen 1,3, pire 7 |
+>
+> 🎯 **QUAND LE SOLVEUR GÉNÈRE LA MACRO HUMAINE, IL LA CLASSE EN TÊTE** — 81 % de
+> rang 1, `df = 0` presque partout. **Le guidage n'est donc pas le problème ; la
+> génération l'est.** C'est la même forme de résultat que la session 2/7 du
+> 2026-08-01 sur les poussées simples (« il ne peut pas départager »), et elle pointe
+> dans la même direction : ce qui manque n'est pas un tie-break de plus.
+> - **Le 200 et le 11 portent les taux les plus hauts** (26,7 % et 28,6 %) — et le 200
+>   est justement le banc que l'humain gagne et que le solveur ne résout pas. ⚠️ **Deux
+>   points ne font pas une loi** (§11.4, piège tombé en direct sur le mou) : le taux
+>   **ne discrimine pas** résolus et non-résolus (le 3, le 4, le 26 sont résolus et en
+>   portent ; le 20, le 25, le 13, le 15 sont non résolus et n'en portent aucun).
+>   Ce n'est PAS le prédicteur que le §6.6 réclame.
+> - ⚠️ **Et ce n'est pas une preuve d'incomplétude.** Le juge dit « à CET état, cette
+>   branche n'est pas dans l'arbre » ; le solveur peut y revenir par un autre chemin.
+>   L'incomplétude, elle, reste prouvée par l'autre bout (le 16 : `AUCUNE`, espace
+>   ÉPUISÉ, §6.0 point 6). Ce que le juge apporte est le **mécanisme nommé et
+>   localisable**, pas un théorème de plus.
+> - ⚠️ **Deux étages ne sont PAS rejoués** et un verdict se lit avec : `loiTropTot`
+>   (propre au régime `loi`, réfuté) et la **dédup `meilleurG`**, qui demande
+>   l'historique d'un run entier. Un `rang` dit « le solveur enfilerait ceci ici », pas
+>   « il le développerait ».
+>
+> 🔬 **L'EXPÉRIENCE QUE LA MESURE DÉSIGNAIT, FAITE LE JOUR MÊME — ET ELLE RÉFUTE
+> L'INFÉRENCE FACILE.** Le couplage étant déjà un interrupteur (`plongeon` contre
+> `coupl-plongeon` : macro + plongeon des deux côtés, le couplage pour seule variable),
+> le tester ne demandait aucun code. Sur `level0200.xsb` :
+>
+> | régime | états | verdict | progression |
+> |---|---|---|---|
+> | `coupl-plongeon` | **18 630 enfilages** | **`AUCUNE`** | **`max 13/15`** |
+> | `plongeon` (sans couplage) | 7,3 M vus (900 s, non conclu) | budget | **`max 13/15`** |
+>
+> - ✅ **Le couplage TRONQUE, c'est confirmé** : avec lui l'espace est ÉPUISÉ en
+>   18 630 enfilages sur un niveau dont l'utilisateur possède une solution. C'est un
+>   `AUCUNE` de plus qui ne prouve rien (§6.0, 2026-08-22), et on sait maintenant par
+>   quel mécanisme. Ce n'est pas non plus le corral : **`PRUNES=0`, 183 durs jugés,
+>   0 mort** sur ce run — cohérent avec les 0 ECARTE du juge.
+> - ❌ **MAIS IL N'EST PAS LE VERROU DU 200, et c'est le résultat le plus utile.** Les
+>   deux régimes plafonnent **au même endroit, 13/15**. Retirer le couplage transforme
+>   un `AUCUNE` en un budget — il ouvre l'espace sans faire progresser d'un seul but.
+>   Le mur du 200 est donc dans ses **deux derniers buts**, pas dans la troncature de
+>   génération que le juge mesure.
+> - ⚠️ **J'avais écrit l'inverse une heure plus tôt** (« le run confirme à l'échelle de
+>   l'espace entier »), sur la seule foi du `AUCUNE` contre le non-épuisement — sans
+>   avoir lu la progression, que `2>/dev/null` avalait. C'est **le piège de la jauge du
+>   §1**, pris sur le fait : la ligne qui réfutait la conclusion partait sur `stderr` et
+>   je l'avais jetée. Deux régimes qui diffèrent par leur mode de sortie peuvent être
+>   identiques par ce qui compte.
+>
+> 🔬 **CE QUE ÇA OUVRE, dans l'ordre.** (1) **Le 200 devient un cas mieux posé** : deux
+> régimes indépendants s'arrêtent à 13/15, donc la question n'est plus « pourquoi le
+> solveur ne démarre pas » mais « qu'y a-t-il aux deux derniers buts ». L'état à 13/15
+> s'exporte (`bench … record`) et se passe à `pas0`/`mort` — c'est le protocole qui a
+> chiffré le plongeon avant de le coder. (2) **Le juge est prêt pour le corpus entier**
+> dès qu'une partie gagnée de plus est enregistrée, et il ne coûte rien à relancer.
+> (3) Le HORS PASSE COUPLAGE reste un fait mesuré à expliquer sur les 7 autres niveaux
+> touchés — mais après le 200, et sans présumer qu'il y pèse davantage.
+>
+> ⚠️ **PIÈGE ÉVITÉ DE JUSTESSE, et il vaut pour tout rejeu de journal** : la partie du
+> 200 a été jouée sous l'**ordre align**, et `rejeu` recalculait l'ordre par défaut. Une
+> macro visant `butActif()`, **11 verdicts sur 15 étaient faux — et silencieusement**,
+> puisque le rejeu des COUPS, lui, marchait parfaitement. Corrigé en lisant la SOURCE de
+> l'ordre dans l'en-tête que l'UI écrit exprès (`calcule` / `⚠ PAR ALIGNEMENT` /
+> `⚠ INJECTE depuis …`), plus un garde qui refuse de juger quand le but du journal et
+> `butActif()` divergent. C'est le §7 (« charger une position recalcule tout le
+> statique ») appliqué au journal — et la démonstration que l'annotation de source
+> ajoutée le 2026-08-19 « pour la relecture humaine » servait en fait à une machine.
+> Le 26 en porte encore une trace (1 macro non jugée, désync à mi-partie).
+>
+> **PÉRIMÈTRE** : `jugemacro.h` (neuf), `mainwindow.h`/`mainwindow.cpp`
+> (`mesureRangMacro`, appelée depuis `joueMacro` — ligne `[macro-rang]` dans le journal),
+> `mesures/rejeu.cpp`. **Aucun fichier du solveur n'est touché** et rien n'appelle
+> `jugeMacro` depuis un chemin du moteur : le canari ne peut pas bouger, et il n'a donc
+> pas été relancé — c'est dit plutôt que sous-entendu.
+
+> 📌 **OÙ REPRENDRE (2026-08-23, fin de session) — remplace la liste du 2026-08-22
+> juste en dessous, dont le point 1 est FAIT et dont le point 3 change de statut.**
+> 1. **LES DEUX DERNIERS BUTS, PAS LE DÉMARRAGE.** Le 20 reste à `max 1/18` et le 13 à
+>    `max 9/16` **ordre sain**, donc la question « pourquoi ne démarre-t-il pas » n'a plus
+>    d'issue du côté de l'ordre. Le protocole qui a chiffré le plongeon AVANT de le coder
+>    s'applique ici : exporter l'état de record (`bench <niv> <regime> record`), le passer
+>    à `pas0` (quelle macro manque, et pourquoi) et à `mort` (l'état est-il seulement
+>    vivant ?). **Un état qu'on regarde vaut mieux qu'un budget qu'on allonge.**
+> 2. **CHERCHER UN PRÉDICTEUR** pour les 8 zones sans ordre et sans caisse pré-posée
+>    (12, 13, 20, 22, 25.1, 26, 28, 32) — inchangé, et c'est la seule ligne vide du
+>    tableau du §6.6. Hypothèse à VÉRIFIER : le rapport embuts/porte.
+> 3. **LE DÉMÊLAGE**, avec les quotas par porte comme cahier des charges — inchangé, et
+>    désormais **la seule grande piste restante** : le §3/§4 le dit irréductible, le
+>    goal-ordering vient d'être clos, et la mémoire était un plafond, pas le problème.
+> 4. Les **19 HORS PASSE COUPLAGE** du juge de macros restent un fait mesuré sans
+>    explication, sur 7 niveaux autres que le 200. ⚠️ **Ne pas en refaire le suspect
+>    principal** : c'est exactement ce qui vient d'être payé cher (§7, « le suspect qui
+>    reste après élimination »). À traiter comme une observation à expliquer, après 1 et 2.
+> ❌ **CE QU'IL NE FAUT PAS REFAIRE** : relancer avec plus de budget (réfuté ×4 et ×10 le
+> 2026-08-22, puis ×2 sur le 13 le 2026-08-23) — **et relancer un corpus que la promotion
+> ne touche pas** (§7, 2026-08-23 : chercher d'abord OÙ le changement mord).
+
+> 📌 **OÙ REPRENDRE (2026-08-22, fin de session).** Par ordre de rendement attendu :
+> 1. ✅ **FAIT le 2026-08-23 — voir le bloc ci-dessus.** ~~**ÉTENDRE `⚠ ECARTE` AUX MACROS** dans le journal hybride.~~ Aujourd'hui le juge ne
+>    confronte le solveur qu'aux poussées choisies À LA MAIN : sur la partie du 200,
+>    **133 coups sur 140 échappent au contrôle**. L'étendre dirait, en UNE partie, quelle
+>    macro le solveur refuse de produire et à quel état. C'est le seul chemin connu vers
+>    le fond du problème, et il se mesure sur 13×12 au lieu du niveau 18 complet.
+> 2. **CHERCHER UN PRÉDICTEUR** pour les 8 zones sans ordre et sans caisse pré-posée
+>    (12, 13, 20, 22, 25.1, 26, 28, 32). Hypothèse à VÉRIFIER, pas à supposer : le rapport
+>    embuts/porte (20 embuts pour 1 porte sur le 28, 18 sur le 20). Ce serait le premier
+>    prédicteur du §6.6 sur le rangement PUR.
+> 3. **LE DÉMÊLAGE**, avec les quotas par porte comme cahier des charges.
+> ❌ **CE QU'IL NE FAUT PAS REFAIRE** : relancer avec plus de budget. Réfuté deux fois le
+> même jour — ×4 sur A\* pur (60 s → 240 s) et ×10 sur l'extraction (30 s → 300 s), zéro
+> gain à chaque fois. On n'est pas au bord du mur.
+>
+> ~~🎯 **CE QUI EST GAGNÉ MALGRÉ TOUT : un banc d'essai minuscule.** `level0200.xsb`
+> (13×12, 15 embuts, ni transport ni congestion) est **résolu à la main par
+> l'utilisateur** et hors de portée du solveur. C'est le plus petit cas reproductible de
+> l'angle mort qui bloque le niveau 18 depuis des semaines.~~
+> ❌ **PÉRIMÉ le 2026-08-23 : le 200 EST RÉSOLU par le solveur, en 54 états.** Son
+> ordre par défaut était MURÉ sur ses deux derniers buts ; l'ordre réparé, il tombe
+> aussitôt. Ce n'était pas un angle mort de la macro, c'était un ordre faux — cf. le
+> bloc du 2026-08-23 plus haut.
+>
+> 🔴 **ET LA CORRECTION DE MÉTHODE DU JOUR — `AUCUNE` N'EST PAS UNE PREUVE.**
+> J'ai lu toute la journée les `AUCUNE` de `macro`/`coupl-plongeon` comme « prouvé
+> insoluble », et j'ai déclaré tel cinq niveaux fabriqués. **C'est faux** : ces régimes
+> embarquent le RÉGIME D'ENGAGEMENT, que le §6.0 (point 6) documente comme INCOMPLET —
+> « il ne rend pas des niveaux plus lents, il les rend insolubles ». Leur `AUCUNE` dit
+> « espace TRONQUÉ épuisé ».
+> **C'est l'utilisateur qui l'a démontré en RÉSOLVANT À LA MAIN**, dans l'app, un niveau
+> que j'avais déclaré insoluble (la zone du 15, exporté en `level0200.xsb`). Vérifié
+> ensuite : A\* pur ne conclut pas dessus, alors qu'il épuise réellement l'ancienne
+> version de la zone 0 du 18 (`level0201.xsb` d'alors). **Seul A\* pur fournit une
+> vérité.** `extrait()` le câble : `coupl-plongeon` pour trouver vite, reprise en `Astar`
+> dès qu'il rend `AUCUNE`, et le mot « insoluble » n'est employé que si A\* épuise.
+> ⚠️ Les faux verdicts ont tout de même fait trouver de VRAIS défauts de construction
+> (cf. ci-dessous) — mais le mot « prouvé » était usurpé, et il ne l'est plus.
+> ~~🎯 **À GARDER : `level0200.xsb` est résolu à la main et PAS par le solveur.**~~
+> ❌ **RÉFUTÉ le 2026-08-23 — il l'est, en 54 états, dès que son ordre n'est plus muré.**
+> La formule « l'humain bat le solveur sur la seule question de l'ordre » était juste au
+> mot près, et personne ne l'a lue au pied de la lettre : c'était bien l'ordre, et il
+> suffisait de lancer `ordre level0200.xsb` pour le voir.
+>
+> 🧱 **LE GÉNÉRATEUR, ET LES PIÈGES QU'IL A COÛTÉ** (six tours de réglage avec
+> l'utilisateur, croquis de référence `niveau1embutSeul.txt`) :
+> - **une caisse ne peut pas TOURNER UN COIN dans un couloir d'une case** : la pousser
+>   perpendiculairement demanderait au personnage de se tenir dans le mur. Posée du côté
+>   opposé à la porte, elle est perdue d'avance ;
+> - **les extrémités d'une voie butant sur une marge nulle sont inutilisables**, pour la
+>   même raison ;
+> - **deux voies étendues jusqu'aux angles s'y recouvrent** et y empilent des caisses en
+>   paquet 2×2, immobiles ;
+> - **un blanc dans un `.xsb` est AMBIGU** (sol de zone, porte, ou hors-zone) : détecter
+>   les côtés ouverts sur les blancs de bordure a fait poser 3 caisses sur 4 d'un côté
+>   sans porte. Il faut passer les VRAIES portes ;
+> - **voies ALIGNÉES et non en quinconce** (constat utilisateur) : en quinconce la caisse
+>   du fond retombe décalée et doit encore glisser — un déplacement avant toute poussée
+>   utile ; **rien en face d'une porte**, pour la même raison ;
+> - ⚠️ **une porte peut ne servir QU'AU PERSONNAGE** (zone 0 du 18) et aucune analyse
+>   statique ne le dit — il faut pousser pour le savoir. **D'où la décision finale : 2
+>   cases de marge PARTOUT**, non optimal mais robuste, qui laisse le solveur router.
+> - ⚠️ Un piège plus vicieux que les autres : une boucle de réessai qui recalculait la
+>   même chose rendait un plateau **VIDE**, et le solveur répondait `OK` dessus. Un
+>   résultat faux qui ne se signale pas. Vérifier `caisses == embuts` sur chaque sortie.
+>
+> 🆕 **2026-08-22 (suite 2) — TROIS CORRECTIFS VENUS DE LA RELECTURE EN IMAGES.**
+> - **L'ÉTAGÈRE** (constat utilisateur sur le 24) : `sallesDeButs()` regroupe les buts
+>   4-ADJACENTS, ce qui coupe en deux le niveau 24 — ses deux paquets ((1,1)..(10,2) et
+>   (13,1)/(13,2)) sont pourtant sur la **même rangée, adossés au même mur continu**
+>   (la ligne y=0), séparés par deux cases vides. C'est une seule étagère. D'où une
+>   seconde règle de regroupement, statique : buts alignés + tout libre entre eux + un
+>   mur continu du même côté sur toute la longueur. **Effet mesuré sur les 32 niveaux :
+>   le 24 et lui seul** (2 zones → 1, 22 embuts).
+>   ⚠️ **La fusion est faite dans `zonesEmbut()`, PAS dans `sallesDeButs()`** — le
+>   SOLVEUR utilise cette dernière pour le lookahead de rang 0 confiné à la salle de
+>   tête (§6.2, le correctif multi-salles qui vaut ×7,5 sur le 10). La toucher
+>   décalerait l'ordre de remplissage de tout le corpus.
+> - **LE SEUIL DE CÔTÉ SUBSTANTIEL PASSE DE 4 À 3** : sur le 18, la coupe (4,6) était
+>   rejetée d'UNE case — son côté gauche en fait exactement 4 — et la zone gardait un
+>   **enclos sans aucun embut**, repéré à l'œil sur la planche contact. Balayé : 1, 2, 3
+>   et 4 laissent les 8 zones de référence identiques ; seul le 18 bouge (18 → 9 cases).
+>   ⚠️ Fausse piste écartée en chemin : « l'absorption rampe » (elle avale 4 cases, puis
+>   4 de plus depuis la zone agrandie). C'est vrai — le garde est resté — mais ce n'était
+>   PAS la cause ici : l'enclos du 18 était dans le cœur, pas dans l'absorption. Vérifié
+>   à la trace avant de conclure.
+> - **MARGE PAR CÔTÉ pour les niveaux simples** (idée utilisateur) : au lieu d'un anneau
+>   uniforme élargi sur les 4 côtés dès qu'une rangée de caisses ne suffit pas, chaque
+>   côté reçoit la marge qu'il lui faut, et les caisses vont d'abord sur les côtés
+>   **OUVERTS** (ceux où débouche une porte) pour n'avoir qu'à glisser. Un côté sans
+>   caisse garde 1 — de quoi laisser passer le personnage. **−12 % de surface totale**
+>   sur les 35 niveaux (6 642 → 5 866 cases), jusqu'à −28 % sur le 24. Moins de cases
+>   libres, c'est moins de configurations de caisses, donc un espace d'états plus petit.
+>
+> 🆕 **2026-08-22 (suite) — LES NIVEAUX SIMPLES : LE RANGEMENT SANS LE DÉMÊLAGE.**
+> Demande utilisateur, référence dessinée à la main dans `niveau1embutSeul.txt`. À partir
+> de chaque zone : on l'enrobe d'un COULOIR, on referme d'un MUR, et on pose une caisse
+> par embut non rempli **dans la voie intérieure du couloir** — la voie extérieure reste
+> libre pour le personnage, posé sur la case libre d'indice le plus faible. La zone GARDE
+> SES MURS : une caisse n'entre que par une porte.
+> **C'est le banc d'essai que le goal-ordering n'a jamais eu** : plus de transport (les
+> caisses sont à pied d'œuvre), plus de congestion — il ne reste que « dans quel ordre
+> remplir, et par où entrer ». Le §3/§4 sépare ces deux moitiés depuis toujours ; ces 35
+> niveaux isolent la première.
+> - **POURQUOI LA VOIE INTÉRIEURE NE PEUT PAS PRODUIRE DE DEADLOCK** : collée au mur de
+>   la zone, une caisse ne peut être poussée que le LONG de la voie (la pousser vers la
+>   zone la jette dans le mur ; la pousser vers l'extérieur demanderait au joueur de se
+>   tenir DANS ce mur). Elle glisse donc jusqu'à une porte. ⚠️ **Un couloir d'UNE case
+>   serait mortel** : une caisse posée dans un COUDE a ses deux voisins libres
+>   perpendiculaires, le joueur ne peut jamais s'aligner, elle est morte avant le premier
+>   coup. D'où le couloir de 2, élargi tant que les caisses ne rentrent pas.
+> - **Vérifié** : 0 caisse en coin, 0 caisse contre le mur extérieur, sur les 35 niveaux.
+> - 🎯 **ET LE RÉSULTAT EST DÉJÀ UN FAIT** : `bench <fichier> macro` résout **27/35 en
+>   moins de 10 s, la plupart en une poignée d'états** (7 sur le niveau 1, 11 sur le 2,
+>   29 sur la grande zone du 10) — mais **8 résistent** : 12, 13, 15, 20, 22, 26, 28, 29.
+>   Le 12 et le 13 tournent encore à 60 s avec un `tableG` à 47 % (≈ 1 M d'entrées). Or il
+>   n'y a RIEN d'autre à faire dans ces niveaux que ranger : ni détour, ni congestion, ni
+>   caisse à écarter. **La difficulté qui reste est l'ordre de remplissage à l'état pur**,
+>   et c'est exactement la moitié que le plan dit irréductible depuis le §3.
+> - Sortie : `simple_nivNN_zK.xsb` + `.png`, planche `_planche_simples.png`.
+>
+> - **SORTIE CONSERVÉE** dans `mesures/zones_20260822/` : les 34 `.xsb`, leur `_resume.txt`
+>   (portes comprises), les 34 PNG et la planche contact — à la manière de
+>   `fixtures_20260820/`, un scratchpad étant éphémère (§1). C'est le témoin si la règle
+>   bouge.
+> - **EN IMAGES (2026-08-22, demande utilisateur)** : rendu par `mesures/image` (sprites
+>   de l'UI), plus `_planche_contact.png` — une vignette par zone, légendée embuts /
+>   cases / portes. **Deux corrections au passage dans `image.cpp`**, toutes deux
+>   révélées par les plateaux de zone, qui n'ont PAS de joueur :
+>   · le perso était dessiné **inconditionnellement** à `getPlayerPoint()`, donc dans le
+>     coin (0,0) — sur un mur — quand le plateau n'en a pas. On relit la case au lieu de
+>     croire le point ;
+>   · sa copie privée de `calculeInterieur` est remplacée par `Game::interieur()` (§7,
+>     exemplaire unique) : elle floodait depuis ce même joueur fantôme.
+>   ⚠️ Une TROISIÈME copie du flood subsiste dans `wgame.cpp` (l'UI), non touchée — elle
+>   ne voit que des plateaux avec joueur, mais c'est le doublon suivant à résorber.
+> - **INVARIANCE VÉRIFIÉE** : le même niveau chargé en cours de partie
+>   (`plateau_niveau21.xsb`, milieu de partie, caisses déplacées) rend **la même zone à
+>   la case près** que `level0021.xsb`. Attendu — une zone ne dépend que des murs et des
+>   buts —, mais c'est le genre d'évidence qui se révèle fausse (§7).
+> - ⚠️ **CE N'EST PAS UNE PREUVE, et rien ne doit en dépendre dans `checkDefaite`.**
+>   Une zone est une lecture de la géométrie, pas un théorème : rien n'y dit qu'une
+>   caisse ne doit pas SORTIR de la zone, et le point 8 ci-dessous (le niveau 18)
+>   rappelle qu'une partie gagnante ressort 12 fois une caisse de son but. Tout usage
+>   futur passe par un juge FP (§1) avant câblage.
+> - **Canari** : le changement est purement ADDITIF (deux fonctions neuves,
+>   `zonesEmbut` et `interieur`, qu'aucun chemin existant n'appelle). Vérifié binaire
+>   contre binaire (`git worktree` sur `d9632f4`) sur **0/1/2/3/17 en `astar` ET
+>   `macro`** : identique à l'unité — états, poussées, coups, et l'histogramme des `f`.
+>   Les poussées retombent sur le canari écrit au §1 (4 / 97 / 131 / 134 / 213).
+>   ⚠️ **Piège de canari rencontré** : le binaire témoin porte son `LEVELS_DIR` en dur
+>   vers le worktree ; une fois le worktree retiré il ne rend plus RIEN, et la
+>   comparaison annonce « DIFFÉRENT » sur un binaire pourtant sain. Comparer en passant
+>   les plateaux **par chemin** (`bench level0001.xsb …`), ou garder le worktree tant
+>   qu'on mesure.
+> - **Coût de l'outil** : 16 s pour les 32 niveaux, dont 4,7 s sur le seul niveau 22 (le
+>   plus grand, 167 cases d'intérieur) — c'est la recherche de coupe, quadratique en
+>   cases. Sans objet pour le solveur : `zonesEmbut()` n'est appelée par aucun chemin du
+>   moteur, seulement par l'outil.
+>
 > 🔴 **SESSION DU 2026-08-20 — LA LOI DE L'ORDRE EST RÉFUTÉE, ET LE RÉGIME D'ENGAGEMENT
 > EST INCOMPLET.** Rien n'est commité ; l'arbre de travail porte tout ce qui suit.
 > Session interrompue (orage) — ce bloc est le point de reprise.
@@ -1491,6 +2096,16 @@ vrai partout.
 >   mort à 7/13 avec deux buts qu'aucune poussée ne peut plus atteindre, le verrou (17,2) du 10,
 >   la poche haute du 18. Là, le verdict tombe **sans lancer le solveur**.
 >
+> - 🎯 **LA DÉMONSTRATION LA PLUS FORTE, 2026-08-23** : le murage a été RÉPARÉ sur les
+>   quatre plateaux où il restait (10 et 20 en align, 13 dans les trois régimes, 200 par
+>   défaut). **Un seul tombe — le 200, un banc d'essai** —, le 10 était déjà résolu par
+>   ailleurs, et **le 13 comme le 20 ne progressent pas d'un seul but** (`max 9/16` et
+>   `max 1/18`, les valeurs de juillet). Le corpus n'a plus un seul ordre muré hors des
+>   deux UNSAT prouvés, et ça n'a rendu aucun niveau. **Le côté « bon, et pourtant rien »
+>   de cette asymétrie n'est donc pas une exception du 16 : c'est le cas GÉNÉRAL.**
+>   Corollaire pour la suite : **le goal-ordering est clos comme piste de déblocage**, ce
+>   qui ne retire rien à sa valeur de test d'ÉLIMINATION ci-dessous.
+>
 > **Conséquence sur le plan d'expérience, et c'est la raison d'être de cette note** : chercher le
 > MURAGE est le seul test d'ordre qui rende un verdict DÉFINITIF pour un coût quasi nul — il se
 > décide statiquement. Vouloir au contraire valider un ordre par un run qui aboutit, c'est faire
@@ -1767,6 +2382,59 @@ plateau × leviers disponibles.**
   PERTINENCE : sans filtrer sur ce que le solveur regarderait VRAIMENT, un grand nombre ne prouve
   rien** — même leçon que le §6.6 sur les prédicteurs a posteriori, appliquée ici à une mesure
   d'ampleur plutôt qu'à un gain.
+- ⚠️ **LE SUSPECT QUI RESTE APRÈS ÉLIMINATION N'EST PAS PROUVÉ COUPABLE** (2026-08-23, la
+  leçon la plus chère de la journée). Le 2026-08-22, quatre causes possibles au blocage du
+  200 : élagage, relégation, couplage, génération des macros. Les trois premières ont été
+  éliminées **une par une, sur pièces** — et la conclusion est tombée sur la quatrième
+  **sans jamais la tester**, écrite en gras comme « le vrai résultat ». Or la vraie cause
+  n'était dans aucune des quatre : **l'ordre par défaut du 200 était MURÉ**, et
+  `ordre level0200.xsb` le disait en une seconde, avec un outil qui existait depuis le
+  2026-07-29. Le raisonnement par élimination ne vaut que si la liste est complète, et rien
+  ne garantit qu'elle l'est. **Interroger le suspect restant coûtait ici moins cher que
+  d'éliminer n'importe lequel des trois autres.** Même famille que « nommer les variables
+  AVANT de lire un écart » (2026-08-19), appliquée à l'attribution d'une CAUSE.
+- ⚠️ **`2>/dev/null` SUR UN BENCH JETTE LA LIGNE QUI TRANCHE** (2026-08-23). Comparant deux
+  régimes sur le 200, l'un rendait `AUCUNE` en 18 630 enfilages et l'autre tournait sans
+  conclure : j'en ai conclu que le premier tronquait l'espace, et c'était juste — mais j'ai
+  ajouté qu'il était donc « le verrou », ce qui était faux. **Les deux plafonnaient au même
+  `max 13/15`**, et cette ligne partait sur `stderr`, dans le `/dev/null` de ma propre
+  commande. Le §1 dit déjà « la jauge part sur stderr, et un pipe l'avale » à propos des
+  niveaux qu'on ne résout pas ; il faut le lire aussi pour les **comparaisons de régimes** :
+  deux runs qui diffèrent par leur mode de SORTIE peuvent être identiques par ce qui compte.
+  Rediriger vers un fichier, toujours — `2>jauge.txt`, jamais `2>/dev/null`.
+- ⚠️ **RELANCER UN CORPUS QUAND RIEN N'A CHANGÉ POUR LUI NE MESURE RIEN** (2026-08-23,
+  objection de l'utilisateur, retenue). Après la correction d'ordre, le réflexe « relancer
+  les 15 non-résolus » (§0 : « relancer après chaque promotion ») allait consommer 2 h 30 de
+  machine — alors que le canari d'ordre venait d'établir que **14 des 15 gardaient un ordre
+  identique au caractère près**, pour un code par ailleurs inchangé : trajectoire
+  déterministe, résultat connu d'avance. Et l'argument « ça rafraîchit des chiffres périmés »
+  ne tenait pas : **un non-résolu n'a pas de ligne dans `scores.md`**, il n'y a rien à
+  rafraîchir. La règle du §0 reste juste, mais elle se lit « relancer ce que la promotion
+  TOUCHE » : chercher d'abord OÙ le changement mord — ici en balayant les trois régimes
+  d'ordre, ce qui a fait apparaître le 10 et le 20, invisibles dans le régime par défaut.
+  **Trois runs au lieu de quinze, et ce sont les trois qui disaient quelque chose.**
+- ⚠️ **REJOUER UN JOURNAL SOUS UN AUTRE ORDRE QUE CELUI DE LA PARTIE EST FAUX EN SILENCE**
+  (2026-08-23, en étendant `mesures/rejeu` aux macros). Une macro vise `butActif()`, donc
+  tout verdict la concernant dépend de `ordreButs`. La partie du 200 avait été jouée sous
+  l'ordre align ; `rejeu` recalculait l'ordre par défaut, et **11 verdicts sur 15 étaient
+  faux** — sans le moindre signe, puisque le rejeu des COUPS, lui, marchait parfaitement
+  (les coups sont des directions, ils ne dépendent d'aucun ordre). Corrigé en lisant la
+  SOURCE dans l'en-tête que l'UI écrit exprès (`calcule` / `⚠ PAR ALIGNEMENT` / `⚠ INJECTE
+  depuis …`), plus un garde qui refuse de juger quand le but du journal et `butActif()`
+  divergent. **L'annotation de source ajoutée le 2026-08-19 « pour la relecture humaine »
+  servait en fait à une machine** — argument à garder quand on hésite à faire dire à une
+  trace d'où vient ce qu'elle contient.
+- ⚠️ **UNE MÉMOÏSATION D'ÉCHECS DOIT DISTINGUER L'ÉPUISEMENT DE L'ABANDON** (2026-08-23, en
+  mémoïsant `ordreParPrecedence`). Marquer « stérile » un sous-ensemble dont on a réellement
+  essayé tous les candidats est une preuve ; le marquer parce qu'on a **cessé de l'explorer
+  faute de budget** ferait rater un ordre sain, et le murage reviendrait **sans que rien ne
+  le signale** — ni le canari (qui ne verrait qu'un niveau non résolu de plus) ni l'outil
+  `ordre` (qui dirait « muré » sans dire pourquoi). C'est la distinction UNSAT / budget que
+  le §6.0 exigeait déjà de `ordredp`, et elle vaut partout où l'on met un résultat en cache :
+  **on ne cache un verdict que s'il est prouvé, jamais s'il est seulement constaté.**
+  Second piège de la même famille, évité par construction : la clé doit porter TOUT ce dont
+  la suite dépend — ici `salleCourante` en plus du sous-ensemble, sans quoi on couperait des
+  branches valides.
 
 ---
 
@@ -1797,6 +2465,18 @@ plateau × leviers disponibles.**
   n'est pas un ordre strict faible et `std::sort` partirait en comportement indéfini.
   ⚠️ `setOrdreLookahead` **refuse de recalculer si un ordre est injecté** (fichier ou `ORDRE_HUMAIN`)
   et le dit sur stderr — sans ce garde, le régime écrasait l'injection en silence (§7).
+- **`jugemacro.h`** (neuf, 2026-08-23) — `jugeMacro()`, le verdict « le solveur produirait-il
+  CETTE macro, à CET état ? », en **exemplaire unique** partagé par l'UI (`mainwindow.cpp`,
+  ligne `[macro-rang]`) et `mesures/rejeu`. À la racine et non dans `mesures/`, pour que la
+  dépendance aille de l'outil vers l'app et jamais l'inverse. Il n'est appelé par **aucun
+  chemin du moteur** : le canari ne peut pas bouger.
+- ⚠️ **`Game::ordreParPrecedence` porte une MÉMOÏSATION PAR SOUS-ENSEMBLES** (2026-08-23) —
+  `butMureLocalement` ne dépend que de l'ENSEMBLE des buts posés, jamais de leur ordre, donc
+  un sous-ensemble prouvé stérile ne se ré-explore pas. **La clé porte aussi `salleCourante`**
+  (les passes 1/2 classent les candidats d'après elle) et **seul l'épuisement RÉEL s'inscrit,
+  jamais un abandon par budget** — l'inverse ferait rater un ordre sain en silence. C'est ce
+  qui a réparé le 13, le 20 (en align), le 10 (en align, l'ordre jadis injecté à la main) et
+  le 200.
 - **`cle.h`** — `Arene` (blocs), `Cle` (offset 4 o), `TableG` (adressage ouvert).
 - **`solveur.*`** — socle `QThread`, fabrique (`types()`/`creer()`), `reconstruire()`.
 - **`mesures/`** — harnais externes ; `mort.cpp` (neuf) et `mou.cpp` (corrigé) pour le taux de

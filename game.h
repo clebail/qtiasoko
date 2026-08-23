@@ -813,6 +813,49 @@ bool butMureLocalement(int idxBut, const QVector<bool>& bloque,
 private:
 
 public:
+// ── LES ZONES D'EMBUT (2026-08-22, idée utilisateur) ────────────────────────
+// Une ZONE D'EMBUT est l'ENCLOS qui enferme un bloc de buts adjacents : le sol
+// qu'il contient, les murs qui le ferment, et les PORTES par lesquelles on en
+// sort. C'est la « salle de buts » que journal-macro.md (2026-07-21) nommait
+// comme candidat naturel — « composantes biconnexes / points d'articulation » —
+// sans jamais la coder, et que le journal hybride appelle « la salle d'embut du
+// 16 » à propos du stockage (§6.0, chantier STOCK).
+//
+// TROIS ÉTAGES, dont le premier existait déjà :
+//   1. les SALLES (`sallesDeButs`) : composantes connexes des buts en 4-connexité.
+//      Une zone par salle. ⚠️ C'est bien l'adjacence des BUTS qui décide du
+//      découpage, pas la géométrie : vérifié contre le découpage à la main de
+//      l'utilisateur sur 1/10/16/20/25, il tombe juste sur les cinq (niveau 20 :
+//      les dents de mur (16,5)/(16,7)/(16,9)/(16,11) ne coupent PAS la colonne
+//      de buts x=17, donc une seule salle, donc une seule zone).
+//   2. les GOULOTS : une case libre, qui n'est PAS un but, et qui a au plus deux
+//      voisins libres — un couloir, un coude, un cul-de-sac. Un but n'est jamais
+//      un goulot : il EST la zone, et la colonne de buts d'une case de large du
+//      niveau 10 (x=17, y=10..14) doit rester dedans.
+//   3. l'ABSORPTION : l'enclos part du fragment (l'intérieur privé de ses
+//      goulots) qui porte les buts, puis avale tout goulot derrière lequel il n'y
+//      a qu'un CUL-DE-SAC (≤ seuilCulDeSac cases). Un goulot derrière lequel ça
+//      s'ouvre est une PORTE, et la croissance s'arrête là.
+//
+// ⚠️ CE N'EST PAS UNE PREUVE, c'est une lecture de la géométrie. Aucun élagage ne
+// doit en dépendre sans passer par un juge FP (§1) : rien ici ne dit qu'une
+// caisse ne doit pas sortir d'une zone, et le §6.0 (point 8, le niveau 18)
+// rappelle qu'une partie gagnante RESSORT les caisses de leurs buts.
+struct ZoneEmbut {
+    QVector<int> cases;   // l'enclos : cases libres, buts compris (index plat)
+    QVector<int> portes;  // cases libres par lesquelles on SORT de l'enclos
+    QVector<int> buts;    // indices de buts (indexation getCaseBut) qu'il contient
+};
+QVector<ZoneEmbut> zonesEmbut(int seuilCulDeSac = 4) const;
+
+// L'INTÉRIEUR DU PLATEAU : flood-fill 4-connexe depuis le joueur à travers tout
+// ce qui n'est pas un mur (les caisses ne bloquent pas — elles bougent ; le
+// contour, lui, ne bouge pas). Indispensable dès qu'on raisonne sur la
+// géométrie : dans un `.xsb` le DEHORS est fait d'espaces, donc « non-mur » ne
+// veut pas dire « case du plateau ». Même contrat que `WGame::calculeInterieur`
+// et que la copie de `mesures/image.cpp` — celui-ci est l'exemplaire du moteur.
+QVector<bool> interieur() const;
+
 // Le fichier `ordre_niveau_XXXX.txt` du répertoire courant s'il existe, sinon "".
 // Injecte un ordre de remplissage à la main DANS L'APP (une variable d'environnement
 // n'y arrive pas, §7), pour le jouer en mode hybride et voir où il coince.

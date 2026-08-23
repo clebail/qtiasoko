@@ -158,6 +158,49 @@ private:
     // dépouillement tranche.
     void mesureRangCoup(const Game& avant, int idxCaisse, Game::EDirection dir);
 
+    // MODE HYBRIDE — LE RANG DE LA MACRO HUMAINE (2026-08-23). Miroir de
+    // mesureRangCoup, du côté des MACROS. Raison d'être : sur la partie gagnée du
+    // level0200, 133 coups sur 140 sont des macros, donc 95 % de la partie
+    // échappait au juge — qui ne confrontait le solveur qu'aux poussées choisies
+    // à la main. Or le trou du plan (§6.0, 2026-08-22) est justement dans la
+    // GÉNÉRATION DES MACROS : l'espace du régime macro ne contient pas de
+    // solution alors qu'une solution existe.
+    //
+    // CE QUE L'ÉCRAN NE DIT PAS, ET QUI EST TOUT LE SUJET. majMacrosJouables
+    // cercle une caisse dès que sa descente aboutit (macroPeutDemarrer +
+    // macroVersButBacktrack + !isPerdu). Le solveur en fait DAVANTAGE, et sur
+    // trois étages que l'overlay ignore :
+    //   1. le RÉGIME DU COUPLAGE (solveurastar.cpp, 'voulue') — la passe 0 ne
+    //      tente que caisseAssignee(but) ; si SA descente aboutit, la boucle
+    //      casse et les autres caisses ne sont jamais tentées. Une macro cerclée
+    //      en vert peut donc n'exister dans AUCUN état de l'arbre du solveur ;
+    //   2. le corral unitaire, puis le corral-N, sur la case de repos ;
+    //   3. loiTropTot et la dédup meilleurG (hors de portée ici : la première est
+    //      propre au régime 'loi', la seconde demande l'historique d'un run).
+    //
+    // MIROIR EXACT des deux passes de tenteMacro et de l'enfilage : mêmes
+    // candidats, mêmes élagages dans le même ordre, même clé de tri que le
+    // comparateur — f croissant, puis g DÉCROISSANT, puis guidage croissant.
+    // ⚠️ Le g n'est PAS commun aux frères ici, contrairement aux poussées simples :
+    // une macro enfile à g + (nombre de poussées). C'est donc bien Δf, et pas Δh,
+    // qui se transporte à la file.
+    // ⚠️ 'macrosOk' compte, dans le solveur, les descentes qui ABOUTISSENT et non
+    // les enfants réellement enfilés (l'incrément suit enfiler(), qui a pu élaguer
+    // en silence). L'engagement est reproduit tel quel, y compris cette nuance :
+    // une passe 0 dont l'unique enfant est élagué par le corral coupe quand même
+    // la passe de repli.
+    //
+    // Trois verdicts, dans l'ordre où ils tombent :
+    //   - ⚠ HORS PASSE COUPLAGE : le solveur s'engage sur la caisse du couplage,
+    //     la macro jouée n'est jamais générée. Le désaccord de génération, et le
+    //     seul qui dise quelque chose de neuf sur l'angle mort du §6.0 ;
+    //   - ⚠ ECARTE par le solveur : la macro est générée puis ÉLAGUÉE. Sur une
+    //     partie gagnée, faux positif PROUVÉ — le raisonnement de mesures/fp,
+    //     étendu aux macros et aux niveaux non résolus ;
+    //   - rang R/N : elle est générée et retenue, et voici sa place.
+    // Un quatrième, ⚠ INTROUVABLE, dit que ce miroir a divergé du solveur.
+    void mesureRangMacro(const Game& avant, int idxCaisse);
+
     // JOURNAL DE PARTIE (2026-08-01). Le mode hybride est fait pour rejouer des
     // niveaux à la main et relire la partie APRÈS coup : une console se perd, un
     // fichier par niveau se compare. Toutes les traces de jeu ([mouv], [undo],

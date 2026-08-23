@@ -563,3 +563,36 @@ viennent de l'**ordre** (`precedenceAlignement`), pas de l'élagage.
 mais ⚠️ **NON ÉLIGIBLE comme score** au titre de la règle ci-dessus : ordre injecté par
 `ordre_niveau_0010.txt`, donc non reproductible avec le binaire seul. Et il reste **2,3× au-dessus
 du défaut** (571 053 contre 249 913), à poussées égales et par le même plongeon gagnant.
+
+---
+
+## 2026-08-23 — `ordreParPrecedence` MÉMOÏSÉE (murage d'ordre corrigé)
+
+⚠️ **Mesures faites sur l'ARBRE DE TRAVAIL, non commité** (base `bfbf440`). La règle du §1
+veut un commit en clair à côté de chaque chiffre : ces lignes sont donc **provisoires** et
+à remesurer après le commit, hash à jour. Elles sont consignées parce qu'un score obtenu
+puis perdu ne se retrouve pas.
+
+| Niveau | Régime | États | Poussées | Coups |
+|---|---|---|---|---|
+| **200** | `coupl-plongeon`, **ordre CALCULÉ** | **54** | **76** | **335** |
+
+**Le 200 est un BANC D'ESSAI** (la zone du 15 isolée, 13×12, 15 embuts), au même titre que
+190/191 : il ne compte pas dans les 33. Il était tenu pour « hors de portée du solveur »
+depuis le 2026-08-22 ; son ordre par défaut était **MURÉ sur ses deux derniers buts**, et
+il tombe en 54 états dès qu'il ne l'est plus.
+
+**Et la note du 10 ci-dessus est LEVÉE.** Elle disait : « NON ÉLIGIBLE comme score — ordre
+injecté par `ordre_niveau_0010.txt`, donc non reproductible avec le binaire seul ». Depuis
+la mémoïsation, **cet ordre est CALCULÉ** : `bench 10 coupl-plongeon` sous l'ordre align
+rend `OK etats=571053 poussees=544 coups=1563`, soit le chiffre du 2026-08-19 **à l'unité
+près**, sans aucun fichier d'injection. Deux voies indépendantes — un ordre écrit à la main
+par l'utilisateur et une recherche de précédence — convergent sur le même ordre et le même
+compte d'états. ⚠️ Ça reste **2,3× au-dessus du défaut** (571 053 contre 249 913) : c'est
+une injection manuelle automatisée, pas un gain de performance.
+
+**Canari de cette modif : 26 mesures binaire contre binaire** (0-9, 17, 190, 191 × `macro`
+et `coupl-plongeon`), **26 identiques** — dont le 8 à `4 376 070` et le 17 à `18 636`, les
+valeurs de ce fichier. Canari d'ordre sur les 35 plateaux : **2 ordres changent** (13 et
+200, MURÉ → sain), les 34 autres identiques au caractère près.
+
